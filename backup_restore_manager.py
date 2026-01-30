@@ -42,8 +42,8 @@ class BackupRestoreManager:
         self.version_header = self.project_dir / 'src' / 'version_auto.h'
         
         # GitHub configuration
-        self.github_repo = 'js9467/autotouchscreen'
-        self.github_branch = 'main'
+        self.github_repo = 'js9467/cancontroller'
+        self.github_branch = 'master'
         self.github_folder = 'versions'
         
     def get_current_version(self):
@@ -65,8 +65,13 @@ class BackupRestoreManager:
         
         return "1.3.78"  # Default fallback
     
-    def increment_version(self):
-        """Increment the build number and update all version files"""
+    def increment_version(self, increment_type='build'):
+        """Increment version and update all version files
+        
+        Args:
+            increment_type: 'major' for full backup (1.x → 2.0.0), 
+                          'build' for version update (1.3.x → 1.3.x+1)
+        """
         # Read current state
         version_state = {"major": 1, "minor": 3, "build": 78}
         if self.version_state_file.exists():
@@ -78,8 +83,16 @@ class BackupRestoreManager:
                 print(f"[Warning] Could not read version state file: {e}")
                 pass
         
-        # Increment build number
-        version_state['build'] += 1
+        # Increment based on type
+        if increment_type == 'major':
+            version_state['major'] += 1
+            version_state['minor'] = 0
+            version_state['build'] = 0
+            print(f"[Version] MAJOR version increment (full backup)")
+        else:  # build
+            version_state['build'] += 1
+            print(f"[Version] Build increment (version update)")
+        
         new_version = f"{version_state['major']}.{version_state['minor']}.{version_state['build']}"
         
         # Save updated state
@@ -95,33 +108,133 @@ class BackupRestoreManager:
         )
         self.version_header.write_text(header_content, encoding='utf-8')
         
-        print(f"[Version] Incremented to {new_version}")
+        print(f"[Version] New version: {new_version}")
         return new_version
     
-    def backup_device(self, version=None):
-        """Create a complete backup of the ESP32-S3 device"""
-        if version is None:
-            version = self.increment_version()
+    def version_update(self):
+        """Create a version snapshot from current project state (no device communication)"""
+        version = self.increment_version(increment_type='build')
         
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        backup_name = f"bronco_v{version}_{timestamp}"
-        backup_folder = self.backups_dir / backup_name
-        backup_folder.mkdir(exist_ok=True)
+        version_name = f"bronco_v{version}_{timestamp}"
+        version_folder = self.backups_dir / version_name
+        version_folder.mkdir(exist_ok=True)
         
         print(f"\n{'='*60}")
-        print(f"[Backup] Starting full device backup")
-        print(f"[Backup] Version: {version}")
-        print(f"[Backup] Location: {backup_folder}")
+        print(f"[Version Update] Creating project snapshot")
+        print(f"[Version] {version}")
+        print(f"[Location] {version_folder}")
         print(f"{'='*60}\n")
         
         # Metadata
         metadata = {
             'version': version,
             'timestamp': timestamp,
+            'type': 'version_update',
+            'device': 'ESP32-S3-Touch-LCD-7',
+            'chip': 'esp32s3',
+            'created_date': datetime.now().isoformat(),
+            'description': 'Project state snapshot - incremental version update'
+        }
+        
+        # Build the firmware
+        print("[1/3] Building firmware...")
+        try:
+            process = subprocess.Popen(
+                ['pio', 'run', '-e', 'waveshare_7in'],
+                cwd=self.project_dir,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1
+            )
+            
+            # Stream output line by line
+            for line in process.stdout:
+                print(line.rstrip())
+            
+            process.wait(timeout=300)
+            
+            if process.returncode == 0:
+                print("    ✓ Build successful")
+                
+                # Copy firmware binary
+                firmware_src = self.project_dir / '.pio' / 'build' / 'waveshare_7in' / 'firmware.bin'
+                if firmware_src.exists():
+                    firmware_dst = version_folder / 'firmware.bin'
+                    import shutil
+                    shutil.copy2(firmware_src, firmware_dst)
+                    print(f"    ✓ Firmware saved ({firmware_dst.stat().st_size} bytes)")
+                    metadata['firmware'] = 'firmware.bin'
+                    metadata['firmware_size'] = firmware_dst.stat().st_size
+                else:
+                    print("    ⚠ Firmware binary not found")
+            else:
+                print(f"    ✗ Build failed with exit code {process.returncode}")
+                return None, None
+        except Exception as e:
+            print(f"    ✗ Build error: {e}")
+            return None, None
+        
+        # Save metadata
+        print("\n[2/3] Saving metadata...")
+        metadata_file = version_folder / 'version_metadata.json'
+        with open(metadata_file, 'w', encoding='utf-8') as f:
+            json.dump(metadata, f, indent=2)
+        print("    ✓ Metadata saved")
+        
+        # Commit to git
+        print("\n[3/3] Committing to git...")
+        try:
+            # Add ALL changes (complete project snapshot)
+            subprocess.run(['git', 'add', '-A'], 
+                         cwd=self.project_dir, check=True)
+            
+            # Commit
+            commit_msg = f"Version {version} - Incremental update"
+            subprocess.run(['git', 'commit', '-m', commit_msg], 
+                         cwd=self.project_dir, check=True)
+            print(f"    ✓ Committed: {commit_msg}")
+            print(f"    ✓ Full project state captured")
+        except subprocess.CalledProcessError as e:
+            print(f"    ⚠ Git commit skipped (possibly no changes)")
+        except Exception as e:
+            print(f"    ⚠ Git error: {e}")
+        
+        print(f"\n{'='*60}")
+        print(f"[Version Update] ✓ Complete!")
+        print(f"{'='*60}\n")
+        
+        # Always upload to GitHub
+        self.upload_to_github(version_folder, version, upload_type='version')
+        
+        return version_folder, version
+    
+    def full_backup(self):
+        """Create a FULL backup from device hardware (increments MAJOR version)"""
+        version = self.increment_version(increment_type='major')
+        
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        backup_name = f"bronco_v{version}_{timestamp}_FULL"
+        backup_folder = self.backups_dir / backup_name
+        backup_folder.mkdir(exist_ok=True)
+        
+        print(f"\n{'='*60}")
+        print(f"[FULL BACKUP] Complete device backup with version increment")
+        print(f"[Version] {version} (MAJOR version bump)")
+        print(f"[Location] {backup_folder}")
+        print(f"{'='*60}\n")
+        
+        # Metadata
+        metadata = {
+            'version': version,
+            'timestamp': timestamp,
+            'type': 'full_backup',
             'device': 'ESP32-S3-Touch-LCD-7',
             'chip': 'esp32s3',
             'flash_size': '16MB',
             'backup_date': datetime.now().isoformat(),
+            'description': 'Complete hardware + software backup from device',
             'regions': {}
         }
         
@@ -201,9 +314,12 @@ class BackupRestoreManager:
         self.create_restore_script(backup_folder, metadata)
         
         print(f"\n{'='*60}")
-        print(f"[Backup] ✓ Complete! Backup saved to:")
-        print(f"         {backup_folder}")
+        print(f"[FULL BACKUP] ✓ Complete! Backup saved to:")
+        print(f"              {backup_folder}")
         print(f"{'='*60}\n")
+        
+        # Always upload to GitHub
+        self.upload_to_github(backup_folder, version, upload_type='full')
         
         return backup_folder, version
     
@@ -345,9 +461,15 @@ pause
         
         return True
     
-    def upload_to_github(self, backup_folder, version):
-        """Upload backup to GitHub repository"""
-        print(f"\n[GitHub] Uploading backup to repository...")
+    def upload_to_github(self, backup_folder, version, upload_type='version'):
+        """Upload backup/version to GitHub repository
+        
+        Args:
+            upload_type: 'full' for full backup, 'version' for version update
+        """
+        type_label = "FULL BACKUP" if upload_type == 'full' else "VERSION UPDATE"
+        print(f"\n[GitHub] Uploading {type_label} to repository...")
+        print(f"[GitHub] Target: {self.github_repo}/tree/{self.github_branch}/{self.github_folder}")
         
         # Try to get token from environment first
         github_token = os.environ.get('GITHUB_TOKEN')
@@ -381,7 +503,8 @@ pause
         
         # Create ZIP archive
         import zipfile
-        zip_name = f"bronco_v{version}.zip"
+        suffix = "_FULL" if upload_type == 'full' else ""
+        zip_name = f"bronco_v{version}{suffix}.zip"
         zip_path = backup_path.parent / zip_name
         
         print(f"[GitHub] Creating archive: {zip_name}")
@@ -390,7 +513,8 @@ pause
                 if file.is_file():
                     arcname = file.relative_to(backup_path.parent)
                     zipf.write(file, arcname)
-                    print(f"    + {arcname}")
+        
+        print(f"    ✓ Archive created ({zip_path.stat().st_size / 1024 / 1024:.1f} MB)")
         
         # Upload to GitHub
         api_url = f"https://api.github.com/repos/{self.github_repo}/contents/{self.github_folder}/{zip_name}"
@@ -403,8 +527,9 @@ pause
             'Accept': 'application/vnd.github.v3+json'
         }
         
+        message = f'Add {type_label.lower()} version {version}'
         data = {
-            'message': f'Add backup version {version}',
+            'message': message,
             'content': content,
             'branch': self.github_branch
         }
@@ -425,6 +550,62 @@ pause
         except Exception as e:
             print(f"[GitHub] ✗ Error: {e}")
             return False
+        finally:
+            # Clean up zip file
+            if zip_path.exists():
+                zip_path.unlink()
+                print(f"[GitHub] Cleaned up temporary archive")
+    
+    def list_github_versions(self):
+        """List available versions in GitHub repository"""
+        print(f"\n[GitHub] Checking for available versions...")
+        print(f"[GitHub] Repository: {self.github_repo}/{self.github_folder}")
+        
+        api_url = f"https://api.github.com/repos/{self.github_repo}/contents/{self.github_folder}"
+        
+        try:
+            response = requests.get(api_url, timeout=10)
+            if response.status_code == 200:
+                files = response.json()
+                versions = []
+                
+                for file in files:
+                    if file['name'].endswith('.zip') and file['name'].startswith('bronco_v'):
+                        # Extract version from filename
+                        match = re.search(r'bronco_v([\d.]+)', file['name'])
+                        if match:
+                            version_str = match.group(1)
+                            is_full = '_FULL' in file['name']
+                            versions.append({
+                                'version': version_str,
+                                'filename': file['name'],
+                                'size': file['size'],
+                                'download_url': file['download_url'],
+                                'type': 'Full Backup' if is_full else 'Version Update'
+                            })
+                
+                # Sort by version (newest first)
+                versions.sort(key=lambda x: list(map(int, x['version'].split('.'))), reverse=True)
+                
+                if versions:
+                    print(f"\n{'='*70}")
+                    print(f"Available Versions ({len(versions)} found):")
+                    print(f"{'='*70}")
+                    for idx, v in enumerate(versions, 1):
+                        size_mb = v['size'] / (1024 * 1024)
+                        print(f"{idx}. v{v['version']} - {v['type']} ({size_mb:.1f} MB)")
+                        print(f"   {v['filename']}")
+                    print(f"{'='*70}\n")
+                else:
+                    print("[GitHub] No versions found in repository")
+                
+                return versions
+            else:
+                print(f"[GitHub] ✗ Failed to fetch versions: {response.status_code}")
+                return []
+        except Exception as e:
+            print(f"[GitHub] ✗ Error: {e}")
+            return []
     
     def list_backups(self):
         """List all available backups"""
@@ -466,31 +647,31 @@ pause
 
 def main():
     parser = argparse.ArgumentParser(
-        description='ESP32-S3 Bronco Controls Backup & Restore Manager',
+        description='ESP32-S3 Bronco Controls Version & Backup Manager',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog='''
 Examples:
-  # Create backup with auto-incremented version
-  python backup_restore_manager.py backup
+  # Create version update from current project (auto-upload to GitHub)
+  python backup_restore_manager.py version
   
-  # Create backup and upload to GitHub
-  python backup_restore_manager.py backup --upload
+  # Create FULL backup from device (increments MAJOR version, auto-upload)
+  python backup_restore_manager.py full-backup
   
-  # List all backups
+  # List local backups
   python backup_restore_manager.py list
+  
+  # List available versions on GitHub
+  python backup_restore_manager.py list-github
   
   # Restore from latest backup
   python backup_restore_manager.py restore
   
   # Restore from specific backup
-  python backup_restore_manager.py restore --backup "backups/bronco_v1.3.79_20260130_123456"
-  
-  # Full test cycle (backup, erase, restore)
-  python backup_restore_manager.py test
+  python backup_restore_manager.py restore --backup "backups/bronco_v2.0.0_20260130_123456_FULL"
         '''
     )
     
-    parser.add_argument('action', choices=['backup', 'restore', 'list', 'test'],
+    parser.add_argument('action', choices=['version', 'full-backup', 'restore', 'list', 'list-github'],
                        help='Action to perform')
     parser.add_argument('--port', default='COM5',
                        help='Serial port (default: COM5)')
@@ -498,17 +679,16 @@ Examples:
                        help='Baud rate (default: 460800)')
     parser.add_argument('--backup', type=str,
                        help='Backup folder to restore from')
-    parser.add_argument('--upload', action='store_true',
-                       help='Upload backup to GitHub')
     
     args = parser.parse_args()
     
     manager = BackupRestoreManager(port=args.port, baud=args.baud)
     
-    if args.action == 'backup':
-        backup_folder, version = manager.backup_device()
-        if backup_folder and args.upload:
-            manager.upload_to_github(backup_folder, version)
+    if args.action == 'version':
+        manager.version_update()
+    
+    elif args.action == 'full-backup':
+        manager.full_backup()
     
     elif args.action == 'restore':
         if args.backup:
@@ -526,22 +706,8 @@ Examples:
     elif args.action == 'list':
         manager.list_backups()
     
-    elif args.action == 'test':
-        print(f"\n{'='*60}")
-        print(f"FULL TEST CYCLE: Backup → Erase → Restore")
-        print(f"{'='*60}\n")
-        input("Press Enter to start backup...")
-        
-        # Step 1: Backup
-        backup_folder, version = manager.backup_device()
-        if not backup_folder:
-            print("[Test] ✗ Backup failed, aborting test")
-            return
-        
-        input("\nBackup complete. Press Enter to ERASE device...")
-        
-        # Step 2: Erase
-        print("\n[Test] Erasing device...")
+    elif args.action == 'list-github':
+        manager.list_github_versions()
         cmd = ['python', '-m', 'esptool', '--chip', 'esp32s3', '--port', args.port, 'erase_flash']
         result = subprocess.run(cmd)
         if result.returncode != 0:

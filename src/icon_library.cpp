@@ -56,7 +56,7 @@ lv_obj_t* IconLibrary::create_icon(lv_obj_t* parent, IconType icon_type, lv_colo
     
     // Apply styling with larger font for icons
     lv_obj_set_style_text_color(icon_label, icon_color, 0);
-    lv_obj_set_style_text_font(icon_label, &lv_font_montserrat_16, 0);
+    lv_obj_set_style_text_font(icon_label, &lv_font_montserrat_14, 0);
     lv_obj_set_style_text_opa(icon_label, LV_OPA_80, 0);
     
     return icon_label;

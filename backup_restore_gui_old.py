@@ -11,6 +11,7 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext, filedialog
 from datetime import datetime
+import re
 
 # Add parent directory to path to import backup manager
 sys.path.insert(0, str(Path(__file__).parent))
@@ -449,59 +450,61 @@ class BackupRestoreGUI:
                 self.disable_buttons()
                 self.manager.port = self.port_var.get()
                 backup_folder, version = self.manager.full_backup()
-                
-                if backup_folder:
-                    self.refresh_backups()
-                    self.current_version = version
-                    messagebox.showinfo("Success", 
-                                       f"FULL BACKUP completed!\nVersion: v{version}\n\n"
-                                       f"Location:\n{backup_folder}\n\n"
-                                       f"Uploaded to GitHub automatically.")
-                else:
-                    messagebox.showerror("Error", "Full backup failed. Check console for details.")
-            except Exception as e:
-                messagebox.showerror("Error", f"Full backup failed:\n{str(e)}")
-            finally:
-                self.enable_buttons()
-        
-        threading.Thread(target=backup_thread, daemon=True).start()
-    
-    def start_restore(self):
-        """Start restore in background thread"""
-        selection = self.backup_tree.selection()
-        if not selection:
-            messagebox.showwarning("No Selection", "Please select a backup to restore")
-            return
-        
-        backup_path = self.backup_tree.item(selection[0])['tags'][0]
-        
-        # Confirm
-        result = messagebox.askyesno("Confirm Restore", 
-                                     f"⚠️ WARNING ⚠️\n\n"
-                                     f"This will COMPLETELY ERASE your device and restore:\n"
-                                     f"{Path(backup_path).name}\n\n"
-                                     f"ALL CURRENT DATA WILL BE LOST!\n\n"
-                                     f"Continue?",
+        """Start full test cycle"""
+        result = messagebox.askyesno("Confirm Test", 
+                                     "⚠️ FULL TEST CYCLE ⚠️\n\n"
+                                     "This will:\n"
+                                     "1. Backup current device\n"
+                                     "2. Erase all data\n"
+                                     "3. Restore from backup\n\n"
+                                     "This takes 5-10 minutes.\n\n"
+                                     "Continue?",
                                      icon='warning')
         if not result:
             return
         
-        def restore_thread():
+        def test_thread():
             try:
                 self.disable_buttons()
                 self.manager.port = self.port_var.get()
-                success = self.manager.restore_device(backup_path)
+                
+                # Backup
+                print("\n[TEST 1/3] Creating backup...")
+                backup_folder, version = self.manager.backup_device()
+                if not backup_folder:
+                    raise Exception("Backup failed")
+                
+                # Erase
+                print("\n[TEST 2/3] Erasing device...")
+                import subprocess
+                cmd = ['python', '-m', 'esptool', '--chip', 'esp32s3', 
+                       '--port', self.manager.port, 'erase_flash']
+                result = subprocess.run(cmd)
+                if result.returncode != 0:
+                    raise Exception("Erase failed")
+                
+                # Restore
+                print("\n[TEST 3/3] Restoring device...")
+                success = self.manager.restore_device(backup_folder)
                 
                 if success:
-                    messagebox.showinfo("Success", "Restore completed!\n\nDevice has been rebooted.")
+                    self.refresh_backups()
+                    messagebox.showinfo("Test Complete", 
+                                       "✓ Full test cycle completed successfully!\n\n"
+                                       "Device has been:\n"
+                                       "• Backed up\n"
+                                       "• Erased\n"
+                                       "• Restored\n\n"
+                                       "Everything is working correctly!")
                 else:
-                    messagebox.showerror("Error", "Restore failed. Check console for details.")
+                    raise Exception("Restore failed")
+                    
             except Exception as e:
-                messagebox.showerror("Error", f"Restore failed:\n{str(e)}")
+                messagebox.showerror("Test Failed", f"Test cycle failed:\n{str(e)}")
             finally:
                 self.enable_buttons()
         
-        threading.Thread(target=restore_thread, daemon=True).start()
+        threading.Thread(target=test_thread, daemon=True).start()
     
     def disable_buttons(self):
         """Disable all action buttons during operations"""

@@ -2104,22 +2104,23 @@ const lv_font_t* UIBuilder::fontFromName(const std::string& name) const {
     if (name == "montserrat_28") return &lv_font_montserrat_28;
     if (name == "montserrat_30") return &lv_font_montserrat_30;
     if (name == "montserrat_32") return &lv_font_montserrat_32;
-    if (name == "montserrat_34") return &lv_font_montserrat_34;
-    if (name == "montserrat_36") return &lv_font_montserrat_36;
-    if (name == "montserrat_38") return &lv_font_montserrat_38;
-    if (name == "montserrat_40") return &lv_font_montserrat_40;
-    if (name == "montserrat_42") return &lv_font_montserrat_42;
-    if (name == "montserrat_44") return &lv_font_montserrat_44;
-    if (name == "montserrat_46") return &lv_font_montserrat_46;
-    if (name == "montserrat_48") return &lv_font_montserrat_48;
+    // Larger fonts not enabled to save memory
+    if (name == "montserrat_34") return &lv_font_montserrat_32;  // Fallback
+    if (name == "montserrat_36") return &lv_font_montserrat_32;  // Fallback
+    if (name == "montserrat_38") return &lv_font_montserrat_32;  // Fallback
+    if (name == "montserrat_40") return &lv_font_montserrat_32;  // Fallback
+    if (name == "montserrat_42") return &lv_font_montserrat_32;  // Fallback
+    if (name == "montserrat_44") return &lv_font_montserrat_32;  // Fallback
+    if (name == "montserrat_46") return &lv_font_montserrat_32;  // Fallback
+    if (name == "montserrat_48") return &lv_font_montserrat_32;  // Fallback
     
-    // Special fonts
-    if (name == "dejavu_16") return &lv_font_dejavu_16_persian_hebrew;
-    if (name == "simsun_16") return &lv_font_simsun_16_cjk;
+    // Special fonts not enabled - use default
+    if (name == "dejavu_16") return &lv_font_montserrat_16;  // Fallback
+    if (name == "simsun_16") return &lv_font_montserrat_16;  // Fallback
     
-    // UNSCII monospace fonts
-    if (name == "unscii_8") return &lv_font_unscii_8;
-    if (name == "unscii_16") return &lv_font_unscii_16;
+    // UNSCII monospace fonts not enabled - use default
+    if (name == "unscii_8") return &lv_font_montserrat_12;   // Fallback
+    if (name == "unscii_16") return &lv_font_montserrat_16;  // Fallback
     
     // Default fallback
     return &lv_font_montserrat_16;
@@ -2161,10 +2162,10 @@ const lv_font_t* UIBuilder::navLabelFontForText(const std::string& text) const {
     }
 
     if (has_cjk) {
-        return &lv_font_simsun_16_cjk;
+        return &lv_font_montserrat_16;  // Fallback - CJK font not enabled
     }
     if (has_rtl || has_extended) {
-        return &lv_font_dejavu_16_persian_hebrew;
+        return &lv_font_montserrat_16;  // Fallback - RTL font not enabled
     }
     return UITheme::FONT_BODY;
 }

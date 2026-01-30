@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 struct WifiStatusSnapshot;
 
@@ -13,6 +14,8 @@ public:
     void loop(const WifiStatusSnapshot& wifi_status);
     void triggerImmediateCheck(bool install_now = false);
     void checkForUpdatesNow();
+    bool checkGitHubVersions(std::vector<std::string>& versions);
+    bool installVersionFromGitHub(const std::string& version);
     const std::string& lastStatus() const { return last_status_; }
 
 private:

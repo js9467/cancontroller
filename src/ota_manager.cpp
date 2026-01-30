@@ -17,6 +17,8 @@
 
 namespace {
 constexpr const char* kUserAgent = "BroncoControls/OTA";
+constexpr const char* kGitHubApiUrl = "https://api.github.com/repos/js9467/cancontroller/contents/versions";
+constexpr const char* kGitHubRawBase = "https://raw.githubusercontent.com/js9467/cancontroller/master/versions/";
 constexpr std::uint32_t kMinIntervalMinutes = 5;
 constexpr std::uint32_t kOnlineMinIntervalMinutes = 2;
 constexpr std::uint32_t kMaxIntervalMinutes = 24 * 60;
@@ -608,4 +610,189 @@ void OTAUpdateManager::hideOtaScreen() {
         ota_bar = nullptr;
         ota_label = nullptr;
     }
+}
+
+bool OTAUpdateManager::checkGitHubVersions(std::vector<std::string>& versions) {
+    versions.clear();
+    
+    if (WiFi.status() != WL_CONNECTED) {
+        Serial.println("[OTA] WiFi not connected");
+        return false;
+    }
+    
+    Serial.println("[OTA] Checking GitHub for available versions...");
+    
+    HTTPClient http;
+    WiFiClientSecure client;
+    client.setInsecure();  // For GitHub API
+    
+    http.begin(client, kGitHubApiUrl);
+    http.setUserAgent(kUserAgent);
+    http.addHeader("Accept", "application/vnd.github.v3+json");
+    
+    int httpCode = http.GET();
+    
+    if (httpCode != HTTP_CODE_OK) {
+        Serial.printf("[OTA] GitHub API failed: %d\n", httpCode);
+        http.end();
+        return false;
+    }
+    
+    String payload = http.getString();
+    http.end();
+    
+    // Parse JSON array
+    DynamicJsonDocument doc(16384);  // Large enough for file list
+    auto err = deserializeJson(doc, payload);
+    if (err) {
+        Serial.printf("[OTA] JSON parse failed: %s\n", err.c_str());
+        return false;
+    }
+    
+    // Extract version numbers from filenames
+    JsonArray files = doc.as<JsonArray>();
+    for (JsonVariant file : files) {
+        String name = file["name"].as<String>();
+        
+        // Look for bronco_v*.zip files
+        if (name.startsWith("bronco_v") && name.endsWith(".zip")) {
+            // Extract version: bronco_v1.3.84.zip -> 1.3.84
+            int start = name.indexOf('v') + 1;
+            int end = name.indexOf(".zip");
+            if (start > 0 && end > start) {
+                String version = name.substring(start, end);
+                // Remove _FULL suffix if present
+                version.replace("_FULL", "");
+                versions.push_back(version.c_str());
+                Serial.printf("[OTA] Found version: %s\n", version.c_str());
+            }
+        }
+    }
+    
+    Serial.printf("[OTA] Found %d versions on GitHub\n", versions.size());
+    return !versions.empty();
+}
+
+bool OTAUpdateManager::installVersionFromGitHub(const std::string& version) {
+    if (WiFi.status() != WL_CONNECTED) {
+        Serial.println("[OTA] WiFi not connected");
+        setStatus("wifi-not-connected");
+        return false;
+    }
+    
+    Serial.printf("[OTA] Installing version %s from GitHub...\n", version.c_str());
+    showOtaScreen(version);
+    
+    // Download firmware.bin from the unzipped version folder on GitHub
+    // GitHub stores: versions/bronco_v1.3.84.zip
+    // We need the firmware.bin inside, but GitHub API doesn't extract zips
+    // So we'll use the raw URL pattern that the Python uploader uses
+    
+    // Try both with and without _FULL suffix
+    std::string url1 = std::string(kGitHubRawBase) + "bronco_v" + version + "/firmware.bin";
+    std::string url2 = std::string(kGitHubRawBase) + "bronco_v" + version + "_FULL/firmware.bin";
+    
+    HTTPClient http;
+    WiFiClientSecure client;
+    client.setInsecure();
+    
+    // Try first URL
+    Serial.printf("[OTA] Trying: %s\n", url1.c_str());
+    http.begin(client, url1.c_str());
+    http.setUserAgent(kUserAgent);
+    
+    int httpCode = http.GET();
+    
+    // If first fails, try second URL
+    if (httpCode != HTTP_CODE_OK) {
+        http.end();
+        Serial.printf("[OTA] First URL failed (%d), trying FULL variant\n", httpCode);
+        http.begin(client, url2.c_str());
+        http.setUserAgent(kUserAgent);
+        httpCode = http.GET();
+    }
+    
+    if (httpCode != HTTP_CODE_OK) {
+        Serial.printf("[OTA] Download failed: %d\n", httpCode);
+        setStatus(std::string("download-failed-") + std::to_string(httpCode));
+        http.end();
+        hideOtaScreen();
+        return false;
+    }
+    
+    int contentLength = http.getSize();
+    Serial.printf("[OTA] Firmware size: %d bytes\n", contentLength);
+    
+    if (contentLength <= 0) {
+        Serial.println("[OTA] Invalid content length");
+        setStatus("invalid-content-length");
+        http.end();
+        hideOtaScreen();
+        return false;
+    }
+    
+    // Begin OTA update
+    if (!Update.begin(contentLength)) {
+        Serial.printf("[OTA] Not enough space: %s\n", Update.errorString());
+        setStatus("insufficient-space");
+        http.end();
+        hideOtaScreen();
+        return false;
+    }
+    
+    // Download and write firmware
+    WiFiClient* stream = http.getStreamPtr();
+    size_t written = 0;
+    uint8_t buffer[512];
+    
+    while (http.connected() && written < contentLength) {
+        size_t available = stream->available();
+        if (available) {
+            size_t to_read = std::min(available, sizeof(buffer));
+            size_t read_bytes = stream->readBytes(buffer, to_read);
+            
+            if (Update.write(buffer, read_bytes) != read_bytes) {
+                Serial.println("[OTA] Write failed");
+                setStatus("write-failed");
+                Update.abort();
+                http.end();
+                hideOtaScreen();
+                return false;
+            }
+            
+            written += read_bytes;
+            uint8_t progress = (written * 100) / contentLength;
+            updateOtaProgress(progress);
+            
+            if (written % 10240 == 0) {  // Log every 10KB
+                Serial.printf("[OTA] Progress: %d/%d (%d%%)\n", written, contentLength, progress);
+            }
+        }
+        delay(1);
+    }
+    
+    http.end();
+    
+    if (written != contentLength) {
+        Serial.printf("[OTA] Size mismatch: %d != %d\n", written, contentLength);
+        setStatus("size-mismatch");
+        Update.abort();
+        hideOtaScreen();
+        return false;
+    }
+    
+    if (!Update.end(true)) {
+        Serial.printf("[OTA] Update failed: %s\n", Update.errorString());
+        setStatus(std::string("update-failed-") + Update.errorString());
+        hideOtaScreen();
+        return false;
+    }
+    
+    Serial.println("[OTA] ✓ Update successful! Rebooting...");
+    setStatus("update-successful");
+    updateOtaProgress(100);
+    delay(2000);
+    
+    ESP.restart();
+    return true;
 }
