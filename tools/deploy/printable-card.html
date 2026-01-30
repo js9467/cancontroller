@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bronco Controls - Printable Setup Card</title>
+    <style>
+        @media print {
+            @page {
+                size: 4in 6in;
+                margin: 0;
+            }
+            .no-print {
+                display: none !important;
+            }
+        }
+        
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #f0f0f0;
+        }
+        
+        .card {
+            width: 4in;
+            height: 6in;
+            background: white;
+            margin: 20px auto;
+            padding: 0.5in;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
+        }
+        
+        .header {
+            text-align: center;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .header h1 {
+            margin: 0;
+            font-size: 24pt;
+            color: #333;
+        }
+        
+        .header .subtitle {
+            color: #667eea;
+            font-size: 12pt;
+            margin-top: 5px;
+        }
+        
+        .qr-section {
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        .qr-placeholder {
+            width: 150px;
+            height: 150px;
+            margin: 0 auto;
+            background: #f8f9fa;
+            border: 2px dashed #667eea;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10pt;
+            color: #999;
+        }
+        
+        .steps {
+            flex: 1;
+        }
+        
+        .step {
+            margin: 15px 0;
+            display: flex;
+            align-items: flex-start;
+        }
+        
+        .step-number {
+            width: 30px;
+            height: 30px;
+            background: #667eea;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 14pt;
+            flex-shrink: 0;
+        }
+        
+        .step-content {
+            margin-left: 15px;
+            flex: 1;
+        }
+        
+        .step-title {
+            font-weight: bold;
+            font-size: 11pt;
+            margin-bottom: 3px;
+        }
+        
+        .step-desc {
+            font-size: 9pt;
+            color: #666;
+        }
+        
+        .footer {
+            text-align: center;
+            padding-top: 15px;
+            border-top: 1px solid #ddd;
+            font-size: 9pt;
+            color: #999;
+        }
+        
+        .url-display {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+            font-family: 'Courier New', monospace;
+            font-size: 9pt;
+            margin: 10px 0;
+            word-break: break-all;
+        }
+        
+        .no-print {
+            text-align: center;
+            margin: 20px;
+        }
+        
+        .no-print button {
+            padding: 10px 30px;
+            font-size: 14pt;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        
+        .no-print button:hover {
+            background: #5568d3;
+        }
+        
+        .help {
+            margin-top: 10px;
+            font-size: 9pt;
+        }
+        
+        .help strong {
+            color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="no-print">
+        <button onclick="window.print()">🖨️ Print Setup Card</button>
+        <div style="margin-top: 20px; color: #666;">
+            <p><strong>Instructions:</strong></p>
+            <ol style="text-align: left; max-width: 500px; margin: 0 auto;">
+                <li>Click "Print Setup Card" above</li>
+                <li>In print dialog, select your printer</li>
+                <li>Set paper size to 4x6 inches (or Letter and cut to size)</li>
+                <li>Optional: Generate a QR code for the URL at <a href="https://qr-code-generator.com" target="_blank">qr-code-generator.com</a></li>
+                <li>Include this card with each device you ship!</li>
+            </ol>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="header">
+            <h1>🚗 BRONCO CONTROLS</h1>
+            <div class="subtitle">Quick Setup Guide</div>
+        </div>
+        
+        <div class="qr-section">
+            <div class="qr-placeholder">
+                Scan to Download
+                <br>
+                <small>(Add QR code here)</small>
+            </div>
+        </div>
+        
+        <div class="url-display">
+            bit.ly/bronco-install
+        </div>
+        
+        <div class="steps">
+            <div class="step">
+                <div class="step-number">1</div>
+                <div class="step-content">
+                    <div class="step-title">Download</div>
+                    <div class="step-desc">Scan QR code or visit URL above</div>
+                </div>
+            </div>
+            
+            <div class="step">
+                <div class="step-number">2</div>
+                <div class="step-content">
+                    <div class="step-title">Connect</div>
+                    <div class="step-desc">Plug device into computer via USB</div>
+                </div>
+            </div>
+            
+            <div class="step">
+                <div class="step-number">3</div>
+                <div class="step-content">
+                    <div class="step-title">Install</div>
+                    <div class="step-desc">Run file and follow instructions</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="help">
+            <strong>⏱️ Takes 3 minutes</strong><br>
+            Updates: 30 seconds
+        </div>
+        
+        <div class="footer">
+            Need help? support@broncocontrols.com<br>
+            Full guide: github.com/js9467/autotouchscreen
+        </div>
+    </div>
+</body>
+</html>

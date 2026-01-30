@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bronco Controls - Quick Install</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 600px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+        
+        .steps {
+            margin: 30px 0;
+        }
+        
+        .step {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .step-number {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            background: #667eea;
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 30px;
+            margin-right: 10px;
+            font-weight: bold;
+        }
+        
+        .step-title {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .step-description {
+            color: #666;
+            margin-left: 40px;
+        }
+        
+        .download-btn {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 40px;
+            border-radius: 50px;
+            text-decoration: none;
+            font-size: 1.2em;
+            font-weight: bold;
+            margin: 20px 0;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .download-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+        
+        .warning {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        
+        .warning-title {
+            font-weight: bold;
+            color: #856404;
+            margin-bottom: 5px;
+        }
+        
+        .note {
+            background: #d1ecf1;
+            border-left: 4px solid #17a2b8;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            color: #0c5460;
+        }
+        
+        .troubleshooting {
+            margin-top: 30px;
+            padding-top: 30px;
+            border-top: 2px solid #eee;
+        }
+        
+        .troubleshooting h2 {
+            color: #333;
+            margin-bottom: 15px;
+        }
+        
+        .troubleshooting ul {
+            list-style-position: inside;
+            color: #666;
+        }
+        
+        .troubleshooting li {
+            margin: 10px 0;
+            padding-left: 10px;
+        }
+        
+        .emoji {
+            font-size: 1.5em;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚗 Bronco Controls</h1>
+        <div class="subtitle">Quick Installation Guide</div>
+        
+        <div class="note">
+            <strong>Time Required:</strong><br>
+            First time: 3-5 minutes (includes driver installation)<br>
+            Updates: 30 seconds
+        </div>
+        
+        <div class="steps">
+            <div class="step">
+                <div class="step-title">
+                    <span class="step-number">1</span>
+                    Download Installer
+                </div>
+                <div class="step-description">
+                    <p>Right-click the button below and choose <strong>"Save link as..."</strong></p>
+                    <a href="https://raw.githubusercontent.com/js9467/autotouchscreen/main/tools/deploy/QuickSetup.bat" 
+                       class="download-btn" 
+                       download>
+                        📥 Download QuickSetup.bat
+                    </a>
+                </div>
+            </div>
+            
+            <div class="step">
+                <div class="step-title">
+                    <span class="step-number">2</span>
+                    Connect Your Device
+                </div>
+                <div class="step-description">
+                    <p>Plug in your ESP32 device using a <strong>USB-C data cable</strong></p>
+                    <p style="margin-top: 10px; color: #999; font-size: 0.9em;">
+                        ⚠️ Make sure it's a data cable, not a charge-only cable
+                    </p>
+                </div>
+            </div>
+            
+            <div class="step">
+                <div class="step-title">
+                    <span class="step-number">3</span>
+                    Run the Installer
+                </div>
+                <div class="step-description">
+                    <p>Double-click <code>QuickSetup.bat</code> and follow the on-screen instructions</p>
+                    <p style="margin-top: 10px; color: #999; font-size: 0.9em;">
+                        Click "Yes" if Windows asks for permission
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="warning">
+            <div class="warning-title">⚡ First Time Users</div>
+            <p>If this is your first time, you'll need to install USB drivers using Zadig (included automatically).</p>
+            <p style="margin-top: 10px;">The installer will guide you step-by-step!</p>
+        </div>
+        
+        <div class="troubleshooting">
+            <h2>❓ Troubleshooting</h2>
+            <ul>
+                <li><strong>No COM port found?</strong> Try a different USB cable (must be data cable)</li>
+                <li><strong>Installation fails?</strong> Close Arduino IDE, PuTTY, or other serial programs</li>
+                <li><strong>Device not detected?</strong> Try a different USB port (USB 2.0 works best)</li>
+                <li><strong>Still stuck?</strong> Unplug, wait 5 seconds, replug, and try again</li>
+            </ul>
+        </div>
+        
+        <div class="note" style="margin-top: 30px; text-align: center; background: #e7f3ff;">
+            <strong>🎉 After Installation</strong><br>
+            The web interface will open automatically in your browser!
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bronco Controls - One-Click Install</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 50px;
+            max-width: 700px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            text-align: center;
+        }
+        
+        h1 {
+            color: #333;
+            font-size: 3em;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            color: #666;
+            font-size: 1.3em;
+            margin-bottom: 40px;
+        }
+        
+        .big-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px 60px;
+            border-radius: 50px;
+            text-decoration: none;
+            font-size: 1.5em;
+            font-weight: bold;
+            margin: 30px 0;
+            transition: all 0.3s;
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+            border: none;
+            cursor: pointer;
+        }
+        
+        .big-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 30px rgba(102, 126, 234, 0.6);
+        }
+        
+        .big-button:active {
+            transform: translateY(-1px);
+        }
+        
+        .info-box {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 15px;
+            margin: 30px 0;
+            text-align: left;
+        }
+        
+        .info-box h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+        
+        .info-box ol {
+            margin-left: 20px;
+            color: #666;
+            line-height: 1.8;
+        }
+        
+        .info-box li {
+            margin: 10px 0;
+        }
+        
+        .note {
+            background: #d1ecf1;
+            border-left: 4px solid #17a2b8;
+            padding: 20px;
+            border-radius: 5px;
+            margin: 25px 0;
+            color: #0c5460;
+            text-align: left;
+        }
+        
+        .note strong {
+            display: block;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+        
+        .warning {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 20px;
+            border-radius: 5px;
+            margin: 25px 0;
+            color: #856404;
+            text-align: left;
+        }
+        
+        code {
+            background: #f1f3f5;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        #downloadStatus {
+            margin-top: 20px;
+            font-size: 1.1em;
+            color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚗 Bronco Controls</h1>
+        <div class="subtitle">One-Click Installer</div>
+        
+        <div class="note">
+            <strong>⏱️ Quick Setup</strong>
+            First time: 3-5 minutes (includes automatic driver installation)<br>
+            Updates: 30 seconds
+        </div>
+        
+        <button id="downloadBtn" class="big-button" onclick="downloadInstaller()">
+            📥 Download Installer
+        </button>
+        
+        <div id="downloadStatus"></div>
+        
+        <div class="info-box">
+            <h3>📋 What Happens Next</h3>
+            <ol>
+                <li><strong>Download completes</strong> - Check your Downloads folder for <code>BroncoInstaller.bat</code></li>
+                <li><strong>Connect your device</strong> - Plug ESP32 into computer via USB</li>
+                <li><strong>Run the installer</strong> - <strong>Double-click</strong> <code>BroncoInstaller.bat</code></li>
+                <li><strong>Follow prompts</strong> - Driver installation is automatic!</li>
+            </ol>
+        </div>
+        
+        <div class="warning">
+            <strong>⚡ First-Time Users</strong>
+            The installer will automatically install USB drivers. Just click "Yes" when Windows asks for permission.
+        </div>
+        
+        <div class="info-box">
+            <h3>❓ Troubleshooting</h3>
+            <ol>
+                <li><strong>Security warning?</strong> Click "More info" → "Run anyway" (file is safe)</li>
+                <li><strong>File opens in notepad?</strong> Save it, then right-click → "Run as administrator"</li>
+                <li><strong>No COM port found?</strong> Try a different USB cable (must transfer data, not just charge)</li>
+                <li><strong>Still stuck?</strong> Close Arduino IDE, PuTTY, or other serial programs and try again</li>
+            </ol>
+        </div>
+        
+        <div class="note" style="background: #e7f3ff; border-color: #667eea;">
+            <strong>🎉 After Installation</strong>
+            The web interface will open automatically in your browser!<br>
+            You can configure WiFi, CAN settings, and customize your display.
+        </div>
+    </div>
+    
+    <script>
+        function downloadInstaller() {
+            const btn = document.getElementById('downloadBtn');
+            const status = document.getElementById('downloadStatus');
+            
+            btn.disabled = true;
+            btn.textContent = '⏳ Downloading...';
+            status.textContent = 'Fetching latest installer...';
+            
+            // Download the BAT file (easier to run than PS1)
+            const timestamp = Date.now();
+            const url = `https://raw.githubusercontent.com/js9467/autotouchscreen/main/tools/deploy/QuickSetup.bat?nocache=${timestamp}`;
+            
+            fetch(url)
+                .then(response => response.text())
+                .then(script => {
+                    // Create a blob and download it
+                    const blob = new Blob([script], { type: 'text/plain' });
+                    const downloadUrl = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = downloadUrl;
+                    a.download = 'BroncoInstaller.bat';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(downloadUrl);
+                    
+                    status.innerHTML = '✅ Downloaded! Check your Downloads folder.<br><strong>Double-click <code>BroncoInstaller.bat</code></strong> to run the installer.';
+                    btn.textContent = '✅ Downloaded Successfully';
+                    setTimeout(() => {
+                        btn.disabled = false;
+                        btn.textContent = '📥 Download Again';
+                    }, 3000);
+                })
+                .catch(error => {
+                    status.textContent = '❌ Download failed. Please try again.';
+                    btn.disabled = false;
+                    btn.textContent = '📥 Try Again';
+                    console.error('Download error:', error);
+                });
+        }
+    </script>
+</body>
+</html>

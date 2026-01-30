@@ -1,0 +1,15 @@
+# Bronco Controls - Backup & Restore Requirements
+# Install with: pip install -r backup_requirements.txt
+
+# Core dependencies
+esptool>=4.6.2
+requests>=2.31.0
+
+# GUI dependencies (optional, for backup_restore_gui.py)
+# tkinter is included with Python on Windows
+
+# Build dependencies (optional, for creating .exe)
+pyinstaller>=6.0.0
+
+# Recommended for better console output
+colorama>=0.4.6

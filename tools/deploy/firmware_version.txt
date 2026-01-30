@@ -1,0 +1,9 @@
+Firmware Version: 1.2.43
+Built: 2026-01-21 19:45:41
+Source: Local PlatformIO build
+firmware.bin (4.3 in)
+	MD5: 6a7225f2fedd1dbb83ec63a06c69dda3
+	Size: 2742688 bytes
+firmware-7.0.bin (7.0 in)
+	MD5: e9cd149dc7b0aae1c4b5e247832ccf30
+	Size: 2742848 bytes

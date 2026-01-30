@@ -1,0 +1,8 @@
+﻿.pio/
+.venv/
+.vscode/
+backups/
+*.pyc
+__pycache__/
+.DS_Store
+*.zip
