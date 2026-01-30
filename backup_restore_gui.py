@@ -182,6 +182,25 @@ class BackupRestoreGUI:
     def create_backup_tab(self, parent):
         """Create full backup tab content"""
         parent.columnconfigure(0, weight=1)
+        parent.rowconfigure(0, weight=1)
+        
+        # Create canvas for scrolling
+        canvas = tk.Canvas(parent, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(parent, orient="vertical", command=canvas.yview)
+        scrollable_frame = ttk.Frame(canvas)
+        
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        canvas.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
+        
+        scrollable_frame.columnconfigure(0, weight=1)
         
         # Info
         info_text = (
@@ -201,13 +220,13 @@ class BackupRestoreGUI:
             "Use this when you have a groundbreaking change or stable milestone!"
         )
         
-        info_label = ttk.Label(parent, text=info_text, justify=tk.LEFT, 
+        info_label = ttk.Label(scrollable_frame, text=info_text, justify=tk.LEFT, 
                               font=('Segoe UI', 9))
-        info_label.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 20))
+        info_label.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 20), padx=10)
         
         # Version preview
-        version_frame = ttk.Frame(parent)
-        version_frame.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
+        version_frame = ttk.Frame(scrollable_frame)
+        version_frame.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=(0, 10), padx=10)
         
         ttk.Label(version_frame, text="Next Version:", 
                  font=('Segoe UI', 10, 'bold')).grid(row=0, column=0, sticky=tk.W)
@@ -218,8 +237,8 @@ class BackupRestoreGUI:
                  foreground='#dc3545').grid(row=0, column=1, sticky=tk.W, padx=(10, 0))
         
         # Warning
-        warning_frame = ttk.Frame(parent, relief=tk.RIDGE, borderwidth=2)
-        warning_frame.grid(row=2, column=0, sticky=(tk.W, tk.E), pady=(0, 20))
+        warning_frame = ttk.Frame(scrollable_frame, relief=tk.RIDGE, borderwidth=2)
+        warning_frame.grid(row=2, column=0, sticky=(tk.W, tk.E), pady=(0, 20), padx=10)
         warning_frame.columnconfigure(0, weight=1)
         
         ttk.Label(warning_frame, text="⚠️ DEVICE REQUIRED", 
@@ -234,10 +253,15 @@ class BackupRestoreGUI:
                  padding=(10, 0, 10, 10)).grid(row=1, column=0)
         
         # Backup button
-        backup_btn = ttk.Button(parent, text="📦 Create FULL BACKUP", 
+        backup_btn = ttk.Button(scrollable_frame, text="📦 Create FULL BACKUP", 
                                style='Warning.TButton',
                                command=self.start_full_backup)
-        backup_btn.grid(row=3, column=0, pady=10)
+        backup_btn.grid(row=3, column=0, pady=20)
+        
+        # Enable mousewheel scrolling
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        canvas.bind_all("<MouseWheel>", _on_mousewheel)
     
     def create_ota_tab(self, parent):
         """Create OTA update tab"""

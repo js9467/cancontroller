@@ -1892,9 +1892,46 @@ void UIBuilder::otaUpdateButtonEvent(lv_event_t* e) {
     Serial.printf("[UI] OTA action: %d (0=blocked, 1=check, 2=install)\n", (int)ui.ota_primary_action_);
     OTAUpdateManager& ota = OTAUpdateManager::instance();
     const bool install_now = (ui.ota_primary_action_ == OtaAction::INSTALL);
-    Serial.printf("[UI] Calling triggerImmediateCheck with install_now=%d\n", install_now);
-    ota.triggerImmediateCheck(install_now);
-    ui.updateOtaStatus(ota.lastStatus());
+    
+    if (install_now) {
+        // Install the version that was previously found
+        Serial.printf("[UI] Installing latest GitHub version\n");
+        ui.updateOtaStatus("installing");
+        // The available version should be in ui.latest_github_version_
+        if (!ui.latest_github_version_.empty()) {
+            bool success = ota.installVersionFromGitHub(ui.latest_github_version_);
+            if (!success) {
+                ui.updateOtaStatus("install-failed");
+            }
+        } else {
+            ui.updateOtaStatus("no-version-selected");
+        }
+    } else {
+        // Check GitHub for available versions
+        Serial.printf("[UI] Checking GitHub for updates\n");
+        ui.updateOtaStatus("checking-github");
+        std::vector<std::string> versions;
+        bool success = ota.checkGitHubVersions(versions);
+        
+        if (success && !versions.empty()) {
+            // Get the latest version (first in list)
+            std::string latest_version = versions[0];
+            ui.latest_github_version_ = latest_version;
+            
+            // Compare with current version
+            if (latest_version != APP_VERSION) {
+                Serial.printf("[UI] Update available: %s (current: %s)\n", latest_version.c_str(), APP_VERSION);
+                ui.updateOtaStatus("update-available-" + latest_version);
+            } else {
+                Serial.printf("[UI] Already on latest version: %s\n", APP_VERSION);
+                ui.updateOtaStatus("up-to-date");
+            }
+        } else {
+            Serial.printf("[UI] GitHub check failed or no versions found\n");
+            ui.updateOtaStatus("github-check-failed");
+        }
+    }
+    
     ui.resetSleepTimer();
     Serial.printf("[UI] OTA button handler complete\n");
 }

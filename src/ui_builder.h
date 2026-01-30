@@ -165,6 +165,7 @@ private:
     lv_img_dsc_t sleep_logo_dsc_{};
     bool sleep_logo_ready_ = false;
     std::string ota_status_text_ = "idle";
+    std::string latest_github_version_;
     OtaAction ota_primary_action_ = OtaAction::INSTALL;
     DiagnosticsPriority diag_priority_ = DiagnosticsPriority::NORMAL;
     bool info_modal_visible_ = false;

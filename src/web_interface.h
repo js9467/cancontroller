@@ -2497,21 +2497,30 @@ async function checkForUpdates(){
 	const updateChip = document.getElementById('update-available');
 	if (updateChip) updateChip.textContent = 'Checking...';
 	try{
-		const res = await fetch('/api/ota/check');
+		const res = await fetch('/api/ota/github/versions');
 		const data = await res.json();
-		if (data.update_available) {
-			if (updateChip) updateChip.innerHTML = `<span style="color: var(--success);">v${data.available_version}</span>`;
-			const updateBtn = document.getElementById('update-btn');
-			if (updateBtn) {
-				updateBtn.style.display = 'block';
-				updateBtn.textContent = `Update to v${data.available_version}`;
+		if (data.status === 'ok' && data.versions && data.versions.length > 0) {
+			const latestVersion = data.versions[0];
+			const currentVersion = data.current;
+			
+			if (latestVersion !== currentVersion) {
+				if (updateChip) updateChip.innerHTML = `<span style="color: var(--success);">v${latestVersion}</span>`;
+				const updateBtn = document.getElementById('update-btn');
+				if (updateBtn) {
+					updateBtn.style.display = 'block';
+					updateBtn.textContent = `Update to v${latestVersion}`;
+					updateBtn.setAttribute('data-version', latestVersion);
+				}
+				showBanner(`Update available: v${latestVersion}`, 'success');
+			} else {
+				if (updateChip) updateChip.textContent = 'Up to date';
+				const updateBtn = document.getElementById('update-btn');
+				if (updateBtn) updateBtn.style.display = 'none';
+				showBanner('Firmware is up to date', 'success');
 			}
-			showBanner(`Update available: v${data.available_version}`, 'success');
 		} else {
-			if (updateChip) updateChip.textContent = 'Up to date';
-			const updateBtn = document.getElementById('update-btn');
-			if (updateBtn) updateBtn.style.display = 'none';
-			showBanner('Firmware is up to date', 'success');
+			if (updateChip) updateChip.textContent = 'No versions found';
+			showBanner('No GitHub versions available', 'error');
 		}
 	}catch(err){
 		if (updateChip) updateChip.textContent = 'Error';
@@ -2524,18 +2533,29 @@ async function checkForUpdates(){
 async function triggerOTAUpdate(){
 	if (!confirm('Ready to update firmware? The device will reboot.')) return;
 	const btn = document.getElementById('update-btn');
+	const version = btn ? btn.getAttribute('data-version') : null;
+	
+	if (!version) {
+		showBanner('No version selected', 'error');
+		return;
+	}
+	
 	if (btn) {
 		btn.disabled = true;
 		btn.textContent = 'Updating...';
 	}
 	try{
-		const res = await fetch('/api/ota/update', { method: 'POST' });
+		const res = await fetch('/api/ota/github/install', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ version: version })
+		});
 		const data = await res.json();
 		if (data.status === 'ok') {
 			showBanner('Update started! Device rebooting...', 'success');
 			setTimeout(() => {
 				window.location.reload();
-			}, 3000);
+			}, 10000);
 		} else {
 			showBanner(data.message || 'Update failed', 'error');
 		}

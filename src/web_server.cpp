@@ -469,6 +469,63 @@ void WebServerManager::setupRoutes() {
         request->send(200, "application/json", payload);
     });
 
+    // GitHub version listing endpoint
+    server_.on("/api/ota/github/versions", HTTP_GET, [](AsyncWebServerRequest* request) {
+        std::vector<std::string> versions;
+        bool success = OTAUpdateManager::instance().checkGitHubVersions(versions);
+        
+        DynamicJsonDocument doc(4096);
+        doc["status"] = success ? "ok" : "error";
+        
+        if (success) {
+            JsonArray arr = doc.createNestedArray("versions");
+            for (const auto& ver : versions) {
+                arr.add(ver);
+            }
+            doc["count"] = versions.size();
+            doc["current"] = APP_VERSION;
+        } else {
+            doc["message"] = "Failed to fetch GitHub versions";
+        }
+        
+        String payload;
+        serializeJson(doc, payload);
+        request->send(success ? 200 : 500, "application/json", payload);
+    });
+
+    // GitHub OTA install endpoint
+    server_.on("/api/ota/github/install", HTTP_POST, [](AsyncWebServerRequest* request) {}, nullptr,
+        [](AsyncWebServerRequest* request, uint8_t* data, size_t len, size_t index, size_t total) {
+            DynamicJsonDocument doc(256);
+            DeserializationError error = deserializeJson(doc, data, len);
+            
+            if (error) {
+                request->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
+                return;
+            }
+            
+            if (!doc.containsKey("version")) {
+                request->send(400, "application/json", "{\"error\":\"Missing version parameter\"}");
+                return;
+            }
+            
+            std::string version = doc["version"].as<std::string>();
+            
+            // Send immediate response
+            DynamicJsonDocument response(128);
+            response["status"] = "ok";
+            response["message"] = "OTA update started";
+            response["version"] = version;
+            String payload;
+            serializeJson(response, payload);
+            request->send(200, "application/json", payload);
+            
+            // Start update in background (will reboot on success)
+            // We delay slightly to let the HTTP response complete
+            delay(500);
+            OTAUpdateManager::instance().installVersionFromGitHub(version);
+        });
+
     // Test CAN frame endpoint
     server_.on("/api/can/send", HTTP_POST, [](AsyncWebServerRequest* request) {}, nullptr,
         [](AsyncWebServerRequest* request, uint8_t* data, size_t len, size_t index, size_t total) {

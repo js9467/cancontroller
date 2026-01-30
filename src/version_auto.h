@@ -1,3 +1,3 @@
 #pragma once
-// Auto-generated on 2026-01-30T18:16:49.126865Z
-constexpr const char* APP_VERSION = "1.3.87";
+// Auto-generated on 2026-01-30T18:44:46.208059Z
+constexpr const char* APP_VERSION = "2.0.1";
