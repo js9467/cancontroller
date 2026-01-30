@@ -275,10 +275,10 @@ function switchTab(tabName){
 		</div>
 		<div class="card">
 			<h3>Device Info & Updates</h3>
-			<div class="muted">Version and current network addresses.</div>
+			<div class="muted">OTA firmware updates via .bin files from GitHub.</div>
 			<div class="status-grid" id="status" data-version="{{VERSION}}">
 				<div class="status-chip"><span>Firmware</span>v{{VERSION}}</div>
-				<div class="status-chip"><span>Available Update</span><span id="update-available">Checking...</span></div>
+				<div class="status-chip"><span>Available Update</span><span id="update-available">Tap check</span></div>
 				<div class="status-chip"><span>Device IP</span>—</div>
 				<div class="status-chip"><span>Connected Network</span>—</div>
 				<div class="status-chip"><span>AP IP</span>—</div>
@@ -286,7 +286,9 @@ function switchTab(tabName){
 			</div>
 			<div class="row" style="margin-top: 12px; gap: 8px;">
 				<button class="btn" onclick="checkForUpdates()">Check Updates</button>
-				<button class="btn primary" id="update-btn" onclick="triggerOTAUpdate()" style="display:none;">Update Available</button>
+			</div>
+			<div id="update-section" class="row" style="margin-top: 8px;">
+				<!-- Version selector will appear here after checking -->
 			</div>
 			<div class="row" style="margin-top: 8px; gap: 8px;">
 				<a class="btn ghost" href="/suspension" target="_blank" rel="noopener">Open Suspension Interface</a>
@@ -2496,28 +2498,34 @@ async function checkForUpdates(){
 	if (btn) btn.disabled = true;
 	const updateChip = document.getElementById('update-available');
 	if (updateChip) updateChip.textContent = 'Checking...';
-	try{
+		try{
 		const res = await fetch('/api/ota/github/versions');
 		const data = await res.json();
 		if (data.status === 'ok' && data.versions && data.versions.length > 0) {
-			const latestVersion = data.versions[0];
 			const currentVersion = data.current;
 			
-			if (latestVersion !== currentVersion) {
-				if (updateChip) updateChip.innerHTML = `<span style="color: var(--success);">v${latestVersion}</span>`;
-				const updateBtn = document.getElementById('update-btn');
-				if (updateBtn) {
-					updateBtn.style.display = 'block';
-					updateBtn.textContent = `Update to v${latestVersion}`;
-					updateBtn.setAttribute('data-version', latestVersion);
-				}
-				showBanner(`Update available: v${latestVersion}`, 'success');
-			} else {
-				if (updateChip) updateChip.textContent = 'Up to date';
-				const updateBtn = document.getElementById('update-btn');
-				if (updateBtn) updateBtn.style.display = 'none';
-				showBanner('Firmware is up to date', 'success');
+			// Create version selector dropdown
+			const updateSection = document.getElementById('update-section');
+			if (updateSection) {
+				updateSection.innerHTML = `
+					<div style="display:flex;flex-direction:column;gap:10px;width:100%;">
+						<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+							<label for="version-select" style="color:var(--text-secondary);">Select Version:</label>
+							<select id="version-select" style="padding:8px;border-radius:4px;background:#2a2a2a;color:#ffffff;border:1px solid #444;flex:1;min-width:150px;">
+								${data.versions.map(v => `<option value="${v}" style="background:#2a2a2a;color:#ffffff;" ${v === currentVersion ? 'selected' : ''}>${v}${v === currentVersion ? ' (current)' : ''}</option>`).join('')}
+							</select>
+						</div>
+						<button id="update-btn" onclick="triggerOTAUpdate()" style="padding:10px 20px;background:var(--accent);color:#000;border:none;border-radius:4px;cursor:pointer;font-weight:600;">Install Selected Version</button>
+						<div style="font-size:0.85em;color:var(--text-secondary);line-height:1.4;">
+							<strong>Current:</strong> ${currentVersion} • <strong>Available:</strong> ${data.versions.length} version(s)<br/>
+							<em>OTA updates use .bin firmware files for fast wireless installation</em>
+						</div>
+					</div>
+				`;
 			}
+			
+			if (updateChip) updateChip.innerHTML = `<span style="color: var(--success);">${data.versions.length} available</span>`;
+			showBanner(`Found ${data.versions.length} OTA-capable version(s)`, 'success');
 		} else {
 			if (updateChip) updateChip.textContent = 'No versions found';
 			showBanner('No GitHub versions available', 'error');
@@ -2531,18 +2539,20 @@ async function checkForUpdates(){
 }
 
 async function triggerOTAUpdate(){
-	if (!confirm('Ready to update firmware? The device will reboot.')) return;
-	const btn = document.getElementById('update-btn');
-	const version = btn ? btn.getAttribute('data-version') : null;
+	const select = document.getElementById('version-select');
+	const version = select ? select.value : null;
 	
 	if (!version) {
 		showBanner('No version selected', 'error');
 		return;
 	}
 	
+	if (!confirm(`Install version ${version}? The device will reboot.`)) return;
+	
+	const btn = document.getElementById('update-btn');
 	if (btn) {
 		btn.disabled = true;
-		btn.textContent = 'Updating...';
+		btn.textContent = 'Installing...';
 	}
 	try{
 		const res = await fetch('/api/ota/github/install', {
@@ -2558,13 +2568,16 @@ async function triggerOTAUpdate(){
 			}, 10000);
 		} else {
 			showBanner(data.message || 'Update failed', 'error');
+			if (btn) {
+				btn.disabled = false;
+				btn.textContent = 'Install Selected Version';
+			}
 		}
 	}catch(err){
 		showBanner('Update request failed: '+err.message, 'error');
-	}finally{
 		if (btn) {
 			btn.disabled = false;
-			btn.textContent = 'Update Available';
+			btn.textContent = 'Install Selected Version';
 		}
 	}
 }

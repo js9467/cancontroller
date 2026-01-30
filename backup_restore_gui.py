@@ -152,8 +152,10 @@ class BackupRestoreGUI:
             "What happens:\n"
             "• Build number increments (e.g., 1.3.82 → 1.3.83)\n"
             "• Builds firmware from current source code\n"
-            "• Commits version files to git\n"
-            "• Automatically uploads to GitHub\n\n"
+            "• Creates firmware.bin for OTA updates\n"
+            "• Uploads .bin to GitHub (OTA-capable)\n"
+            "• For major versions (v2→v3), also creates .zip for USB install\n"
+            "• Commits version files to git\n\n"
             "No device connection required!"
         )
         
@@ -209,8 +211,10 @@ class BackupRestoreGUI:
             "What happens:\n"
             "• MAJOR version increments (e.g., 1.3.82 → 2.0.0)\n"
             "• Reads ALL flash memory from connected device\n"
-            "• Creates restoration point for known-good hardware state\n"
-            "• Automatically uploads to GitHub\n\n"
+            "• Creates firmware.bin for OTA updates\n"
+            "• Creates .zip archive for USB installation\n"
+            "• Uploads both .bin and .zip to GitHub\n"
+            "• Creates restoration point for known-good hardware state\n\n"
             "Includes:\n"
             "✓ Bootloader and partition table\n"
             "✓ Application firmware (both OTA slots)\n"
@@ -456,7 +460,10 @@ class BackupRestoreGUI:
                     self.current_version = version
                     messagebox.showinfo("Success", 
                                        f"Version update completed!\nVersion: v{version}\n\n"
-                                       f"Uploaded to GitHub automatically.")
+                                       f"Files created:\n"
+                                       f"• firmware.bin (for OTA updates)\n"
+                                       f"• Uploaded to GitHub automatically\n\n"
+                                       f"Your device can now update OTA to this version!")
                 else:
                     messagebox.showerror("Error", "Version update failed. Check console for details.")
             except Exception as e:
@@ -479,6 +486,10 @@ class BackupRestoreGUI:
                     self.current_version = version
                     messagebox.showinfo("Success", 
                                        f"FULL BACKUP completed!\nVersion: v{version}\n\n"
+                                       f"Files created:\n"
+                                       f"• firmware.bin (for OTA updates)\n"
+                                       f"• Complete .zip archive (for USB install)\n"
+                                       f"• All flash partitions backed up\n\n"
                                        f"Location:\n{backup_folder}\n\n"
                                        f"Uploaded to GitHub automatically.")
                 else:

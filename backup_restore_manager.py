@@ -113,7 +113,15 @@ class BackupRestoreManager:
     
     def version_update(self):
         """Create a version snapshot from current project state (no device communication)"""
+        # Get current version to determine if it's a major version change
+        old_version = self.get_current_version()
+        old_parts = list(map(int, old_version.split('.')))
+        
         version = self.increment_version(increment_type='build')
+        new_parts = list(map(int, version.split('.')))
+        
+        # Check if this is a major version change (e.g., v2 to v3)
+        is_major_version = (new_parts[0] > old_parts[0])
         
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         version_name = f"bronco_v{version}_{timestamp}"
@@ -123,6 +131,10 @@ class BackupRestoreManager:
         print(f"\n{'='*60}")
         print(f"[Version Update] Creating project snapshot")
         print(f"[Version] {version}")
+        if is_major_version:
+            print(f"[Type] MAJOR VERSION CHANGE - USB installation required")
+        else:
+            print(f"[Type] Minor/Build update - OTA capable")
         print(f"[Location] {version_folder}")
         print(f"{'='*60}\n")
         
@@ -134,7 +146,9 @@ class BackupRestoreManager:
             'device': 'ESP32-S3-Touch-LCD-7',
             'chip': 'esp32s3',
             'created_date': datetime.now().isoformat(),
-            'description': 'Project state snapshot - incremental version update'
+            'description': 'Project state snapshot - incremental version update',
+            'is_major_version': is_major_version,
+            'requires_usb': is_major_version
         }
         
         # Build the firmware
@@ -205,8 +219,8 @@ class BackupRestoreManager:
         print(f"[Version Update] ✓ Complete!")
         print(f"{'='*60}\n")
         
-        # Always upload to GitHub
-        self.upload_to_github(version_folder, version, upload_type='version')
+        # Upload to GitHub with appropriate type
+        self.upload_to_github(version_folder, version, upload_type='version', is_major_version=is_major_version)
         
         return version_folder, version
     
@@ -318,8 +332,8 @@ class BackupRestoreManager:
         print(f"              {backup_folder}")
         print(f"{'='*60}\n")
         
-        # Always upload to GitHub
-        self.upload_to_github(backup_folder, version, upload_type='full')
+        # Always upload to GitHub (full backups always include ZIP for USB installation)
+        self.upload_to_github(backup_folder, version, upload_type='full', is_major_version=True)
         
         return backup_folder, version
     
@@ -461,11 +475,12 @@ pause
         
         return True
     
-    def upload_to_github(self, backup_folder, version, upload_type='version'):
+    def upload_to_github(self, backup_folder, version, upload_type='version', is_major_version=False):
         """Upload backup/version to GitHub repository
         
         Args:
             upload_type: 'full' for full backup, 'version' for version update
+            is_major_version: True if this is a major version change requiring USB installation
         """
         type_label = "FULL BACKUP" if upload_type == 'full' else "VERSION UPDATE"
         print(f"\n[GitHub] Uploading {type_label} to repository...")
@@ -501,60 +516,106 @@ pause
         
         backup_path = Path(backup_folder)
         
-        # Create ZIP archive
-        import zipfile
-        suffix = "_FULL" if upload_type == 'full' else ""
-        zip_name = f"bronco_v{version}{suffix}.zip"
-        zip_path = backup_path.parent / zip_name
-        
-        print(f"[GitHub] Creating archive: {zip_name}")
-        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            for file in backup_path.rglob('*'):
-                if file.is_file():
-                    arcname = file.relative_to(backup_path.parent)
-                    zipf.write(file, arcname)
-        
-        print(f"    ✓ Archive created ({zip_path.stat().st_size / 1024 / 1024:.1f} MB)")
-        
-        # Upload to GitHub
-        api_url = f"https://api.github.com/repos/{self.github_repo}/contents/{self.github_folder}/{zip_name}"
-        
-        with open(zip_path, 'rb') as f:
-            content = base64.b64encode(f.read()).decode('utf-8')
+        # For OTA updates (minor/build versions), upload .bin file directly
+        # For major versions or full backups, also upload .zip archive
         
         headers = {
             'Authorization': f'token {github_token}',
             'Accept': 'application/vnd.github.v3+json'
         }
         
-        message = f'Add {type_label.lower()} version {version}'
-        data = {
-            'message': message,
-            'content': content,
-            'branch': self.github_branch
-        }
+        upload_success = True
         
-        try:
-            print(f"[GitHub] Uploading to {self.github_repo}/{self.github_folder}...")
-            response = requests.put(api_url, headers=headers, json=data, timeout=300)
+        # ALWAYS upload the .bin file for OTA capability
+        firmware_bin = backup_path / 'firmware.bin'
+        if firmware_bin.exists():
+            bin_name = f"bronco_v{version}.bin"
+            print(f"[GitHub] Uploading OTA binary: {bin_name}")
             
-            if response.status_code in [200, 201]:
-                print(f"[GitHub] ✓ Upload successful!")
-                print(f"[GitHub] URL: https://github.com/{self.github_repo}/tree/{self.github_branch}/{self.github_folder}")
-                return True
-            else:
-                print(f"[GitHub] ✗ Upload failed: {response.status_code}")
-                print(f"[GitHub] Response: {response.text}")
-                return False
+            with open(firmware_bin, 'rb') as f:
+                content = base64.b64encode(f.read()).decode('utf-8')
+            
+            bin_api_url = f"https://api.github.com/repos/{self.github_repo}/contents/{self.github_folder}/{bin_name}"
+            
+            data = {
+                'message': f'Add OTA firmware v{version}',
+                'content': content,
+                'branch': self.github_branch
+            }
+            
+            try:
+                print(f"    Uploading {firmware_bin.stat().st_size / 1024 / 1024:.1f} MB...")
+                response = requests.put(bin_api_url, headers=headers, json=data, timeout=300)
                 
-        except Exception as e:
-            print(f"[GitHub] ✗ Error: {e}")
-            return False
-        finally:
-            # Clean up zip file
-            if zip_path.exists():
-                zip_path.unlink()
-                print(f"[GitHub] Cleaned up temporary archive")
+                if response.status_code in [200, 201]:
+                    print(f"    ✓ BIN upload successful!")
+                else:
+                    print(f"    ✗ BIN upload failed: {response.status_code}")
+                    print(f"    Response: {response.text}")
+                    upload_success = False
+            except Exception as e:
+                print(f"    ✗ BIN upload error: {e}")
+                upload_success = False
+        else:
+            print(f"[GitHub] ⚠ firmware.bin not found, skipping BIN upload")
+        
+        # Upload ZIP archive for full backups or major versions (USB installation)
+        if upload_type == 'full' or is_major_version:
+            import zipfile
+            suffix = "_FULL" if upload_type == 'full' else ""
+            zip_name = f"bronco_v{version}{suffix}.zip"
+            zip_path = backup_path.parent / zip_name
+            
+            print(f"[GitHub] Creating archive for USB installation: {zip_name}")
+            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                for file in backup_path.rglob('*'):
+                    if file.is_file():
+                        arcname = file.relative_to(backup_path.parent)
+                        zipf.write(file, arcname)
+            
+            print(f"    ✓ Archive created ({zip_path.stat().st_size / 1024 / 1024:.1f} MB)")
+            
+            # Upload ZIP to GitHub
+            zip_api_url = f"https://api.github.com/repos/{self.github_repo}/contents/{self.github_folder}/{zip_name}"
+            # Upload ZIP to GitHub
+            zip_api_url = f"https://api.github.com/repos/{self.github_repo}/contents/{self.github_folder}/{zip_name}"
+            
+            with open(zip_path, 'rb') as f:
+                content = base64.b64encode(f.read()).decode('utf-8')
+            
+            message = f'Add {type_label.lower()} version {version}'
+            data = {
+                'message': message,
+                'content': content,
+                'branch': self.github_branch
+            }
+            
+            try:
+                print(f"    Uploading ZIP archive...")
+                response = requests.put(zip_api_url, headers=headers, json=data, timeout=300)
+                
+                if response.status_code in [200, 201]:
+                    print(f"    ✓ ZIP upload successful!")
+                else:
+                    print(f"    ✗ ZIP upload failed: {response.status_code}")
+                    print(f"    Response: {response.text}")
+                    upload_success = False
+            except Exception as e:
+                print(f"    ✗ ZIP upload error: {e}")
+                upload_success = False
+            finally:
+                # Clean up zip file
+                if zip_path.exists():
+                    zip_path.unlink()
+                    print(f"    Cleaned up temporary archive")
+        
+        if upload_success:
+            print(f"[GitHub] ✓ Upload complete!")
+            print(f"[GitHub] URL: https://github.com/{self.github_repo}/tree/{self.github_branch}/{self.github_folder}")
+        else:
+            print(f"[GitHub] ⚠ Upload completed with errors")
+        
+        return upload_success
     
     def list_github_versions(self):
         """List available versions in GitHub repository"""

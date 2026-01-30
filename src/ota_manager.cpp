@@ -17,8 +17,11 @@
 
 namespace {
 constexpr const char* kUserAgent = "BroncoControls/OTA";
+constexpr const char* kGitHubToken = "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";
 constexpr const char* kGitHubApiUrl = "https://api.github.com/repos/js9467/cancontroller/contents/versions";
 constexpr const char* kGitHubRawBase = "https://raw.githubusercontent.com/js9467/cancontroller/master/versions/";
+const char* kAuthHeader = "Authorization";
+const char* kAuthValue = "token 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";
 constexpr std::uint32_t kMinIntervalMinutes = 5;
 constexpr std::uint32_t kOnlineMinIntervalMinutes = 2;
 constexpr std::uint32_t kMaxIntervalMinutes = 24 * 60;
@@ -613,33 +616,47 @@ void OTAUpdateManager::hideOtaScreen() {
 }
 
 bool OTAUpdateManager::checkGitHubVersions(std::vector<std::string>& versions) {
+    Serial.println("[OTA] checkGitHubVersions() called");
     versions.clear();
     
     if (WiFi.status() != WL_CONNECTED) {
-        Serial.println("[OTA] WiFi not connected");
+        Serial.printf("[OTA] WiFi not connected (status: %d)\n", WiFi.status());
         return false;
     }
     
-    Serial.println("[OTA] Checking GitHub for available versions...");
+    Serial.println("[OTA] WiFi connected, checking GitHub for available versions...");
+    Serial.printf("[OTA] Requesting: %s\n", kGitHubApiUrl);
     
     HTTPClient http;
     WiFiClientSecure client;
     client.setInsecure();  // For GitHub API
     
-    http.begin(client, kGitHubApiUrl);
+    Serial.println("[OTA] Starting HTTP request...");
+    if (!http.begin(client, kGitHubApiUrl)) {
+        Serial.println("[OTA] http.begin() failed!");
+        return false;
+    }
+    
     http.setUserAgent(kUserAgent);
     http.addHeader("Accept", "application/vnd.github.v3+json");
+    http.addHeader("Authorization", String("token ") + kGitHubToken);
     
+    Serial.println("[OTA] Sending GET request...");
     int httpCode = http.GET();
+    Serial.printf("[OTA] HTTP response code: %d\n", httpCode);
     
     if (httpCode != HTTP_CODE_OK) {
-        Serial.printf("[OTA] GitHub API failed: %d\n", httpCode);
+        Serial.printf("[OTA] GitHub API failed with code: %d\n", httpCode);
+        String error = http.errorToString(httpCode);
+        Serial.printf("[OTA] Error: %s\n", error.c_str());
         http.end();
         return false;
     }
     
     String payload = http.getString();
     http.end();
+    
+    Serial.printf("[OTA] Response: %d bytes\n", payload.length());
     
     // Parse JSON array
     DynamicJsonDocument doc(16384);  // Large enough for file list
@@ -649,22 +666,34 @@ bool OTAUpdateManager::checkGitHubVersions(std::vector<std::string>& versions) {
         return false;
     }
     
-    // Extract version numbers from filenames
+    if (!doc.is<JsonArray>()) {
+        Serial.println("[OTA] Response is not an array");
+        return false;
+    }
+    
+    // Extract version numbers from filenames (BIN files only for OTA)
     JsonArray files = doc.as<JsonArray>();
+    Serial.printf("[OTA] Found %d items\n", files.size());
+    
     for (JsonVariant file : files) {
-        String name = file["name"].as<String>();
+        const char* name_c = file["name"];
+        if (!name_c) continue;
         
-        // Look for bronco_v*.zip files
-        if (name.startsWith("bronco_v") && name.endsWith(".zip")) {
-            // Extract version: bronco_v1.3.84.zip -> 1.3.84
+        String name = String(name_c);
+        
+        // Look for bronco_v*.bin files only (OTA updates)
+        if (name.startsWith("bronco_v") && name.endsWith(".bin")) {
+            // BIN file: bronco_v1.3.84.bin -> 1.3.84
             int start = name.indexOf('v') + 1;
-            int end = name.indexOf(".zip");
+            int end = name.indexOf(".bin");
             if (start > 0 && end > start) {
                 String version = name.substring(start, end);
                 // Remove _FULL suffix if present
                 version.replace("_FULL", "");
-                versions.push_back(version.c_str());
-                Serial.printf("[OTA] Found version: %s\n", version.c_str());
+                if (version.length() > 0) {
+                    versions.push_back(version.c_str());
+                    Serial.printf("[OTA] Found: %s\n", version.c_str());
+                }
             }
         }
     }
@@ -683,34 +712,23 @@ bool OTAUpdateManager::installVersionFromGitHub(const std::string& version) {
     Serial.printf("[OTA] Installing version %s from GitHub...\n", version.c_str());
     showOtaScreen(version);
     
-    // Download firmware.bin from the unzipped version folder on GitHub
-    // GitHub stores: versions/bronco_v1.3.84.zip
-    // We need the firmware.bin inside, but GitHub API doesn't extract zips
-    // So we'll use the raw URL pattern that the Python uploader uses
+    // Download firmware.bin directly from GitHub versions folder
+    // GitHub stores: versions/bronco_v1.3.84.bin (for OTA updates)
+    // Also stores: versions/bronco_v2.0.0_FULL.zip (for major upgrades via USB)
     
-    // Try both with and without _FULL suffix
-    std::string url1 = std::string(kGitHubRawBase) + "bronco_v" + version + "/firmware.bin";
-    std::string url2 = std::string(kGitHubRawBase) + "bronco_v" + version + "_FULL/firmware.bin";
+    // OTA updates use .bin files directly from the versions folder
+    std::string bin_url = std::string(kGitHubRawBase) + "bronco_v" + version + ".bin";
     
     HTTPClient http;
     WiFiClientSecure client;
     client.setInsecure();
     
-    // Try first URL
-    Serial.printf("[OTA] Trying: %s\n", url1.c_str());
-    http.begin(client, url1.c_str());
+    // Download the .bin file
+    Serial.printf("[OTA] Downloading: %s\n", bin_url.c_str());
+    http.begin(client, bin_url.c_str());
     http.setUserAgent(kUserAgent);
     
     int httpCode = http.GET();
-    
-    // If first fails, try second URL
-    if (httpCode != HTTP_CODE_OK) {
-        http.end();
-        Serial.printf("[OTA] First URL failed (%d), trying FULL variant\n", httpCode);
-        http.begin(client, url2.c_str());
-        http.setUserAgent(kUserAgent);
-        httpCode = http.GET();
-    }
     
     if (httpCode != HTTP_CODE_OK) {
         Serial.printf("[OTA] Download failed: %d\n", httpCode);

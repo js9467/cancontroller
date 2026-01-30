@@ -471,8 +471,11 @@ void WebServerManager::setupRoutes() {
 
     // GitHub version listing endpoint
     server_.on("/api/ota/github/versions", HTTP_GET, [](AsyncWebServerRequest* request) {
+        Serial.println("[WEB] /api/ota/github/versions endpoint called");
         std::vector<std::string> versions;
         bool success = OTAUpdateManager::instance().checkGitHubVersions(versions);
+        Serial.printf("[WEB] checkGitHubVersions returned: %s, found %d versions\n", 
+                     success ? "SUCCESS" : "FAILED", versions.size());
         
         DynamicJsonDocument doc(4096);
         doc["status"] = success ? "ok" : "error";
@@ -481,6 +484,7 @@ void WebServerManager::setupRoutes() {
             JsonArray arr = doc.createNestedArray("versions");
             for (const auto& ver : versions) {
                 arr.add(ver);
+                Serial.printf("[WEB] Adding version: %s\n", ver.c_str());
             }
             doc["count"] = versions.size();
             doc["current"] = APP_VERSION;
@@ -490,6 +494,7 @@ void WebServerManager::setupRoutes() {
         
         String payload;
         serializeJson(doc, payload);
+        Serial.printf("[WEB] Sending response: %s\n", payload.c_str());
         request->send(success ? 200 : 500, "application/json", payload);
     });
 
