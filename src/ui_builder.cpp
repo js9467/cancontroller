@@ -1114,10 +1114,10 @@ void UIBuilder::createInfoModal() {
     lv_obj_add_event_cb(info_modal_bg_, infoModalBackdropEvent, LV_EVENT_CLICKED, nullptr);
     lv_obj_move_foreground(info_modal_bg_);  // Ensure modal is on top
 
-    // Modal content box - use most of screen height to show all content
+    // Modal content box - sized to content with max limit, with scrolling for overflow
     info_modal_ = lv_obj_create(info_modal_bg_);
     lv_obj_set_width(info_modal_, screen_w - 16);
-    lv_obj_set_height(info_modal_, screen_h - 40);  // Almost full height to fit all content
+    lv_obj_set_height(info_modal_, 420);  // Fixed reasonable height, scrollable for overflow
     lv_obj_center(info_modal_);
     lv_obj_set_style_bg_color(info_modal_, lv_color_hex(0x2A2A2A), 0);
     lv_obj_set_style_bg_opa(info_modal_, LV_OPA_COVER, 0);
@@ -1130,9 +1130,8 @@ void UIBuilder::createInfoModal() {
     lv_obj_set_flex_align(info_modal_, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_gap(info_modal_, 10, 0);
     lv_obj_add_flag(info_modal_, LV_OBJ_FLAG_CLICKABLE);  // Block clicks from reaching background
-    lv_obj_clear_flag(info_modal_, LV_OBJ_FLAG_SCROLLABLE);  // Disable scrolling
-    lv_obj_set_scroll_dir(info_modal_, LV_DIR_NONE);  // No scrolling
-    lv_obj_set_scrollbar_mode(info_modal_, LV_SCROLLBAR_MODE_OFF);  // Hide scrollbar
+    lv_obj_set_scroll_dir(info_modal_, LV_DIR_VER);  // Allow vertical scrolling on main modal too
+    lv_obj_set_scrollbar_mode(info_modal_, LV_SCROLLBAR_MODE_AUTO);  // Show scrollbar if needed
     lv_obj_clear_flag(info_modal_, LV_OBJ_FLAG_EVENT_BUBBLE);
 
     // Title - smaller for compact design
@@ -1146,12 +1145,11 @@ void UIBuilder::createInfoModal() {
     lv_obj_t* modal_body = lv_obj_create(info_modal_);
     lv_obj_remove_style_all(modal_body);
     lv_obj_set_width(modal_body, lv_pct(100));
-    lv_obj_set_height(modal_body, lv_pct(100));  // Fill modal height
+    lv_obj_set_height(modal_body, LV_SIZE_CONTENT);  // Auto-size height to content
     lv_obj_set_style_pad_all(modal_body, 0, 0);
     lv_obj_set_style_pad_gap(modal_body, 12, 0);
-    lv_obj_set_scroll_dir(modal_body, LV_DIR_VER);  // Enable vertical scrolling
+    lv_obj_set_scroll_dir(modal_body, LV_DIR_VER);  // Allow vertical scrolling
     lv_obj_set_scrollbar_mode(modal_body, LV_SCROLLBAR_MODE_AUTO);  // Show scrollbar when needed
-    lv_obj_set_scroll_snap_y(modal_body, LV_SCROLL_SNAP_NONE);  // Smooth scrolling
 
     lv_obj_set_layout(modal_body, LV_LAYOUT_GRID);
     static lv_coord_t grid_cols[] = { LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST };
@@ -1319,10 +1317,8 @@ void UIBuilder::createInfoModal() {
     lv_obj_set_style_pad_bottom(updates_header, 8, 0);
 
     ota_primary_button_ = lv_btn_create(updates_header);
-    Serial.printf("[UI] Created ota_primary_button_ at %p, parent: %p\n", ota_primary_button_, updates_header);
-    Serial.printf("[UI] updates_card at %p, modal_body at %p\n", updates_card, modal_body);
+    Serial.printf("[UI] Created ota_primary_button_ at %p\n", ota_primary_button_);
     lv_obj_set_size(ota_primary_button_, 200, 40);  // Fixed width + height
-    lv_obj_clear_flag(ota_primary_button_, LV_OBJ_FLAG_HIDDEN);  // Ensure not hidden
     lv_obj_set_style_bg_color(ota_primary_button_, UITheme::COLOR_ACCENT, 0);
     lv_obj_set_style_bg_opa(ota_primary_button_, LV_OPA_COVER, 0);
     lv_obj_set_style_radius(ota_primary_button_, UITheme::RADIUS_MD, 0);
@@ -1331,13 +1327,6 @@ void UIBuilder::createInfoModal() {
     lv_obj_set_style_shadow_color(ota_primary_button_, lv_color_hex(0x000000), 0);
     lv_obj_set_style_shadow_opa(ota_primary_button_, LV_OPA_20, 0);
     lv_obj_add_event_cb(ota_primary_button_, otaUpdateButtonEvent, LV_EVENT_CLICKED, nullptr);
-    
-    lv_coord_t btn_x = lv_obj_get_x(ota_primary_button_);
-    lv_coord_t btn_y = lv_obj_get_y(ota_primary_button_);
-    Serial.printf("[UI] Button position: x=%d, y=%d\n", btn_x, btn_y);
-    Serial.printf("[UI] OTA button visible: %d, clickable: %d\n", 
-                  !lv_obj_has_flag(ota_primary_button_, LV_OBJ_FLAG_HIDDEN),
-                  lv_obj_has_flag(ota_primary_button_, LV_OBJ_FLAG_CLICKABLE));
 
     ota_primary_button_label_ = lv_label_create(ota_primary_button_);
     Serial.printf("[UI] Created ota_primary_button_label_ at %p\n", ota_primary_button_label_);
@@ -1416,29 +1405,9 @@ void UIBuilder::showInfoModal() {
     }
 
     info_modal_visible_ = true;
-    Serial.printf("[UI] Opening info modal\n");
-    Serial.printf("[UI] - Modal bg at %p, modal at %p\n", info_modal_bg_, info_modal_);
-    Serial.printf("[UI] - OTA button at %p\n", ota_primary_button_);
-    if (ota_primary_button_) {
-        Serial.printf("[UI] - Button hidden: %d, parent: %p\n", 
-                      lv_obj_has_flag(ota_primary_button_, LV_OBJ_FLAG_HIDDEN),
-                      lv_obj_get_parent(ota_primary_button_));
-    }
-    
-    // Auto-check for GitHub updates when modal opens
-    updateOtaStatus("checking-github");
-    std::vector<std::string> versions;
-    if (OTAUpdateManager::instance().checkGitHubVersions(versions) && !versions.empty()) {
-        latest_github_version_ = versions[0];
-        if (latest_github_version_ != APP_VERSION) {
-            updateOtaStatus("update-available-" + latest_github_version_);
-        } else {
-            updateOtaStatus("up-to-date");
-        }
-    } else {
-        updateOtaStatus("github-check-failed");
-    }
-    
+    Serial.printf("[UI] Opening info modal, triggering OTA check\n");
+    OTAUpdateManager::instance().triggerImmediateCheck(false);  // Trigger check when modal opens
+    updateOtaStatus(OTAUpdateManager::instance().lastStatus());
     refreshNetworkStatusLabel();
     refreshVersionLabel();
 
@@ -1923,46 +1892,9 @@ void UIBuilder::otaUpdateButtonEvent(lv_event_t* e) {
     Serial.printf("[UI] OTA action: %d (0=blocked, 1=check, 2=install)\n", (int)ui.ota_primary_action_);
     OTAUpdateManager& ota = OTAUpdateManager::instance();
     const bool install_now = (ui.ota_primary_action_ == OtaAction::INSTALL);
-    
-    if (install_now) {
-        // Install the version that was previously found
-        Serial.printf("[UI] Installing latest GitHub version\n");
-        ui.updateOtaStatus("installing");
-        // The available version should be in ui.latest_github_version_
-        if (!ui.latest_github_version_.empty()) {
-            bool success = ota.installVersionFromGitHub(ui.latest_github_version_);
-            if (!success) {
-                ui.updateOtaStatus("install-failed");
-            }
-        } else {
-            ui.updateOtaStatus("no-version-selected");
-        }
-    } else {
-        // Check GitHub for available versions
-        Serial.printf("[UI] Checking GitHub for updates\n");
-        ui.updateOtaStatus("checking-github");
-        std::vector<std::string> versions;
-        bool success = ota.checkGitHubVersions(versions);
-        
-        if (success && !versions.empty()) {
-            // Get the latest version (first in list)
-            std::string latest_version = versions[0];
-            ui.latest_github_version_ = latest_version;
-            
-            // Compare with current version
-            if (latest_version != APP_VERSION) {
-                Serial.printf("[UI] Update available: %s (current: %s)\n", latest_version.c_str(), APP_VERSION);
-                ui.updateOtaStatus("update-available-" + latest_version);
-            } else {
-                Serial.printf("[UI] Already on latest version: %s\n", APP_VERSION);
-                ui.updateOtaStatus("up-to-date");
-            }
-        } else {
-            Serial.printf("[UI] GitHub check failed or no versions found\n");
-            ui.updateOtaStatus("github-check-failed");
-        }
-    }
-    
+    Serial.printf("[UI] Calling triggerImmediateCheck with install_now=%d\n", install_now);
+    ota.triggerImmediateCheck(install_now);
+    ui.updateOtaStatus(ota.lastStatus());
     ui.resetSleepTimer();
     Serial.printf("[UI] OTA button handler complete\n");
 }

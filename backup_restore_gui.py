@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Bronco Controls Version & Backup Manager - GUI Application
-User-friendly interface for version management, backups, and OTA updates
+Bronco Controls Backup & Restore - GUI Application
+User-friendly Windows interface for device management
 """
 
 import sys
@@ -20,8 +20,8 @@ from backup_restore_manager import BackupRestoreManager
 class BackupRestoreGUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("Bronco Controls - Version & Backup Manager")
-        self.root.geometry("1000x750")
+        self.root.title("Bronco Controls - Backup & Restore Manager")
+        self.root.geometry("900x700")
         self.root.resizable(True, True)
         
         # Configure style
@@ -54,10 +54,6 @@ class BackupRestoreGUI:
         style.configure('Danger.TButton', font=('Segoe UI', 10), 
                        padding=8, background='#dc3545', foreground='white')
         style.map('Danger.TButton', background=[('active', '#c82333')])
-        
-        style.configure('Warning.TButton', font=('Segoe UI', 10), 
-                       padding=8, background='#ffc107', foreground='black')
-        style.map('Warning.TButton', background=[('active', '#e0a800')])
     
     def create_widgets(self):
         """Create all GUI widgets"""
@@ -101,25 +97,20 @@ class BackupRestoreGUI:
         notebook = ttk.Notebook(main_frame)
         notebook.grid(row=2, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 10))
         
-        # Tab 1: Version Update
-        version_tab = ttk.Frame(notebook, padding="10")
-        notebook.add(version_tab, text="📝 Version Update")
-        self.create_version_tab(version_tab)
-        
-        # Tab 2: Full Backup
+        # Tab 1: Backup
         backup_tab = ttk.Frame(notebook, padding="10")
-        notebook.add(backup_tab, text="📦 Full Backup")
+        notebook.add(backup_tab, text="📦 Backup")
         self.create_backup_tab(backup_tab)
         
-        # Tab 3: OTA Update
-        ota_tab = ttk.Frame(notebook, padding="10")
-        notebook.add(ota_tab, text="📡 OTA Update")
-        self.create_ota_tab(ota_tab)
-        
-        # Tab 4: Restore
+        # Tab 2: Restore
         restore_tab = ttk.Frame(notebook, padding="10")
         notebook.add(restore_tab, text="♻️ Restore")
         self.create_restore_tab(restore_tab)
+        
+        # Tab 3: Test
+        test_tab = ttk.Frame(notebook, padding="10")
+        notebook.add(test_tab, text="🧪 Test")
+        self.create_test_tab(test_tab)
         
         # Console output
         console_frame = ttk.LabelFrame(main_frame, text="Console Output", padding="5")
@@ -136,31 +127,28 @@ class BackupRestoreGUI:
         # Redirect stdout to console
         sys.stdout = ConsoleRedirector(self.console)
         
-        print(f"Bronco Controls Version & Backup Manager")
+        print(f"Bronco Controls Backup & Restore Manager")
         print(f"Current Version: v{self.current_version}")
-        print(f"GitHub: https://github.com/js9467/cancontroller/tree/master/versions")
         print(f"Ready.\n")
     
-    def create_version_tab(self, parent):
-        """Create version update tab (no device needed)"""
+    def create_backup_tab(self, parent):
+        """Create backup tab content"""
         parent.columnconfigure(0, weight=1)
         
         # Info
         info_text = (
-            "📝 Create a Version Update\n\n"
-            "This creates a lightweight version snapshot from your current project state.\n\n"
-            "What happens:\n"
-            "• Build number increments (e.g., 1.3.82 → 1.3.83)\n"
-            "• Builds firmware from current source code\n"
-            "• Creates firmware.bin for OTA updates\n"
-            "• Uploads .bin to GitHub (OTA-capable)\n"
-            "• For major versions (v2→v3), also creates .zip for USB install\n"
-            "• Commits version files to git\n\n"
-            "No device connection required!"
+            "Create a complete backup of your ESP32-S3 device.\n\n"
+            "This includes:\n"
+            "• Bootloader and partition table\n"
+            "• Application firmware (both slots)\n"
+            "• NVS (settings, WiFi credentials, etc.)\n"
+            "• OTA data\n"
+            "• File system (SPIFFS)\n\n"
+            "The version number will be auto-incremented."
         )
         
         info_label = ttk.Label(parent, text=info_text, justify=tk.LEFT, 
-                              font=('Segoe UI', 10))
+                              font=('Segoe UI', 9))
         info_label.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 20))
         
         # Version preview
@@ -170,155 +158,22 @@ class BackupRestoreGUI:
         ttk.Label(version_frame, text="Next Version:", 
                  font=('Segoe UI', 10, 'bold')).grid(row=0, column=0, sticky=tk.W)
         
-        next_ver = self.get_next_version(increment_type='build')
+        next_ver = self.get_next_version()
         ttk.Label(version_frame, text=f"v{next_ver}", 
                  font=('Segoe UI', 14, 'bold'), 
                  foreground='#667eea').grid(row=0, column=1, sticky=tk.W, padx=(10, 0))
         
-        # Button
-        version_btn = ttk.Button(parent, text="📝 Create Version Update", 
-                               style='Success.TButton',
-                               command=self.start_version_update)
-        version_btn.grid(row=2, column=0, pady=10)
-    
-    def create_backup_tab(self, parent):
-        """Create full backup tab content"""
-        parent.columnconfigure(0, weight=1)
-        parent.rowconfigure(0, weight=1)
-        
-        # Create canvas for scrolling
-        canvas = tk.Canvas(parent, highlightthickness=0)
-        scrollbar = ttk.Scrollbar(parent, orient="vertical", command=canvas.yview)
-        scrollable_frame = ttk.Frame(canvas)
-        
-        scrollable_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-        )
-        
-        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar.set)
-        
-        canvas.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
-        scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
-        
-        scrollable_frame.columnconfigure(0, weight=1)
-        
-        # Info
-        info_text = (
-            "📦 Create a FULL BACKUP\n\n"
-            "This creates a complete backup of your ESP32-S3 device hardware + software.\n\n"
-            "What happens:\n"
-            "• MAJOR version increments (e.g., 1.3.82 → 2.0.0)\n"
-            "• Reads ALL flash memory from connected device\n"
-            "• Creates firmware.bin for OTA updates\n"
-            "• Creates .zip archive for USB installation\n"
-            "• Uploads both .bin and .zip to GitHub\n"
-            "• Creates restoration point for known-good hardware state\n\n"
-            "Includes:\n"
-            "✓ Bootloader and partition table\n"
-            "✓ Application firmware (both OTA slots)\n"
-            "✓ NVS (settings, WiFi credentials, CAN config)\n"
-            "✓ OTA data partition\n"
-            "✓ File system (SPIFFS)\n\n"
-            "Use this when you have a groundbreaking change or stable milestone!"
-        )
-        
-        info_label = ttk.Label(scrollable_frame, text=info_text, justify=tk.LEFT, 
-                              font=('Segoe UI', 9))
-        info_label.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 20), padx=10)
-        
-        # Version preview
-        version_frame = ttk.Frame(scrollable_frame)
-        version_frame.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=(0, 10), padx=10)
-        
-        ttk.Label(version_frame, text="Next Version:", 
-                 font=('Segoe UI', 10, 'bold')).grid(row=0, column=0, sticky=tk.W)
-        
-        next_ver = self.get_next_version(increment_type='major')
-        ttk.Label(version_frame, text=f"v{next_ver} (MAJOR)", 
-                 font=('Segoe UI', 14, 'bold'), 
-                 foreground='#dc3545').grid(row=0, column=1, sticky=tk.W, padx=(10, 0))
-        
-        # Warning
-        warning_frame = ttk.Frame(scrollable_frame, relief=tk.RIDGE, borderwidth=2)
-        warning_frame.grid(row=2, column=0, sticky=(tk.W, tk.E), pady=(0, 20), padx=10)
-        warning_frame.columnconfigure(0, weight=1)
-        
-        ttk.Label(warning_frame, text="⚠️ DEVICE REQUIRED", 
-                 font=('Segoe UI', 11, 'bold'), 
-                 foreground='#ffc107', 
-                 padding=10).grid(row=0, column=0)
-        
-        ttk.Label(warning_frame, 
-                 text="Device must be connected via USB.\nThis operation takes 3-5 minutes.",
-                 font=('Segoe UI', 9),
-                 justify=tk.CENTER,
-                 padding=(10, 0, 10, 10)).grid(row=1, column=0)
+        # GitHub upload option
+        self.upload_var = tk.BooleanVar(value=False)
+        upload_check = ttk.Checkbutton(parent, text="📤 Upload to GitHub (requires GITHUB_TOKEN)", 
+                                       variable=self.upload_var)
+        upload_check.grid(row=2, column=0, sticky=tk.W, pady=(0, 20))
         
         # Backup button
-        backup_btn = ttk.Button(scrollable_frame, text="📦 Create FULL BACKUP", 
-                               style='Warning.TButton',
-                               command=self.start_full_backup)
-        backup_btn.grid(row=3, column=0, pady=20)
-        
-        # Enable mousewheel scrolling
-        def _on_mousewheel(event):
-            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
-        canvas.bind_all("<MouseWheel>", _on_mousewheel)
-    
-    def create_ota_tab(self, parent):
-        """Create OTA update tab"""
-        parent.columnconfigure(0, weight=1)
-        parent.rowconfigure(1, weight=1)
-        
-        # Info
-        info_text = (
-            "📡 Over-The-Air Updates\n\n"
-            "Check for available firmware versions on GitHub and upgrade your device wirelessly.\n"
-            "(Coming Soon - Manual OTA selection)"
-        )
-        
-        info_label = ttk.Label(parent, text=info_text, justify=tk.LEFT, 
-                              font=('Segoe UI', 10))
-        info_label.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 20))
-        
-        # Versions list
-        list_frame = ttk.LabelFrame(parent, text="Available GitHub Versions", padding="10")
-        list_frame.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 10))
-        list_frame.columnconfigure(0, weight=1)
-        list_frame.rowconfigure(0, weight=1)
-        
-        # Treeview for versions
-        columns = ('Type', 'Size')
-        self.version_tree = ttk.Treeview(list_frame, columns=columns, show='tree headings', height=10)
-        
-        self.version_tree.heading('#0', text='Version')
-        self.version_tree.heading('Type', text='Type')
-        self.version_tree.heading('Size', text='Size (MB)')
-        
-        self.version_tree.column('#0', width=150)
-        self.version_tree.column('Type', width=150, anchor=tk.CENTER)
-        self.version_tree.column('Size', width=100, anchor=tk.E)
-        
-        self.version_tree.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
-        
-        # Scrollbar
-        scrollbar = ttk.Scrollbar(list_frame, orient=tk.VERTICAL, command=self.version_tree.yview)
-        scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
-        self.version_tree.configure(yscrollcommand=scrollbar.set)
-        
-        # Buttons
-        btn_frame = ttk.Frame(parent)
-        btn_frame.grid(row=2, column=0, pady=10)
-        
-        ttk.Button(btn_frame, text="🔄 Check for Updates", 
-                  style='Action.TButton',
-                  command=self.check_github_versions).grid(row=0, column=0, padx=5)
-        
-        # OTA button (placeholder for future)
-        ttk.Button(btn_frame, text="📡 OTA Update (Coming Soon)", 
-                  state='disabled').grid(row=0, column=1, padx=5)
+        backup_btn = ttk.Button(parent, text="🔽 Create Backup", 
+                               style='Action.TButton',
+                               command=self.start_backup)
+        backup_btn.grid(row=3, column=0, pady=10)
     
     def create_restore_tab(self, parent):
         """Create restore tab content"""
@@ -343,18 +198,16 @@ class BackupRestoreGUI:
         list_frame.rowconfigure(0, weight=1)
         
         # Treeview for backups
-        columns = ('Version', 'Type', 'Date', 'Size')
+        columns = ('Version', 'Date', 'Size')
         self.backup_tree = ttk.Treeview(list_frame, columns=columns, show='tree headings', height=8)
         
         self.backup_tree.heading('#0', text='Backup Name')
         self.backup_tree.heading('Version', text='Version')
-        self.backup_tree.heading('Type', text='Type')
         self.backup_tree.heading('Date', text='Date')
         self.backup_tree.heading('Size', text='Size (MB)')
         
-        self.backup_tree.column('#0', width=200)
+        self.backup_tree.column('#0', width=250)
         self.backup_tree.column('Version', width=80, anchor=tk.CENTER)
-        self.backup_tree.column('Type', width=120, anchor=tk.CENTER)
         self.backup_tree.column('Date', width=150, anchor=tk.CENTER)
         self.backup_tree.column('Size', width=80, anchor=tk.E)
         
@@ -379,19 +232,53 @@ class BackupRestoreGUI:
                   style='Danger.TButton',
                   command=self.start_restore).grid(row=0, column=2, padx=5)
     
-    def get_next_version(self, increment_type='build'):
+    def create_test_tab(self, parent):
+        """Create test tab content"""
+        parent.columnconfigure(0, weight=1)
+        
+        # Info
+        info_text = (
+            "🧪 Full Test Cycle\n\n"
+            "This will perform a complete backup-erase-restore cycle:\n\n"
+            "1. Create a new backup (version incremented)\n"
+            "2. Completely erase the device flash\n"
+            "3. Restore from the newly created backup\n\n"
+            "This verifies that the backup/restore process works correctly.\n"
+            "The device will be in the same state after the test."
+        )
+        
+        info_label = ttk.Label(parent, text=info_text, justify=tk.LEFT, 
+                              font=('Segoe UI', 10))
+        info_label.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 30))
+        
+        # Warning
+        warning_frame = ttk.Frame(parent, relief=tk.RIDGE, borderwidth=2)
+        warning_frame.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=(0, 20))
+        warning_frame.columnconfigure(0, weight=1)
+        
+        ttk.Label(warning_frame, text="⚠️ IMPORTANT", 
+                 font=('Segoe UI', 11, 'bold'), 
+                 foreground='#ffc107', 
+                 padding=10).grid(row=0, column=0)
+        
+        ttk.Label(warning_frame, 
+                 text="This process will temporarily erase your device.\nMake sure you have time for the full cycle (5-10 minutes).",
+                 font=('Segoe UI', 9),
+                 justify=tk.CENTER,
+                 padding=(10, 0, 10, 10)).grid(row=1, column=0)
+        
+        # Test button
+        test_btn = ttk.Button(parent, text="▶️ Run Full Test Cycle", 
+                             style='Action.TButton',
+                             command=self.start_test)
+        test_btn.grid(row=2, column=0, pady=20)
+    
+    def get_next_version(self):
         """Calculate next version number"""
         current = self.current_version
-        parts = list(map(int, current.split('.')))
-        
-        if increment_type == 'major':
-            parts[0] += 1
-            parts[1] = 0
-            parts[2] = 0
-        else:  # build
-            parts[2] += 1
-        
-        return '.'.join(map(str, parts))
+        parts = current.split('.')
+        parts[-1] = str(int(parts[-1]) + 1)
+        return '.'.join(parts)
     
     def refresh_backups(self):
         """Refresh the backups list"""
@@ -407,10 +294,9 @@ class BackupRestoreGUI:
             date = backup['date'][:19].replace('T', ' ')
             size_mb = backup['size'] / (1024 * 1024)
             name = backup['path'].name
-            backup_type = 'Full Backup' if '_FULL' in name else 'Version Update'
             
             self.backup_tree.insert('', 'end', text=name, 
-                                   values=(version, backup_type, date, f"{size_mb:.1f}"),
+                                   values=(version, date, f"{size_mb:.1f}"),
                                    tags=(str(backup['path']),))
     
     def open_backups_folder(self):
@@ -418,84 +304,23 @@ class BackupRestoreGUI:
         import subprocess
         subprocess.Popen(f'explorer "{self.manager.backups_dir}"')
     
-    def check_github_versions(self):
-        """Check for available versions on GitHub"""
-        def check_thread():
-            try:
-                self.disable_buttons()
-                
-                # Clear existing items
-                for item in self.version_tree.get_children():
-                    self.version_tree.delete(item)
-                
-                # Fetch versions
-                versions = self.manager.list_github_versions()
-                
-                # Populate tree
-                for v in versions:
-                    size_mb = v['size'] / (1024 * 1024)
-                    self.version_tree.insert('', 'end', text=f"v{v['version']}", 
-                                           values=(v['type'], f"{size_mb:.1f}"),
-                                           tags=(v['download_url'],))
-                
-                if not versions:
-                    messagebox.showinfo("No Versions", "No versions found on GitHub.")
-                
-            except Exception as e:
-                messagebox.showerror("Error", f"Failed to check versions:\n{str(e)}")
-            finally:
-                self.enable_buttons()
-        
-        threading.Thread(target=check_thread, daemon=True).start()
-    
-    def start_version_update(self):
-        """Start version update (no device needed)"""
-        def version_thread():
-            try:
-                self.disable_buttons()
-                version_folder, version = self.manager.version_update()
-                
-                if version_folder:
-                    self.refresh_backups()
-                    self.current_version = version
-                    messagebox.showinfo("Success", 
-                                       f"Version update completed!\nVersion: v{version}\n\n"
-                                       f"Files created:\n"
-                                       f"• firmware.bin (for OTA updates)\n"
-                                       f"• Uploaded to GitHub automatically\n\n"
-                                       f"Your device can now update OTA to this version!")
-                else:
-                    messagebox.showerror("Error", "Version update failed. Check console for details.")
-            except Exception as e:
-                messagebox.showerror("Error", f"Version update failed:\n{str(e)}")
-            finally:
-                self.enable_buttons()
-        
-        threading.Thread(target=version_thread, daemon=True).start()
-    
-    def start_full_backup(self):
-        """Start full backup from device"""
+    def start_backup(self):
+        """Start backup in background thread"""
         def backup_thread():
             try:
                 self.disable_buttons()
                 self.manager.port = self.port_var.get()
-                backup_folder, version = self.manager.full_backup()
+                backup_folder, version = self.manager.backup_device()
                 
-                if backup_folder:
-                    self.refresh_backups()
-                    self.current_version = version
-                    messagebox.showinfo("Success", 
-                                       f"FULL BACKUP completed!\nVersion: v{version}\n\n"
-                                       f"Files created:\n"
-                                       f"• firmware.bin (for OTA updates)\n"
-                                       f"• Complete .zip archive (for USB install)\n"
-                                       f"• All flash partitions backed up\n\n"
-                                       f"Location:\n{backup_folder}\n\n"
-                                       f"Uploaded to GitHub automatically.")
-                else:
-                    messagebox.showerror("Error", "Full backup failed. Check console for details.")
+                if backup_folder and self.upload_var.get():
+                    self.manager.upload_to_github(backup_folder, version)
+                
+                self.refresh_backups()
+                self.current_version = version
+                messagebox.showinfo("Success", 
+                                   f"Backup completed!\nVersion: v{version}\n\nLocation:\n{backup_folder}")
             except Exception as e:
-                messagebox.showerror("Error", f"Full backup failed:\n{str(e)}")
+                messagebox.showerror("Error", f"Backup failed:\n{str(e)}")
             finally:
                 self.enable_buttons()
         
@@ -537,6 +362,63 @@ class BackupRestoreGUI:
                 self.enable_buttons()
         
         threading.Thread(target=restore_thread, daemon=True).start()
+    
+    def start_test(self):
+        """Start full test cycle"""
+        result = messagebox.askyesno("Confirm Test", 
+                                     "⚠️ FULL TEST CYCLE ⚠️\n\n"
+                                     "This will:\n"
+                                     "1. Backup current device\n"
+                                     "2. Erase all data\n"
+                                     "3. Restore from backup\n\n"
+                                     "This takes 5-10 minutes.\n\n"
+                                     "Continue?",
+                                     icon='warning')
+        if not result:
+            return
+        
+        def test_thread():
+            try:
+                self.disable_buttons()
+                self.manager.port = self.port_var.get()
+                
+                # Backup
+                print("\n[TEST 1/3] Creating backup...")
+                backup_folder, version = self.manager.backup_device()
+                if not backup_folder:
+                    raise Exception("Backup failed")
+                
+                # Erase
+                print("\n[TEST 2/3] Erasing device...")
+                import subprocess
+                cmd = ['python', '-m', 'esptool', '--chip', 'esp32s3', 
+                       '--port', self.manager.port, 'erase_flash']
+                result = subprocess.run(cmd)
+                if result.returncode != 0:
+                    raise Exception("Erase failed")
+                
+                # Restore
+                print("\n[TEST 3/3] Restoring device...")
+                success = self.manager.restore_device(backup_folder)
+                
+                if success:
+                    self.refresh_backups()
+                    messagebox.showinfo("Test Complete", 
+                                       "✓ Full test cycle completed successfully!\n\n"
+                                       "Device has been:\n"
+                                       "• Backed up\n"
+                                       "• Erased\n"
+                                       "• Restored\n\n"
+                                       "Everything is working correctly!")
+                else:
+                    raise Exception("Restore failed")
+                    
+            except Exception as e:
+                messagebox.showerror("Test Failed", f"Test cycle failed:\n{str(e)}")
+            finally:
+                self.enable_buttons()
+        
+        threading.Thread(target=test_thread, daemon=True).start()
     
     def disable_buttons(self):
         """Disable all action buttons during operations"""

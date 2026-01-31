@@ -113,6 +113,7 @@ private:
     lv_obj_t* ota_status_label_ = nullptr;
     lv_obj_t* ota_primary_button_ = nullptr;
     lv_obj_t* ota_primary_button_label_ = nullptr;
+    lv_obj_t* ota_modal_ = nullptr;  // Separate OTA updates popup
     lv_obj_t* network_status_bar_ = nullptr;
     lv_obj_t* ota_status_bar_ = nullptr;
     lv_obj_t* diagnostics_label_ = nullptr;

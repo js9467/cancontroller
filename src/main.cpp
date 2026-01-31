@@ -33,7 +33,7 @@
 #define USB_SEL 5
 
 // I2C definitions for the external IO expander (CH422G)
-#define I2C_MASTER_NUM 0
+#define I2C_MASTER_NUM 1
 #define I2C_MASTER_SDA_IO 8
 #define I2C_MASTER_SCL_IO 9
 
@@ -228,7 +228,7 @@ void setup() {
     delay(50);
     if (expander) {
         expander->digitalWrite(USB_SEL, HIGH);
-        Serial.println("[Boot] USB_SEL set HIGH for CAN transceiver");
+        Serial.println("[Boot] USB_SEL re-confirmed HIGH for CAN transceiver");
     }
 
     // === CAN INITIALIZATION (after I2C is ready) ===

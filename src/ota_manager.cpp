@@ -358,12 +358,17 @@ bool OTAUpdateManager::downloadAndInstall(const ManifestInfo& manifest) {
         return false;
     }
 
-    if (!Update.begin(content_length)) {
+    // Begin OTA update - explicitly specify U_FLASH to update firmware partition
+    if (!Update.begin(content_length, U_FLASH)) {
+        Serial.println("[OTA] Update.begin() FAILED - cannot allocate flash space");
+        Serial.printf("[OTA] Required: %u bytes, U_FLASH=%d\n", content_length, U_FLASH);
         Update.printError(Serial);
         setStatus("update-begin-failed");
         http.end();
         return false;
     }
+    
+    Serial.printf("[OTA] Update.begin() SUCCESS - allocated %u bytes in flash partition\n", content_length);
 
     if (!manifest.md5.empty()) {
         if (!Update.setMD5(manifest.md5.c_str())) {
@@ -456,15 +461,19 @@ bool OTAUpdateManager::downloadAndInstall(const ManifestInfo& manifest) {
         delay(5);
     }
     
-    // Use Update.end(false) to prevent automatic restart
-    if (!Update.end(false)) {
-        Serial.println("[OTA] Update.end() failed");
+    // Use Update.end(true) to mark new firmware as bootable
+    if (!Update.end(true)) {
+        Serial.println("[OTA] Update.end() FAILED");
         Update.printError(Serial);
         setStatus("update-end-failed");
         return false;
     }
 
-    Serial.println("[OTA] Firmware update finalized");
+    Serial.println("[OTA] ✓ Firmware update finalized SUCCESSFULLY");
+    Serial.printf("[OTA] ✓ Boot partition will switch on restart\n");
+    Serial.printf("[OTA] ✓ Update MD5: %s\n", Update.md5String().c_str());
+    Serial.printf("[OTA] Boot partition will switch on restart\n");
+    Serial.printf("[OTA] Current MD5: %s\n", Update.md5String().c_str());
     updateOtaProgress(99);
     
     // CRITICAL FIX: Do NOT save config before restart!
@@ -727,6 +736,7 @@ bool OTAUpdateManager::installVersionFromGitHub(const std::string& version) {
     Serial.printf("[OTA] Downloading: %s\n", bin_url.c_str());
     http.begin(client, bin_url.c_str());
     http.setUserAgent(kUserAgent);
+    http.addHeader(kAuthHeader, kAuthValue);  // Add GitHub token for private repo access
     
     int httpCode = http.GET();
     
@@ -749,8 +759,8 @@ bool OTAUpdateManager::installVersionFromGitHub(const std::string& version) {
         return false;
     }
     
-    // Begin OTA update
-    if (!Update.begin(contentLength)) {
+    // Begin OTA update - explicitly specify U_FLASH to update firmware partition
+    if (!Update.begin(contentLength, U_FLASH)) {
         Serial.printf("[OTA] Not enough space: %s\n", Update.errorString());
         setStatus("insufficient-space");
         http.end();
@@ -806,11 +816,27 @@ bool OTAUpdateManager::installVersionFromGitHub(const std::string& version) {
         return false;
     }
     
-    Serial.println("[OTA] ✓ Update successful! Rebooting...");
+    Serial.println("[OTA] ✓ Update successful! Rebooting in 3 seconds...");
     setStatus("update-successful");
     updateOtaProgress(100);
-    delay(2000);
+    
+    // Give time for UI to update
+    for (int i = 3; i > 0; i--) {
+        Serial.printf("[OTA] Restarting in %d...\n", i);
+        delay(1000);
+        yield();
+    }
+    
+    Serial.println("[OTA] **RESTARTING NOW**");
+    Serial.flush();
+    delay(100);
     
     ESP.restart();
+    
+    // Should never reach here
+    while(1) {
+        delay(1000);
+    }
+    
     return true;
 }

@@ -2498,7 +2498,7 @@ async function checkForUpdates(){
 	if (btn) btn.disabled = true;
 	const updateChip = document.getElementById('update-available');
 	if (updateChip) updateChip.textContent = 'Checking...';
-		try{
+	try{
 		const res = await fetch('/api/ota/github/versions');
 		const data = await res.json();
 		if (data.status === 'ok' && data.versions && data.versions.length > 0) {
