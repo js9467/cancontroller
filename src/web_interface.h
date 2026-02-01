@@ -2562,10 +2562,17 @@ async function triggerOTAUpdate(){
 		});
 		const data = await res.json();
 		if (data.status === 'ok') {
-			showBanner('Update started! Device rebooting...', 'success');
+			showBanner('Download started... This will take 1-2 minutes. DO NOT close this page!', 'success');
+			// Show status for 90 seconds, then remind user to wait
+			setTimeout(() => {
+				showBanner('Still downloading firmware... Please wait...', 'info');
+			}, 30000);
+			setTimeout(() => {
+				showBanner('Installing firmware... Device will reboot shortly...', 'info');
+			}, 60000);
 			setTimeout(() => {
 				window.location.reload();
-			}, 10000);
+			}, 120000);
 		} else {
 			showBanner(data.message || 'Update failed', 'error');
 			if (btn) {

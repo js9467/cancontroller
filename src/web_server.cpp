@@ -174,9 +174,16 @@ void WebServerManager::configureWifi() {
 }
 
 void WebServerManager::setupRoutes() {
+    // Log ALL incoming requests for debugging
+    server_.onNotFound([](AsyncWebServerRequest* request) {
+        Serial.printf("[WEB] 404: %s %s\n", request->methodToString(), request->url().c_str());
+        request->send(404, "text/plain", "Not Found");
+    });
+    
     // Captive portal detection endpoints - return wrong content to trigger portal
     // iOS and macOS - expects "Success" but we return wrong content to trigger portal
     server_.on("/hotspot-detect.html", HTTP_GET, [](AsyncWebServerRequest* request) {
+        Serial.println("[WEB] GET /hotspot-detect.html");
         AsyncWebServerResponse* response = request->beginResponse(200, "text/html", 
             "<!DOCTYPE html><html><head><meta http-equiv='refresh' content='0; url=http://192.168.4.250/'></head><body></body></html>");
         response->addHeader("Cache-Control", "no-cache, no-store, must-revalidate");
@@ -501,20 +508,25 @@ void WebServerManager::setupRoutes() {
     // GitHub OTA install endpoint
     server_.on("/api/ota/github/install", HTTP_POST, [](AsyncWebServerRequest* request) {}, nullptr,
         [](AsyncWebServerRequest* request, uint8_t* data, size_t len, size_t index, size_t total) {
+            Serial.println("[WEB] /api/ota/github/install endpoint called");
+            
             DynamicJsonDocument doc(256);
             DeserializationError error = deserializeJson(doc, data, len);
             
             if (error) {
+                Serial.println("[WEB] ERROR: Invalid JSON");
                 request->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
                 return;
             }
             
             if (!doc.containsKey("version")) {
+                Serial.println("[WEB] ERROR: Missing version parameter");
                 request->send(400, "application/json", "{\"error\":\"Missing version parameter\"}");
                 return;
             }
             
             std::string version = doc["version"].as<std::string>();
+            Serial.printf("[WEB] OTA install requested for version: %s\n", version.c_str());
             
             // Send immediate response
             DynamicJsonDocument response(128);
@@ -525,10 +537,10 @@ void WebServerManager::setupRoutes() {
             serializeJson(response, payload);
             request->send(200, "application/json", payload);
             
-            // Start update in background (will reboot on success)
-            // We delay slightly to let the HTTP response complete
-            delay(500);
-            OTAUpdateManager::instance().installVersionFromGitHub(version);
+            // Start update in separate task (will reboot on success)
+            Serial.println("[WEB] Calling installVersionFromGitHubAsync...");
+            OTAUpdateManager::instance().installVersionFromGitHubAsync(version);
+            Serial.println("[WEB] installVersionFromGitHubAsync returned");
         });
 
     // Test CAN frame endpoint

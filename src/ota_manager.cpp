@@ -731,17 +731,36 @@ bool OTAUpdateManager::installVersionFromGitHub(const std::string& version) {
     HTTPClient http;
     WiFiClientSecure client;
     client.setInsecure();
+    client.setTimeout(15);  // 15 second timeout for SSL handshake
     
     // Download the .bin file
     Serial.printf("[OTA] Downloading: %s\n", bin_url.c_str());
-    http.begin(client, bin_url.c_str());
+    
+    if (!http.begin(client, bin_url.c_str())) {
+        Serial.println("[OTA] http.begin() failed!");
+        setStatus("http-begin-failed");
+        hideOtaScreen();
+        return false;
+    }
+    
     http.setUserAgent(kUserAgent);
     http.addHeader(kAuthHeader, kAuthValue);  // Add GitHub token for private repo access
+    http.setTimeout(30000);  // 30 second timeout for download
     
+    Serial.println("[OTA] Sending GET request...");
     int httpCode = http.GET();
+    Serial.printf("[OTA] HTTP response code: %d\n", httpCode);
     
     if (httpCode != HTTP_CODE_OK) {
         Serial.printf("[OTA] Download failed: %d\n", httpCode);
+        if (httpCode == -1) {
+            Serial.println("[OTA] HTTP error -1: Connection/SSL handshake failed");
+            Serial.println("[OTA] Check WiFi signal strength and GitHub availability");
+        } else if (httpCode == 404) {
+            Serial.printf("[OTA] File not found: %s\n", bin_url.c_str());
+        } else {
+            Serial.printf("[OTA] HTTP error: %s\n", http.errorToString(httpCode).c_str());
+        }
         setStatus(std::string("download-failed-") + std::to_string(httpCode));
         http.end();
         hideOtaScreen();
@@ -839,4 +858,44 @@ bool OTAUpdateManager::installVersionFromGitHub(const std::string& version) {
     }
     
     return true;
+}
+
+void OTAUpdateManager::installVersionFromGitHubAsync(const std::string& version) {
+    Serial.println("[OTA] installVersionFromGitHubAsync() called");
+    Serial.printf("[OTA] Requested version: %s\n", version.c_str());
+    
+    // Create a task to run the update in the background
+    // This prevents the web server from interfering with the download
+    static std::string version_copy;
+    version_copy = version;  // Make a copy for the task
+    
+    Serial.println("[OTA] Creating FreeRTOS task...");
+    BaseType_t result = xTaskCreate(
+        [](void* param) {
+            std::string* ver = static_cast<std::string*>(param);
+            Serial.printf("[OTA] Starting async update for version %s\n", ver->c_str());
+            
+            // Give web server time to send response
+            vTaskDelay(pdMS_TO_TICKS(1000));
+            
+            // Run the actual update
+            OTAUpdateManager::instance().installVersionFromGitHub(*ver);
+            
+            // Task will end here (device reboots on success)
+            vTaskDelete(NULL);
+        },
+        "OTA_Update",
+        8192,  // Stack size
+        &version_copy,
+        1,     // Priority
+        NULL
+    );
+    
+    if (result == pdPASS) {
+        Serial.println("[OTA] Task created successfully");
+    } else {
+        Serial.println("[OTA] ERROR: Failed to create task!");
+    }
+    
+    Serial.println("[OTA] installVersionFromGitHubAsync() returning");
 }

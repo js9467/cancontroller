@@ -1,17 +1,11 @@
 #include "can_manager.h"
+#include "hardware_config.h"
 
 #include <driver/twai.h>
 #include <freertos/FreeRTOS.h>
 #include <Wire.h>
 
 #include <algorithm>
-
-// CH422G I2C configuration for CAN transceiver power
-// NOTE: CH422G uses REGISTER addresses as I2C device addresses (unique protocol)
-#define CH422G_REG_WR_IO    0x38  // Output control register I2C address
-#define CH422G_USB_SEL_HIGH 0x2A  // USB_SEL (bit 5) = HIGH, enables CAN transceiver
-#define I2C_SDA_PIN         8
-#define I2C_SCL_PIN         9
 
 CanManager& CanManager::instance() {
     static CanManager manager;
@@ -25,26 +19,9 @@ bool CanManager::begin(gpio_num_t tx_pin, gpio_num_t rx_pin, std::uint32_t bitra
 
     Serial.printf("[CanManager] Initializing TWAI on TX=GPIO%d, RX=GPIO%d, Bitrate=%lu\n", tx_pin_, rx_pin_, bitrate_);
 
-    // CRITICAL: Enable CAN transceiver via CH422G I2C expander BEFORE starting TWAI
-    // The SN65HVD230 CAN transceiver power is controlled by USB_SEL pin on CH422G
-    // Without this, GPIO19 RX will not receive any CAN messages
-    // NOTE: CH422G has unique I2C protocol - register address IS the I2C device address
-    // I2C is already initialized by panel library - just write directly
-    Serial.println("[CanManager] Enabling CAN transceiver via CH422G...");
-    
-    // Write to CH422G register 0x38 (WR_IO) to set USB_SEL HIGH
-    // beginTransmission takes the REGISTER address, not a device address!
-    Wire.beginTransmission(CH422G_REG_WR_IO);  // 0x38, not 0x24!
-    Wire.write(CH422G_USB_SEL_HIGH);            // 0x2A
-    int i2c_result = Wire.endTransmission();
-    
-    if (i2c_result == 0) {
-        Serial.println("[CanManager] ✓ CAN transceiver enabled (USB_SEL=HIGH)");
-    } else {
-        Serial.printf("[CanManager] ⚠ CH422G I2C write failed (err=%d) - CAN may not work\n", i2c_result);
-    }
-    
-    delay(50); // Give transceiver time to power up
+    // NOTE: CAN transceiver power (USB_SEL) is controlled by main.cpp via ESP_IOExpander
+    // The expander sets USB_SEL HIGH before calling this function
+    // Do NOT write to CH422G here - it would conflict with expander management
 
     twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT(tx_pin_, rx_pin_, TWAI_MODE_NORMAL);
     g_config.tx_queue_len = 8;

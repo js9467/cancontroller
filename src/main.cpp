@@ -174,7 +174,7 @@ void setup() {
     // Initialize display panel
     panel = new ESP_Panel();
 
-    // Configure IO expander - create and add to panel, let panel->init() handle full initialization
+    // Configure IO expander - panel->init() will initialize I2C for touch
     ESP_IOExpander* expander = new ESP_IOExpander_CH422G(I2C_MASTER_NUM, ESP_IO_EXPANDER_I2C_CH422G_ADDRESS_000);
     expander->init();
     expander->begin();
@@ -216,13 +216,19 @@ void setup() {
     lv_indev_drv_register(&indev_drv);
 #endif
 
+    Serial.println("[Boot] Calling panel->init()...");
     panel->init();
+    Serial.println("[Boot] ✓ panel->init() completed");
+    
 #if ESP_PANEL_LCD_BUS_TYPE != ESP_PANEL_BUS_TYPE_RGB
     panel->getLcd()->setCallback(notify_lvgl_flush_ready, &disp_drv);
 #endif
+    
+    Serial.println("[Boot] Calling panel->begin()...");
     panel->begin();
+    Serial.println("[Boot] ✓ panel->begin() completed");
 
-    // CRITICAL: Re-ensure USB_SEL is HIGH after panel initialization
+    // Re-confirm USB_SEL is HIGH after panel initialization
     // The ESP_IOExpander may have been reset during panel->init()
     // USB_SEL (bit 5) must be HIGH to power the CAN transceiver
     delay(50);
@@ -244,10 +250,15 @@ void setup() {
     Serial.println();
 
     // Enable backlight
+    Serial.println("[Boot] Getting backlight...");
     auto *backlight = panel->getBacklight();
     if (backlight) {
+        Serial.println("[Boot] ✓ Backlight found, turning on...");
         backlight->on();
         backlight->setBrightness(255);
+        Serial.println("[Boot] ✓ Backlight enabled at 100%");
+    } else {
+        Serial.println("[Boot] ✗ ERROR: Backlight is NULL!");
     }
 
     // Start LVGL background task
