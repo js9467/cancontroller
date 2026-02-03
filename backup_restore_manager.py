@@ -15,6 +15,9 @@ from datetime import datetime
 import requests
 import base64
 import re
+import zipfile
+import shutil
+import tempfile
 
 class BackupRestoreManager:
     """Manages full device backup and restore operations for ESP32-S3"""
@@ -42,9 +45,10 @@ class BackupRestoreManager:
         self.version_header = self.project_dir / 'src' / 'version_auto.h'
         
         # GitHub configuration
-        self.github_repo = 'js9467/autotouchscreen'
-        self.github_branch = 'main'
+        self.github_repo = 'js9467/cancontroller'
+        self.github_branch = 'master'
         self.github_folder = 'versions'
+        self.github_token = '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'
         
     def get_current_version(self):
         """Read current version from version state file"""
@@ -279,9 +283,9 @@ class BackupRestoreManager:
         print(f"\n[Backup] Preparing OTA firmware...")
         self.copy_firmware_for_ota(version)
         
-        # Push ALL versions to git automatically
+        # Push ALL versions to git automatically and create GitHub release with backup
         print(f"\n[Git] Pushing to repository...")
-        self.git_push_all(version, True)
+        self.git_push_all(version, True, backup_folder)
         
         print(f"\n{'='*60}")
         print(f"[Backup] ✓ Complete! Backup saved to:")
@@ -346,11 +350,16 @@ pause
         restore_script.write_text(script_content, encoding='utf-8')
         print(f"[Backup] Created restore script: {restore_script.name}")
     
-    def restore_device(self, backup_folder):
-        """Restore device from a backup folder"""
-        backup_path = Path(backup_folder)
+    def restore_device(self, backup_source):
+        """Restore device from a backup folder or GitHub URL"""
+        # Check if it's a GitHub URL
+        if isinstance(backup_source, str) and backup_source.startswith('http'):
+            return self.restore_from_github(backup_source)
+        
+        # Local backup restore
+        backup_path = Path(backup_source)
         if not backup_path.exists():
-            print(f"[Error] Backup folder not found: {backup_folder}")
+            print(f"[Error] Backup folder not found: {backup_source}")
             return False
         
         metadata_file = backup_path / 'backup_metadata.json'
@@ -429,6 +438,71 @@ pause
         print(f"{'='*60}\n")
         
         return True
+    
+    def restore_from_github(self, download_url):
+        """Download and restore backup from GitHub"""
+        try:
+            print(f"\n{'='*60}")
+            print(f"[GitHub] Downloading backup from GitHub...")
+            print(f"{'='*60}\n")
+            
+            # Download zip file
+            headers = {
+                'Authorization': f'token {self.github_token}',
+                'Accept': 'application/octet-stream'
+            }
+            
+            response = requests.get(download_url, headers=headers, stream=True)
+            
+            if response.status_code != 200:
+                print(f"[Error] Download failed: {response.status_code}")
+                return False
+            
+            # Save to temp file
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.zip') as temp_zip:
+                total_size = int(response.headers.get('content-length', 0))
+                downloaded = 0
+                
+                for chunk in response.iter_content(chunk_size=8192):
+                    temp_zip.write(chunk)
+                    downloaded += len(chunk)
+                    if total_size > 0:
+                        percent = (downloaded / total_size) * 100
+                        print(f"\r[Download] {percent:.1f}% ({downloaded / (1024*1024):.1f} MB)", end='')
+                
+                temp_zip_path = temp_zip.name
+            
+            print(f"\n[Download] ✓ Download complete")
+            
+            # Extract to temp directory
+            temp_extract_dir = tempfile.mkdtemp()
+            print(f"[Extract] Extracting backup...")
+            
+            with zipfile.ZipFile(temp_zip_path, 'r') as zip_ref:
+                zip_ref.extractall(temp_extract_dir)
+            
+            print(f"[Extract] ✓ Extraction complete")
+            
+            # Find the backup folder (should be only one)
+            extracted_folders = [f for f in Path(temp_extract_dir).iterdir() if f.is_dir()]
+            if not extracted_folders:
+                print(f"[Error] No backup folder found in archive")
+                return False
+            
+            backup_folder = extracted_folders[0]
+            
+            # Restore from extracted folder
+            result = self.restore_device(str(backup_folder))
+            
+            # Clean up
+            os.unlink(temp_zip_path)
+            shutil.rmtree(temp_extract_dir)
+            
+            return result
+            
+        except Exception as e:
+            print(f"[Error] Failed to restore from GitHub: {e}")
+            return False
     
     def build_firmware(self):
         """Build firmware using PlatformIO"""
@@ -524,7 +598,7 @@ pause
             print(f"[OTA] ✗ Copy failed: {e}")
             return False
     
-    def git_push_all(self, version, is_major=False):
+    def git_push_all(self, version, is_major=False, backup_folder=None):
         """Commit all source code and push to git repository"""
         try:
             print(f"[Git] Adding all source files...")
@@ -546,6 +620,11 @@ pause
             
             if result.returncode == 0:
                 print(f"[Git] ✓ Successfully pushed to repository")
+                
+                # If major release and backup folder provided, create GitHub release with backup
+                if is_major and backup_folder:
+                    self.create_github_release(version, backup_folder)
+                
                 return True
             else:
                 print(f"[Git] ✗ Push failed: {result.stderr}")
@@ -558,20 +637,131 @@ pause
             print(f"[Git] ✗ Unexpected error: {e}")
             return False
     
-    def list_backups(self):
-        """List all available backups"""
-        backups = sorted(self.backups_dir.glob('bronco_v*'), reverse=True)
-        
-        if not backups:
-            print("[Backups] No backups found")
+    def create_github_release(self, version, backup_folder):
+        """Create GitHub release with backup zip file"""
+        try:
+            print(f"[GitHub] Creating release v{version} with full backup...")
+            
+            # Create zip file from backup folder
+            backup_path = Path(backup_folder)
+            zip_filename = f"bronco_v{version}_FULL_BACKUP.zip"
+            zip_path = self.project_dir / zip_filename
+            
+            print(f"[GitHub] Creating backup archive...")
+            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                for file in backup_path.rglob('*'):
+                    if file.is_file():
+                        arcname = file.relative_to(backup_path.parent)
+                        zipf.write(file, arcname)
+            
+            zip_size_mb = zip_path.stat().st_size / (1024 * 1024)
+            print(f"[GitHub] Created {zip_filename} ({zip_size_mb:.1f} MB)")
+            
+            # Create GitHub release
+            headers = {
+                'Authorization': f'token {self.github_token}',
+                'Accept': 'application/vnd.github.v3+json'
+            }
+            
+            release_data = {
+                'tag_name': f'v{version}',
+                'name': f'Bronco Controls v{version} - Full Backup',
+                'body': f'Full device backup for version {version}\n\nIncludes complete flash dump with all partitions.',
+                'draft': False,
+                'prerelease': False
+            }
+            
+            print(f"[GitHub] Creating release tag v{version}...")
+            response = requests.post(
+                f'https://api.github.com/repos/{self.github_repo}/releases',
+                headers=headers,
+                json=release_data
+            )
+            
+            if response.status_code == 201:
+                release_id = response.json()['id']
+                upload_url = response.json()['upload_url'].split('{')[0]
+                print(f"[GitHub] ✓ Release created (ID: {release_id})")
+                
+                # Upload zip file as release asset
+                print(f"[GitHub] Uploading backup archive...")
+                upload_headers = headers.copy()
+                upload_headers['Content-Type'] = 'application/zip'
+                
+                with open(zip_path, 'rb') as f:
+                    upload_response = requests.post(
+                        f'{upload_url}?name={zip_filename}',
+                        headers=upload_headers,
+                        data=f
+                    )
+                
+                if upload_response.status_code == 201:
+                    print(f"[GitHub] ✓ Backup uploaded successfully")
+                    print(f"[GitHub] Release URL: https://github.com/{self.github_repo}/releases/tag/v{version}")
+                else:
+                    print(f"[GitHub] ✗ Upload failed: {upload_response.status_code}")
+                    print(f"[GitHub] {upload_response.text}")
+                
+                # Clean up local zip file
+                zip_path.unlink()
+                
+            elif response.status_code == 422:
+                print(f"[GitHub] ℹ Release v{version} already exists")
+            else:
+                print(f"[GitHub] ✗ Failed to create release: {response.status_code}")
+                print(f"[GitHub] {response.text}")
+                
+        except Exception as e:
+            print(f"[GitHub] ✗ Error creating release: {e}")
+    
+    def fetch_github_releases(self):
+        """Fetch available releases from GitHub"""
+        try:
+            headers = {
+                'Authorization': f'token {self.github_token}',
+                'Accept': 'application/vnd.github.v3+json'
+            }
+            
+            response = requests.get(
+                f'https://api.github.com/repos/{self.github_repo}/releases',
+                headers=headers
+            )
+            
+            if response.status_code == 200:
+                releases = response.json()
+                github_backups = []
+                
+                for release in releases:
+                    # Look for full backup assets (zip files)
+                    for asset in release.get('assets', []):
+                        if 'FULL_BACKUP.zip' in asset['name']:
+                            github_backups.append({
+                                'version': release['tag_name'].lstrip('v'),
+                                'date': release['published_at'],
+                                'size': asset['size'],
+                                'download_url': asset['browser_download_url'],
+                                'name': asset['name'],
+                                'source': 'github'
+                            })
+                
+                return github_backups
+            else:
+                print(f"[GitHub] Could not fetch releases: {response.status_code}")
+                return []
+                
+        except Exception as e:
+            print(f"[GitHub] Error fetching releases: {e}")
             return []
-        
-        print(f"\n{'='*60}")
-        print(f"Available Backups ({len(backups)} found):")
-        print(f"{'='*60}")
+    
+    def list_backups(self, include_github=True):
+        """List all available backups (local and GitHub)"""
+        # Get local backups
+        local_backups = sorted(self.backups_dir.glob('bronco_v*'), reverse=True)
         
         backup_info = []
-        for idx, backup in enumerate(backups, 1):
+        
+        # Process local backups
+        for backup in local_backups:
             metadata_file = backup / 'backup_metadata.json'
             if metadata_file.exists():
                 with open(metadata_file, 'r') as f:
@@ -579,20 +769,45 @@ pause
                     version = metadata.get('version', 'unknown')
                     date = metadata.get('backup_date', 'unknown')
                     size = sum(f.stat().st_size for f in backup.rglob('*') if f.is_file())
-                    size_mb = size / (1024 * 1024)
                     
-                    print(f"{idx}. v{version} - {date[:19]} ({size_mb:.1f} MB)")
-                    print(f"   {backup}")
                     backup_info.append({
-                        'path': backup,
+                        'path': str(backup),
                         'version': version,
                         'date': date,
-                        'size': size
+                        'size': size,
+                        'source': 'local'
                     })
-            else:
-                print(f"{idx}. {backup.name} (metadata missing)")
         
-        print(f"{'='*60}\n")
+        # Get GitHub backups
+        if include_github:
+            github_backups = self.fetch_github_releases()
+            backup_info.extend(github_backups)
+        
+        # Sort by version (descending)
+        backup_info.sort(key=lambda x: x['version'], reverse=True)
+        
+        if not backup_info:
+            print("[Backups] No backups found")
+            return []
+        
+        # Display all backups
+        print(f"\n{'='*70}")
+        print(f"Available Backups ({len(backup_info)} found):")
+        print(f"{'='*70}")
+        
+        for idx, backup in enumerate(backup_info, 1):
+            version = backup['version']
+            date = backup['date'][:19] if len(backup['date']) > 19 else backup['date']
+            size_mb = backup['size'] / (1024 * 1024)
+            source = backup['source'].upper()
+            
+            print(f"{idx}. v{version} - {date} ({size_mb:.1f} MB) [{source}]")
+            if backup['source'] == 'local':
+                print(f"   {backup['path']}")
+            else:
+                print(f"   {backup['download_url']}")
+        
+        print(f"{'='*70}\n")
         return backup_info
 
 

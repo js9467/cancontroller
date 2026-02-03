@@ -47,4 +47,12 @@ private:
     bool pending_manual_check_ = false;
     bool manual_install_requested_ = false;
     std::string last_status_ = "idle";
+    std::string last_status_message_ = "Ready";
+    uint8_t last_progress_ = 0;
+
+public:
+    const std::string& lastStatusMessage() const { return last_status_message_; }
+    uint8_t lastProgress() const { return last_progress_; }
+    void setStatusMessage(const std::string& message) { last_status_message_ = message; }
+    void setProgress(uint8_t percent) { last_progress_ = percent; }
 };

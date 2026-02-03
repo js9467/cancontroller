@@ -2693,8 +2693,27 @@ async function triggerOTAUpdate(){
 	const btn = document.getElementById('update-btn');
 	if (btn) {
 		btn.disabled = true;
-		btn.textContent = 'Installing...';
+		btn.textContent = 'Starting...';
 	}
+	
+	// Create progress indicator
+	const updateSection = document.getElementById('update-section');
+	if (updateSection) {
+		updateSection.innerHTML = `
+			<div style="display:flex;flex-direction:column;gap:15px;width:100%;padding:20px;background:#1a1a1a;border-radius:8px;">
+				<div style="text-align:center;">
+					<h3 style="margin:0;color:var(--accent);">Installing Version ${version}</h3>
+					<p id="ota-status-text" style="color:var(--text-secondary);margin:10px 0;">Initializing...</p>
+				</div>
+				<div style="width:100%;height:30px;background:#333;border-radius:15px;overflow:hidden;position:relative;">
+					<div id="ota-progress-bar" style="width:0%;height:100%;background:linear-gradient(90deg, var(--accent) 0%, #ffa500 100%);transition:width 0.3s ease;"></div>
+					<div id="ota-progress-text" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#fff;font-weight:600;">0%</div>
+				</div>
+				<div id="ota-messages" style="font-size:0.85em;color:var(--text-secondary);max-height:150px;overflow-y:auto;"></div>
+			</div>
+		`;
+	}
+	
 	try{
 		const res = await fetch('/api/ota/github/install', {
 			method: 'POST',
@@ -2703,31 +2722,88 @@ async function triggerOTAUpdate(){
 		});
 		const data = await res.json();
 		if (data.status === 'ok') {
-			showBanner('Download started... This will take 1-2 minutes. DO NOT close this page!', 'success');
-			// Show status for 90 seconds, then remind user to wait
-			setTimeout(() => {
-				showBanner('Still downloading firmware... Please wait...', 'info');
-			}, 30000);
-			setTimeout(() => {
-				showBanner('Installing firmware... Device will reboot shortly...', 'info');
-			}, 60000);
-			setTimeout(() => {
-				window.location.reload();
-			}, 120000);
+			// Start polling for status
+			pollOTAStatus();
 		} else {
 			showBanner(data.message || 'Update failed', 'error');
-			if (btn) {
-				btn.disabled = false;
-				btn.textContent = 'Install Selected Version';
-			}
+			setTimeout(() => checkForUpdates(), 2000);
 		}
 	}catch(err){
 		showBanner('Update request failed: '+err.message, 'error');
-		if (btn) {
-			btn.disabled = false;
-			btn.textContent = 'Install Selected Version';
-		}
+		setTimeout(() => checkForUpdates(), 2000);
 	}
+}
+
+let otaPolling = null;
+async function pollOTAStatus() {
+	if (otaPolling) clearInterval(otaPolling);
+	
+	let lastProgress = 0;
+	let consecutiveErrors = 0;
+	
+	otaPolling = setInterval(async () => {
+		try {
+			const res = await fetch('/api/ota/status');
+			if (!res.ok) {
+				consecutiveErrors++;
+				if (consecutiveErrors > 5) {
+					clearInterval(otaPolling);
+					showBanner('Lost connection to device. It may be rebooting...', 'info');
+					setTimeout(() => {
+						showBanner('Attempting to reconnect...', 'info');
+						window.location.reload();
+					}, 10000);
+				}
+				return;
+			}
+			
+			consecutiveErrors = 0;
+			const data = await res.json();
+			
+			// Update progress bar
+			const progressBar = document.getElementById('ota-progress-bar');
+			const progressText = document.getElementById('ota-progress-text');
+			const statusText = document.getElementById('ota-status-text');
+			
+			if (progressBar && data.progress !== undefined) {
+				progressBar.style.width = data.progress + '%';
+				if (progressText) progressText.textContent = data.progress + '%';
+			}
+			
+			if (statusText && data.message) {
+				statusText.textContent = data.message;
+			}
+			
+			// Add status messages
+			const messages = document.getElementById('ota-messages');
+			if (messages && data.message && data.progress > lastProgress) {
+				const msg = document.createElement('div');
+				msg.textContent = `[${new Date().toLocaleTimeString()}] ${data.message} (${data.progress}%)`;
+				messages.appendChild(msg);
+				messages.scrollTop = messages.scrollHeight;
+				lastProgress = data.progress;
+			}
+			
+			// Check if update completed
+			if (data.progress >= 100 || data.message.includes('Success') || data.message.includes('Rebooting')) {
+				clearInterval(otaPolling);
+				showBanner('Update successful! Device is rebooting...', 'success');
+				setTimeout(() => {
+					showBanner('Waiting for device to come back online...', 'info');
+					window.location.reload();
+				}, 5000);
+			}
+			
+		} catch (err) {
+			consecutiveErrors++;
+			console.error('OTA status poll error:', err);
+			if (consecutiveErrors > 5) {
+				clearInterval(otaPolling);
+				showBanner('Device is rebooting. Please wait...', 'info');
+				setTimeout(() => window.location.reload(), 15000);
+			}
+		}
+	}, 500); // Poll every 500ms for smooth updates
 }
 
 document.addEventListener('DOMContentLoaded',()=>{

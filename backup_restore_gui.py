@@ -231,18 +231,20 @@ class BackupRestoreGUI:
         list_frame.rowconfigure(0, weight=1)
         
         # Treeview for backups
-        columns = ('Version', 'Date', 'Size')
-        self.backup_tree = ttk.Treeview(list_frame, columns=columns, show='tree headings', height=8)
+        columns = ('Version', 'Date', 'Size', 'Source')
+        self.backup_tree = ttk.Treeview(list_frame, columns=columns, height=12)
         
-        self.backup_tree.heading('#0', text='Backup Name')
+        self.backup_tree.heading('#0', text='Name / URL')
         self.backup_tree.heading('Version', text='Version')
         self.backup_tree.heading('Date', text='Date')
         self.backup_tree.heading('Size', text='Size (MB)')
+        self.backup_tree.heading('Source', text='Source')
         
-        self.backup_tree.column('#0', width=250)
+        self.backup_tree.column('#0', width=220)
         self.backup_tree.column('Version', width=80, anchor=tk.CENTER)
         self.backup_tree.column('Date', width=150, anchor=tk.CENTER)
         self.backup_tree.column('Size', width=80, anchor=tk.E)
+        self.backup_tree.column('Source', width=70, anchor=tk.CENTER)
         
         self.backup_tree.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
@@ -336,23 +338,30 @@ class BackupRestoreGUI:
             self.next_version_label.config(foreground='#667eea')  # Blue for normal
     
     def refresh_backups(self):
-        """Refresh the backups list"""
+        """Refresh the backups list (local and GitHub)"""
         # Clear existing items
         for item in self.backup_tree.get_children():
             self.backup_tree.delete(item)
         
-        # Get backups
-        backups = self.manager.list_backups()
+        # Get backups (local + GitHub)
+        backups = self.manager.list_backups(include_github=True)
         
         for backup in backups:
             version = backup['version']
             date = backup['date'][:19].replace('T', ' ')
             size_mb = backup['size'] / (1024 * 1024)
-            name = backup['path'].name
+            source = backup['source'].upper()
+            
+            if backup['source'] == 'local':
+                name = Path(backup['path']).name
+                backup_ref = backup['path']
+            else:  # GitHub
+                name = backup.get('name', f"v{version}")
+                backup_ref = backup['download_url']
             
             self.backup_tree.insert('', 'end', text=name, 
-                                   values=(version, date, f"{size_mb:.1f}"),
-                                   tags=(str(backup['path']),))
+                                   values=(version, date, f"{size_mb:.1f}", source),
+                                   tags=(backup_ref,))
     
     def open_backups_folder(self):
         """Open backups folder in explorer"""
@@ -409,13 +418,20 @@ class BackupRestoreGUI:
             messagebox.showwarning("No Selection", "Please select a backup to restore")
             return
         
-        backup_path = self.backup_tree.item(selection[0])['tags'][0]
+        backup_ref = self.backup_tree.item(selection[0])['tags'][0]
+        selected_values = self.backup_tree.item(selection[0])['values']
+        backup_name = self.backup_tree.item(selection[0])['text']
+        
+        # Determine if it's a GitHub or local backup
+        is_github = backup_ref.startswith('http')
+        source_type = "GitHub" if is_github else "Local"
         
         # Confirm
         result = messagebox.askyesno("Confirm Restore", 
                                      f"⚠️ WARNING ⚠️\n\n"
                                      f"This will COMPLETELY ERASE your device and restore:\n"
-                                     f"{Path(backup_path).name}\n\n"
+                                     f"{backup_name}\n"
+                                     f"Source: {source_type}\n\n"
                                      f"ALL CURRENT DATA WILL BE LOST!\n\n"
                                      f"Continue?",
                                      icon='warning')
@@ -426,7 +442,14 @@ class BackupRestoreGUI:
             try:
                 self.disable_buttons()
                 self.manager.port = self.port_var.get()
-                success = self.manager.restore_device(backup_path)
+                
+                if is_github:
+                    messagebox.showinfo("Downloading", 
+                                       f"Downloading backup from GitHub...\n\n"
+                                       f"This may take a few minutes.\n"
+                                       f"Please wait...")
+                
+                success = self.manager.restore_device(backup_ref)
                 
                 if success:
                     messagebox.showinfo("Success", "Restore completed!\n\nDevice has been rebooted.")

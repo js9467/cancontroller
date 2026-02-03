@@ -506,6 +506,28 @@ void WebServerManager::setupRoutes() {
         request->send(success ? 200 : 500, "application/json", payload);
     });
 
+    // OTA status endpoint for polling during update
+    server_.on("/api/ota/status", HTTP_GET, [](AsyncWebServerRequest* request) {
+        DynamicJsonDocument doc(512);
+        OTAUpdateManager& ota = OTAUpdateManager::instance();
+        
+        doc["status"] = ota.lastStatus().c_str();
+        doc["message"] = ota.lastStatusMessage().c_str();
+        doc["progress"] = ota.lastProgress();
+        doc["version"] = APP_VERSION;
+        
+        // Determine if update is in progress
+        const std::string& status = ota.lastStatus();
+        bool in_progress = (status.find("downloading") != std::string::npos ||
+                          status.find("installing") != std::string::npos ||
+                          status.find("update") != std::string::npos);
+        doc["in_progress"] = in_progress;
+        
+        String payload;
+        serializeJson(doc, payload);
+        request->send(200, "application/json", payload);
+    });
+
     // GitHub OTA install endpoint
     server_.on("/api/ota/github/install", HTTP_POST, [](AsyncWebServerRequest* request) {}, nullptr,
         [](AsyncWebServerRequest* request, uint8_t* data, size_t len, size_t index, size_t total) {

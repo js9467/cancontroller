@@ -555,6 +555,8 @@ void OTAUpdateManager::setStatus(const std::string& status) {
 static lv_obj_t* ota_screen = nullptr;
 static lv_obj_t* ota_bar = nullptr;
 static lv_obj_t* ota_label = nullptr;
+static lv_obj_t* ota_status_label = nullptr;
+static lv_obj_t* ota_percent_label = nullptr;
 
 void OTAUpdateManager::showOtaScreen(const std::string& version) {
     if (ota_screen != nullptr) {
@@ -574,7 +576,7 @@ void OTAUpdateManager::showOtaScreen(const std::string& version) {
     lv_label_set_text(title, "Updating Firmware");
     lv_obj_set_style_text_color(title, lv_color_hex(0xffffff), 0);
     lv_obj_set_style_text_font(title, &lv_font_montserrat_24, 0);
-    lv_obj_align(title, LV_ALIGN_CENTER, 0, -60);
+    lv_obj_align(title, LV_ALIGN_CENTER, 0, -80);
     
     // Version label
     ota_label = lv_label_create(ota_screen);
@@ -582,37 +584,55 @@ void OTAUpdateManager::showOtaScreen(const std::string& version) {
     lv_label_set_text(ota_label, msg.c_str());
     lv_obj_set_style_text_color(ota_label, lv_color_hex(0xaaaaaa), 0);
     lv_obj_set_style_text_font(ota_label, &lv_font_montserrat_16, 0);
-    lv_obj_align(ota_label, LV_ALIGN_CENTER, 0, -20);
+    lv_obj_align(ota_label, LV_ALIGN_CENTER, 0, -40);
+    
+    // Status message label
+    ota_status_label = lv_label_create(ota_screen);
+    lv_label_set_text(ota_status_label, "Connecting to GitHub...");
+    lv_obj_set_style_text_color(ota_status_label, lv_color_hex(0x00a8e8), 0);
+    lv_obj_set_style_text_font(ota_status_label, &lv_font_montserrat_14, 0);
+    lv_obj_align(ota_status_label, LV_ALIGN_CENTER, 0, -5);
     
     // Progress bar
     ota_bar = lv_bar_create(ota_screen);
-    lv_obj_set_size(ota_bar, 280, 20);
-    lv_obj_align(ota_bar, LV_ALIGN_CENTER, 0, 20);
+    lv_obj_set_size(ota_bar, 320, 24);
+    lv_obj_align(ota_bar, LV_ALIGN_CENTER, 0, 30);
     lv_obj_set_style_bg_color(ota_bar, lv_color_hex(0x333333), LV_PART_MAIN);
     lv_obj_set_style_bg_color(ota_bar, lv_color_hex(0x00a8e8), LV_PART_INDICATOR);
     lv_bar_set_value(ota_bar, 0, LV_ANIM_OFF);
     lv_bar_set_range(ota_bar, 0, 100);
     
     // Percent label
-    lv_obj_t* percent = lv_label_create(ota_screen);
-    lv_label_set_text(percent, "0%");
-    lv_obj_set_style_text_color(percent, lv_color_hex(0xaaaaaa), 0);
-    lv_obj_align(percent, LV_ALIGN_CENTER, 0, 50);
+    ota_percent_label = lv_label_create(ota_screen);
+    lv_label_set_text(ota_percent_label, "0%");
+    lv_obj_set_style_text_color(ota_percent_label, lv_color_hex(0xaaaaaa), 0);
+    lv_obj_align(ota_percent_label, LV_ALIGN_CENTER, 0, 65);
     
     lv_obj_move_foreground(ota_screen);
 }
 
 void OTAUpdateManager::updateOtaProgress(uint8_t percent) {
-    if (ota_bar != nullptr) {
-        lv_bar_set_value(ota_bar, percent, LV_ANIM_OFF);
-        
-        // Update percent text
-        lv_obj_t* percent_label = lv_obj_get_child(ota_screen, 3);
-        if (percent_label) {
-            std::string text = std::to_string(percent) + "%";
-            lv_label_set_text(percent_label, text.c_str());
-        }
+    if (ota_bar == nullptr) {
+        return;
     }
+    lv_bar_set_value(ota_bar, percent, LV_ANIM_OFF);
+    
+    if (ota_percent_label) {
+        char buf[8];
+        snprintf(buf, sizeof(buf), "%d%%", percent);
+        lv_label_set_text(ota_percent_label, buf);
+    }
+    
+    // Update progress for web interface
+    last_progress_ = percent;
+}
+
+void updateOtaStatusMessage(const char* message) {
+    if (ota_status_label) {
+        lv_label_set_text(ota_status_label, message);
+    }
+    // Update status message for web interface
+    OTAUpdateManager::instance().setStatusMessage(message);
 }
 
 void OTAUpdateManager::hideOtaScreen() {
@@ -720,6 +740,8 @@ bool OTAUpdateManager::installVersionFromGitHub(const std::string& version) {
     
     Serial.printf("[OTA] Installing version %s from GitHub...\n", version.c_str());
     showOtaScreen(version);
+    updateOtaStatusMessage("Connecting to GitHub...");
+    delay(100);  // Allow UI to update
     
     // Download firmware.bin directly from GitHub versions folder
     // GitHub stores: versions/bronco_v1.3.84.bin (for OTA updates)
@@ -735,10 +757,13 @@ bool OTAUpdateManager::installVersionFromGitHub(const std::string& version) {
     
     // Download the .bin file
     Serial.printf("[OTA] Downloading: %s\n", bin_url.c_str());
+    updateOtaStatusMessage("Requesting firmware...");
     
     if (!http.begin(client, bin_url.c_str())) {
         Serial.println("[OTA] http.begin() failed!");
         setStatus("http-begin-failed");
+        updateOtaStatusMessage("Connection failed!");
+        delay(3000);
         hideOtaScreen();
         return false;
     }
@@ -748,6 +773,7 @@ bool OTAUpdateManager::installVersionFromGitHub(const std::string& version) {
     http.setTimeout(30000);  // 30 second timeout for download
     
     Serial.println("[OTA] Sending GET request...");
+    updateOtaStatusMessage("Downloading from GitHub...");
     int httpCode = http.GET();
     Serial.printf("[OTA] HTTP response code: %d\n", httpCode);
     
@@ -756,12 +782,16 @@ bool OTAUpdateManager::installVersionFromGitHub(const std::string& version) {
         if (httpCode == -1) {
             Serial.println("[OTA] HTTP error -1: Connection/SSL handshake failed");
             Serial.println("[OTA] Check WiFi signal strength and GitHub availability");
+            updateOtaStatusMessage("Connection failed!");
         } else if (httpCode == 404) {
             Serial.printf("[OTA] File not found: %s\n", bin_url.c_str());
+            updateOtaStatusMessage("Version not found!");
         } else {
             Serial.printf("[OTA] HTTP error: %s\n", http.errorToString(httpCode).c_str());
+            updateOtaStatusMessage(("Error: " + std::to_string(httpCode)).c_str());
         }
         setStatus(std::string("download-failed-") + std::to_string(httpCode));
+        delay(3000);
         http.end();
         hideOtaScreen();
         return false;
@@ -773,21 +803,27 @@ bool OTAUpdateManager::installVersionFromGitHub(const std::string& version) {
     if (contentLength <= 0) {
         Serial.println("[OTA] Invalid content length");
         setStatus("invalid-content-length");
+        updateOtaStatusMessage("Invalid firmware size!");
+        delay(3000);
         http.end();
         hideOtaScreen();
         return false;
     }
     
     // Begin OTA update - explicitly specify U_FLASH to update firmware partition
+    updateOtaStatusMessage("Preparing flash...");
     if (!Update.begin(contentLength, U_FLASH)) {
         Serial.printf("[OTA] Not enough space: %s\n", Update.errorString());
         setStatus("insufficient-space");
+        updateOtaStatusMessage("Insufficient space!");
+        delay(3000);
         http.end();
         hideOtaScreen();
         return false;
     }
     
     // Download and write firmware
+    updateOtaStatusMessage("Installing firmware...");
     WiFiClient* stream = http.getStreamPtr();
     size_t written = 0;
     uint8_t buffer[512];
@@ -801,7 +837,9 @@ bool OTAUpdateManager::installVersionFromGitHub(const std::string& version) {
             if (Update.write(buffer, read_bytes) != read_bytes) {
                 Serial.println("[OTA] Write failed");
                 setStatus("write-failed");
+                updateOtaStatusMessage("Write failed!");
                 Update.abort();
+                delay(3000);
                 http.end();
                 hideOtaScreen();
                 return false;
@@ -823,14 +861,19 @@ bool OTAUpdateManager::installVersionFromGitHub(const std::string& version) {
     if (written != contentLength) {
         Serial.printf("[OTA] Size mismatch: %d != %d\n", written, contentLength);
         setStatus("size-mismatch");
+        updateOtaStatusMessage("Download incomplete!");
         Update.abort();
+        delay(3000);
         hideOtaScreen();
         return false;
     }
     
+    updateOtaStatusMessage("Verifying firmware...");
     if (!Update.end(true)) {
         Serial.printf("[OTA] Update failed: %s\n", Update.errorString());
         setStatus(std::string("update-failed-") + Update.errorString());
+        updateOtaStatusMessage("Verification failed!");
+        delay(3000);
         hideOtaScreen();
         return false;
     }
@@ -838,6 +881,7 @@ bool OTAUpdateManager::installVersionFromGitHub(const std::string& version) {
     Serial.println("[OTA] ✓ Update successful! Rebooting in 3 seconds...");
     setStatus("update-successful");
     updateOtaProgress(100);
+    updateOtaStatusMessage("Success! Rebooting...");
     
     // Give time for UI to update
     for (int i = 3; i > 0; i--) {

@@ -1,7 +1,7 @@
 {
-  "major": 2,
+  "major": 3,
   "minor": 1,
-  "build": 9,
-  "last_increment": "build",
-  "last_update": "2026-02-03T11:19:06.323425"
+  "build": 0,
+  "last_increment": "minor",
+  "last_update": "2026-02-03T13:26:27.874544"
 }
