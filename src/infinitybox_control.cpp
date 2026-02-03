@@ -7,7 +7,6 @@
 #include "ipm1_can_system.h"
 #include <ArduinoJson.h>
 #include <algorithm>
-#include <set>
 
 namespace InfinityboxControl {
 
@@ -97,32 +96,33 @@ bool InfinityboxController::begin(Ipm1CanSystem* can_system) {
     addDevice(im_pr);
     addDevice(mastercell);
     
-    // COMPLETE IPM1 Function Set (from JSON spec)
-    // Turn Signals - POWERCELL NGX Front (Cell 1) + Rear (Cell 2)
+    // Function definitions from JSON
+    // Turn signals
     {
         Function f;
-        f.name = "Left Turn Signal";
-        f.outputs = {{"pc_front", 1, "output_1"}, {"pc_rear", 1, "output_1"}};
+        f.name = "Left Turn Signal Front";
+        f.outputs = {{"pc_front", 1, "output_1"}};
         f.allowed_behaviors = {BehaviorType::FLASH, BehaviorType::FLASH_TIMED};
+        f.requires = {"ignition"};
         addFunction(f);
     }
     {
         Function f;
-        f.name = "Right Turn Signal";
-        f.outputs = {{"pc_front", 2, "output_2"}, {"pc_rear", 2, "output_2"}};
+        f.name = "Right Turn Signal Front";
+        f.outputs = {{"pc_front", 2, "output_2"}};
         f.allowed_behaviors = {BehaviorType::FLASH, BehaviorType::FLASH_TIMED};
+        f.requires = {"ignition"};
         addFunction(f);
     }
     {
         Function f;
         f.name = "4-Ways";
-        f.outputs = {{"pc_front", 1, "output_1"}, {"pc_front", 2, "output_2"}, 
-                     {"pc_rear", 1, "output_1"}, {"pc_rear", 2, "output_2"}};
+        f.outputs = {{"pc_front", 1, "output_1"}, {"pc_front", 2, "output_2"}};
         f.allowed_behaviors = {BehaviorType::FLASH};
         addFunction(f);
     }
     
-    // Powertrain - POWERCELL NGX Front (Cell 1)
+    // Powertrain
     {
         Function f;
         f.name = "Ignition";
@@ -139,12 +139,12 @@ bool InfinityboxController::begin(Ipm1CanSystem* can_system) {
         addFunction(f);
     }
     
-    // Lighting - POWERCELL NGX Front (Cell 1)
+    // Lighting
     {
         Function f;
         f.name = "Headlights";
         f.outputs = {{"pc_front", 5, "output_5"}};
-        f.allowed_behaviors = {BehaviorType::TOGGLE, BehaviorType::FADE};
+        f.allowed_behaviors = {BehaviorType::TOGGLE, BehaviorType::SCENE, BehaviorType::FADE};
         addFunction(f);
     }
     {
@@ -163,13 +163,6 @@ bool InfinityboxController::begin(Ipm1CanSystem* can_system) {
     }
     {
         Function f;
-        f.name = "OPEN Front 8";
-        f.outputs = {{"pc_front", 8, "output_8"}};
-        f.allowed_behaviors = {BehaviorType::TOGGLE, BehaviorType::FLASH, BehaviorType::TIMED};
-        addFunction(f);
-    }
-    {
-        Function f;
         f.name = "Horn";
         f.outputs = {{"pc_front", 9, "output_9"}};
         f.allowed_behaviors = {BehaviorType::MOMENTARY};
@@ -183,7 +176,21 @@ bool InfinityboxController::begin(Ipm1CanSystem* can_system) {
         addFunction(f);
     }
     
-    // Lighting - POWERCELL NGX Rear (Cell 2)
+    // Rear lighting
+    {
+        Function f;
+        f.name = "Left Turn Signal Rear";
+        f.outputs = {{"pc_rear", 1, "output_1"}};
+        f.allowed_behaviors = {BehaviorType::FLASH, BehaviorType::FLASH_TIMED};
+        addFunction(f);
+    }
+    {
+        Function f;
+        f.name = "Right Turn Signal Rear";
+        f.outputs = {{"pc_rear", 2, "output_2"}};
+        f.allowed_behaviors = {BehaviorType::FLASH, BehaviorType::FLASH_TIMED};
+        addFunction(f);
+    }
     {
         Function f;
         f.name = "Brake Lights";
@@ -203,129 +210,6 @@ bool InfinityboxController::begin(Ipm1CanSystem* can_system) {
         f.name = "Backup Lights";
         f.outputs = {{"pc_rear", 5, "output_5"}};
         f.allowed_behaviors = {BehaviorType::TOGGLE};
-        addFunction(f);
-    }
-    {
-        Function f;
-        f.name = "Parking Lights Rear";
-        f.outputs = {{"pc_rear", 6, "output_6"}};
-        f.allowed_behaviors = {BehaviorType::TOGGLE};
-        addFunction(f);
-    }
-    {
-        Function f;
-        f.name = "OPEN Rear 7";
-        f.outputs = {{"pc_rear", 7, "output_7"}};
-        f.allowed_behaviors = {BehaviorType::TOGGLE, BehaviorType::FLASH, BehaviorType::TIMED};
-        addFunction(f);
-    }
-    {
-        Function f;
-        f.name = "OPEN Rear 8";
-        f.outputs = {{"pc_rear", 8, "output_8"}};
-        f.allowed_behaviors = {BehaviorType::TOGGLE, BehaviorType::FLASH, BehaviorType::TIMED};
-        addFunction(f);
-    }
-    {
-        Function f;
-        f.name = "OPEN Rear 9";
-        f.outputs = {{"pc_rear", 9, "output_9"}};
-        f.allowed_behaviors = {BehaviorType::TOGGLE, BehaviorType::FLASH, BehaviorType::TIMED};
-        addFunction(f);
-    }
-    {
-        Function f;
-        f.name = "Fuel Pump";
-        f.outputs = {{"pc_rear", 10, "output_10"}};
-        f.allowed_behaviors = {BehaviorType::TOGGLE};
-        f.blocked_when = {"security"};
-        addFunction(f);
-    }
-    
-    // Windows - inMOTION NGX
-    {
-        Function f;
-        f.name = "Driver Window Up";
-        f.outputs = {{"im_df", 0, "relay_1a"}};
-        f.allowed_behaviors = {BehaviorType::MOMENTARY};
-        addFunction(f);
-    }
-    {
-        Function f;
-        f.name = "Driver Window Down";
-        f.outputs = {{"im_df", 0, "relay_1b"}};
-        f.allowed_behaviors = {BehaviorType::MOMENTARY};
-        addFunction(f);
-    }
-    {
-        Function f;
-        f.name = "Passenger Window Up";
-        f.outputs = {{"im_pf", 0, "relay_1a"}};
-        f.allowed_behaviors = {BehaviorType::MOMENTARY};
-        addFunction(f);
-    }
-    {
-        Function f;
-        f.name = "Passenger Window Down";
-        f.outputs = {{"im_pf", 0, "relay_1b"}};
-        f.allowed_behaviors = {BehaviorType::MOMENTARY};
-        addFunction(f);
-    }
-    
-    // Door Locks - inMOTION NGX
-    {
-        Function f;
-        f.name = "Driver Door Lock";
-        f.outputs = {{"im_df", 0, "relay_2a"}};
-        f.allowed_behaviors = {BehaviorType::TIMED};
-        addFunction(f);
-    }
-    {
-        Function f;
-        f.name = "Driver Door Unlock";
-        f.outputs = {{"im_df", 0, "relay_2b"}};
-        f.allowed_behaviors = {BehaviorType::TIMED};
-        addFunction(f);
-    }
-    {
-        Function f;
-        f.name = "Passenger Door Lock";
-        f.outputs = {{"im_pf", 0, "relay_2a"}};
-        f.allowed_behaviors = {BehaviorType::TIMED};
-        addFunction(f);
-    }
-    {
-        Function f;
-        f.name = "Passenger Door Unlock";
-        f.outputs = {{"im_pf", 0, "relay_2b"}};
-        f.allowed_behaviors = {BehaviorType::TIMED};
-        addFunction(f);
-    }
-    
-    // AUX - inMOTION NGX
-    {
-        Function f;
-        f.name = "AUX 03";
-        f.outputs = {{"im_df", 0, "aux_03"}};
-        f.allowed_behaviors = {BehaviorType::TOGGLE, BehaviorType::FLASH, BehaviorType::FADE, BehaviorType::TIMED};
-        f.renameable = true;
-        addFunction(f);
-    }
-    {
-        Function f;
-        f.name = "AUX 04";
-        f.outputs = {{"im_df", 0, "aux_04"}};
-        f.allowed_behaviors = {BehaviorType::TOGGLE, BehaviorType::FLASH, BehaviorType::FADE, BehaviorType::TIMED};
-        f.renameable = true;
-        addFunction(f);
-    }
-    
-    // Indicators - MASTERCELL
-    {
-        Function f;
-        f.name = "Gauge Illumination";
-        f.outputs = {{"mastercell", 0, "gauge_lights"}};
-        f.allowed_behaviors = {BehaviorType::TOGGLE, BehaviorType::FADE};
         addFunction(f);
     }
     {
@@ -709,12 +593,9 @@ void InfinityboxController::updateFunctionFeedback(const std::string& name, floa
 }
 
 bool InfinityboxController::sendCanCommand(const Function& func, bool state) {
-    if (func.outputs.empty()) return false;
+    if (!m_can_system) return false;
     
-    // Track which POWERCELL cells need updates
-    std::set<uint8_t> cells_to_update;
-    
-    // Update state for each output in the function
+    // Send to all outputs for this function
     for (const auto& output : func.outputs) {
         const Device* device = getDevice(output.device_id);
         if (!device) {
@@ -722,136 +603,32 @@ bool InfinityboxController::sendCanCommand(const Function& func, bool state) {
             continue;
         }
         
-        // Only handle POWERCELL devices
-        if (device->type != DeviceType::POWERCELL) {
-            Serial.printf("[IBOX] Skipping non-POWERCELL device %s\n", output.device_id.c_str());
+        // Prepare JSON action for IPM1 system
+        StaticJsonDocument<256> doc;
+        JsonObject action = doc.to<JsonObject>();
+        
+        action["circuit"] = func.name;
+        action["action"] = "toggle";
+        
+        JsonObject params = action.createNestedObject("params");
+        params["state"] = state ? "on" : "off";
+        
+        String error;
+        StaticJsonDocument<128> responseDoc;
+        JsonObject response = responseDoc.to<JsonObject>();
+        
+        // Pass action as JsonVariantConst
+        if (!m_can_system->handleAction(action, error, response)) {
+            Serial.printf("[IBOX] CAN send failed: %s\n", error.c_str());
             continue;
         }
         
-        uint8_t cell_addr = device->address;
-        uint8_t output_num = output.output_num;  // 1-10
-        
-        if (output_num < 1 || output_num > 10) {
-            Serial.printf("[IBOX] Invalid output %d for %s\n", output_num, device->id.c_str());
-            continue;
-        }
-        
-        // Initialize cell state if needed
-        if (m_powercell_states.find(cell_addr) == m_powercell_states.end()) {
-            m_powercell_states[cell_addr] = PowercellState{{0,0},{0,0},{0,0},{0,0,0,0,0,0,0,0}};
-        }
-        
-        PowercellState& ps = m_powercell_states[cell_addr];
-        
-        // Determine if we should use soft-start (based on function name/type)
-        bool use_softstart = (func.name.find("headlights") != std::string::npos) ||
-                             (func.name.find("parking") != std::string::npos) ||
-                             (func.name.find("cooling") != std::string::npos);
-        
-        // Update the appropriate bitmap
-        if (output_num <= 8) {
-            // Outputs 1-8 in byte 0 (or byte 1 for soft-start)
-            uint8_t bit = 8 - output_num;  // Bit 7 = output 1
-            if (use_softstart && state) {
-                // Soft-start: set in bytes 1-2
-                if (output_num <= 6) {
-                    ps.softstart[0] |= (1 << (5 - (output_num - 1)));  // Byte 2 bits 5-0
-                } else {
-                    ps.softstart[1] |= (1 << (13 - output_num));  // Byte 3 bits 7-6 for outputs 7-10
-                }
-                ps.track[0] &= ~(1 << bit);  // Clear track bit
-            } else {
-                // Track mode
-                if (state) {
-                    ps.track[0] |= (1 << bit);
-                } else {
-                    ps.track[0] &= ~(1 << bit);
-                }
-                // Clear soft-start bits
-                if (output_num <= 6) {
-                    ps.softstart[0] &= ~(1 << (5 - (output_num - 1)));
-                } else {
-                    ps.softstart[1] &= ~(1 << (13 - output_num));
-                }
-            }
-        } else if (output_num == 9) {
-            // Output 9 = bit 7 of byte 2
-            if (use_softstart && state) {
-                ps.softstart[1] |= 0x08;  // Byte 3 bit 3
-                ps.track[1] &= ~0x80;
-            } else {
-                if (state) {
-                    ps.track[1] |= 0x80;
-                } else {
-                    ps.track[1] &= ~0x80;
-                }
-                ps.softstart[1] &= ~0x08;
-            }
-        } else if (output_num == 10) {
-            // Output 10 = bit 6 of byte 2
-            if (use_softstart && state) {
-                ps.softstart[1] |= 0x04;  // Byte 3 bit 2
-                ps.track[1] &= ~0x40;
-            } else {
-                if (state) {
-                    ps.track[1] |= 0x40;
-                } else {
-                    ps.track[1] &= ~0x40;
-                }
-                ps.softstart[1] &= ~0x04;
-            }
-        }
-        
-        cells_to_update.insert(cell_addr);
-        
-        Serial.printf("[IBOX] %s cell=%d out=%d -> %s (softstart=%d)\n",
-                      func.name.c_str(), cell_addr, output_num, 
-                      state ? "ON" : "OFF", use_softstart);
+        Serial.printf("[IBOX] CAN: %s (dev=%s addr=%d out=%d) -> %s\n",
+                      func.name.c_str(), device->id.c_str(), device->address,
+                      output.output_num, state ? "ON" : "OFF");
     }
     
-    // Send updated frames for each affected cell
-    for (uint8_t cell_addr : cells_to_update) {
-        sendPowercellFrame(cell_addr);
-    }
-    
-    return !cells_to_update.empty();
-}
-
-void InfinityboxController::sendPowercellFrame(uint8_t cell_address) {
-    if (m_powercell_states.find(cell_address) == m_powercell_states.end()) {
-        return;  // No state for this cell
-    }
-    
-    const PowercellState& ps = m_powercell_states[cell_address];
-    
-    // Build POWERCELL NGX frame (8 bytes)
-    // Byte 1: Track bitmap outputs 1-8
-    // Byte 2: Track bits 7-6 (outputs 9-10) + Soft-start bits 5-0 (outputs 1-6)
-    // Byte 3: Soft-start bits 7-6 (outputs 7-8) + Soft-start bits 5-4 (outputs 9-10) + PWM enable 3-0
-    // Byte 4: PWM enable bits 7-4 (outputs 5-8)
-    // Bytes 5-8: PWM duty cycles
-    
-    uint8_t data[8];
-    data[0] = ps.track[0];  // Outputs 1-8 track
-    data[1] = ps.track[1] | ps.softstart[0];  // Mix track 9-10 with softstart 1-6
-    data[2] = ps.softstart[1] | (ps.pwm_enable[0] & 0x0F);  // Softstart 7-10 + PWM enable 1-4
-    data[3] = (ps.pwm_enable[0] >> 4) | (ps.pwm_enable[1] << 4);  // PWM enable 5-8
-    data[4] = ps.pwm_duty[0];  // Output 1 PWM
-    data[5] = ps.pwm_duty[1];  // Output 2 PWM
-    data[6] = ps.pwm_duty[2];  // Output 3 PWM
-    data[7] = ps.pwm_duty[3];  // Output 4 PWM
-    
-    // Use CanManager to send the frame
-    // PGN = FF00 + cell_address, source = 0x1E, dest = 0xFF
-    uint32_t pgn = 0xFF00 + cell_address;
-    
-    Serial.printf("[IBOX] Sending POWERCELL cell=%d PGN=%04X: %02X %02X %02X %02X %02X %02X %02X %02X\n",
-                  cell_address, pgn, 
-                  data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7]);
-    
-    // TODO: Actually send via CanManager
-    // For now, just use IPM1 system as passthrough (you'll need to add direct CAN send)
-    // m_can_system->sendRawCanFrame(pgn, 0x1E, 0xFF, data, 8);
+    return true;
 }
 
 void InfinityboxController::updateFlashEngines() {

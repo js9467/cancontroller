@@ -533,8 +533,8 @@ function switchTab(tabName){
 		</div>
 		<h4>Infinitybox IPM1 Function</h4>
 		<div class="grid two-col">
-			<div style="grid-column:1/-1;"><label>Function</label><select id="btn-infinitybox-function"><option value="">None (use CAN below)</option><option value="Left Turn Signal">Left Turn Signal</option><option value="Right Turn Signal">Right Turn Signal</option><option value="4-Ways">4-Ways</option><option value="Ignition">Ignition</option><option value="Starter">Starter</option><option value="Headlights">Headlights</option><option value="Parking Lights Front">Parking Lights Front</option><option value="High Beams">High Beams</option><option value="OPEN Front 8">OPEN Front 8</option><option value="Horn">Horn</option><option value="Cooling Fan">Cooling Fan</option><option value="Brake Lights">Brake Lights</option><option value="Interior Lights">Interior Lights</option><option value="Backup Lights">Backup Lights</option><option value="Parking Lights Rear">Parking Lights Rear</option><option value="OPEN Rear 7">OPEN Rear 7</option><option value="OPEN Rear 8">OPEN Rear 8</option><option value="OPEN Rear 9">OPEN Rear 9</option><option value="Fuel Pump">Fuel Pump</option><option value="Driver Window Up">Driver Window Up</option><option value="Driver Window Down">Driver Window Down</option><option value="Passenger Window Up">Passenger Window Up</option><option value="Passenger Window Down">Passenger Window Down</option><option value="Driver Door Lock">Driver Door Lock</option><option value="Driver Door Unlock">Driver Door Unlock</option><option value="Passenger Door Lock">Passenger Door Lock</option><option value="Passenger Door Unlock">Passenger Door Unlock</option><option value="AUX 03">AUX 03</option><option value="AUX 04">AUX 04</option><option value="Gauge Illumination">Gauge Illumination</option></select></div>
-			<div class="muted" style="grid-column:1/-1; font-size:0.85rem;">Select a function - it will be controlled by the behavior engine with proper CAN handling</div>
+			<div style="grid-column:1/-1;"><label>Function</label><select id="btn-infinitybox-function" onchange="applyInfinityboxTemplate()"><option value="">None (use CAN below)</option><option value="left_turn">Left Turn</option><option value="right_turn">Right Turn</option><option value="four_way">4-Way Flashers</option><option value="horn">Horn</option><option value="high_beams">High Beams</option><option value="headlights">Headlights</option><option value="parking_lights">Parking Lights</option><option value="backup_lights">Backup Lights</option><option value="brake_lights">Brake Lights</option><option value="interior_lights">Interior Lights</option><option value="gauge_illumination">Gauge Illumination</option><option value="door_lock">Door Lock</option><option value="door_unlock">Door Unlock</option><option value="window_up_driver">Window Up (Driver)</option><option value="window_down_driver">Window Down (Driver)</option><option value="window_up_passenger">Window Up (Passenger)</option><option value="window_down_passenger">Window Down (Passenger)</option><option value="ignition">Ignition</option><option value="starter">Starter</option><option value="fuel_pump">Fuel Pump</option><option value="cooling_fan">Cooling Fan</option><option value="aux_1">AUX 1</option><option value="aux_2">AUX 2</option><option value="security_arm">Security Arm</option><option value="security_disarm">Security Disarm</option></select></div>
+			<div class="muted" style="grid-column:1/-1; font-size:0.85rem;">Select an Infinitybox function to auto-populate CAN fields below</div>
 		</div>
 		<h4>Behavior Timing</h4>
 		<div class="grid two-col">
@@ -1258,83 +1258,119 @@ function applyInfinityboxTemplate(){
 	const funcName = document.getElementById('btn-infinitybox-function').value;
 	if(!funcName) return;
 	
-	// POWERCELL NGX J1939 mappings based on actual wiring table
-	// Format: {cell, outputs: [array], label, momentary}
+	// POWERCELL NGX J1939 function mapping
+	// Format: {cell: address, output: 1-10, label: display name, softStart: boolean}
 	const templates = {
-		left_turn: {cell:1, outputs:[1], cell2:2, outputs2:[1], label:'Left Turn', momentary:true},
-		right_turn: {cell:1, outputs:[2], cell2:2, outputs2:[2], label:'Right Turn', momentary:true},
-		four_way: {cell:1, outputs:[1,2], cell2:2, outputs2:[1,2], label:'4-Ways', momentary:false},
-		ignition: {cell:1, outputs:[3], label:'Ignition', momentary:false},
-		starter: {cell:1, outputs:[4], label:'Starter', momentary:true},
-		headlights: {cell:1, outputs:[5], label:'Headlights', momentary:false, softstart:true},
-		parking_lights: {cell:1, outputs:[6], cell2:2, outputs2:[6], label:'Parking', momentary:false},
-		high_beams: {cell:1, outputs:[7], label:'High Beams', momentary:false},
-		horn: {cell:1, outputs:[9], label:'Horn', momentary:true},
-		cooling_fan: {cell:1, outputs:[10], label:'Cooling Fan', momentary:false},
-		brake_lights: {cell:2, outputs:[3], label:'Brake Lights', momentary:false},
-		interior_lights: {cell:2, outputs:[4], label:'Interior', momentary:false},
-		backup_lights: {cell:2, outputs:[5], label:'Backup', momentary:false},
-		fuel_pump: {cell:2, outputs:[10], label:'Fuel Pump', momentary:false}
+		left_turn: {cell:1, output:1, label:'Left Turn', softStart:false},
+		right_turn: {cell:1, output:2, label:'Right Turn', softStart:false},
+		four_way: {cell:1, output:1, label:'4-Ways', softStart:false, dual:2}, // Controls outputs 1 & 2
+		horn: {cell:1, output:6, label:'Horn', softStart:false},
+		high_beams: {cell:1, output:7, label:'High Beams', softStart:false},
+		headlights: {cell:1, output:5, label:'Headlights', softStart:true},
+		parking_lights: {cell:1, output:8, label:'Parking Lights', softStart:true},
+		backup_lights: {cell:2, output:1, label:'Backup Lights', softStart:false},
+		brake_lights: {cell:2, output:2, label:'Brake Lights', softStart:false},
+		interior_lights: {cell:1, output:9, label:'Interior Lights', softStart:true},
+		gauge_illumination: {cell:1, output:10, label:'Gauge Illum', softStart:true},
+		door_lock: {cell:2, output:3, label:'Door Lock', softStart:false},
+		door_unlock: {cell:2, output:4, label:'Door Unlock', softStart:false},
+		window_up_driver: {cell:2, output:5, label:'Win Up Drv', softStart:false},
+		window_down_driver: {cell:2, output:6, label:'Win Dn Drv', softStart:false},
+		window_up_passenger: {cell:2, output:7, label:'Win Up Pax', softStart:false},
+		window_down_passenger: {cell:2, output:8, label:'Win Dn Pax', softStart:false},
+		ignition: {cell:1, output:3, label:'Ignition', softStart:false},
+		starter: {cell:1, output:4, label:'Starter', softStart:false},
+		fuel_pump: {cell:2, output:9, label:'Fuel Pump', softStart:false},
+		cooling_fan: {cell:2, output:10, label:'Cooling Fan', softStart:false},
+		aux_1: {cell:3, output:1, label:'AUX 1', softStart:false},
+		aux_2: {cell:3, output:2, label:'AUX 2', softStart:false},
+		security_arm: {cell:3, output:3, label:'Sec Arm', softStart:false},
+		security_disarm: {cell:3, output:4, label:'Sec Disarm', softStart:false}
 	};
 	
 	const tmpl = templates[funcName];
 	if(!tmpl) return;
 	
-	// Auto-populate label and momentary
+	// Auto-populate label if still default
 	const currentLabel = document.getElementById('btn-label').value;
 	if(!currentLabel || currentLabel.match(/^Button \d+$/)){
 		document.getElementById('btn-label').value = tmpl.label;
 	}
-	document.getElementById('btn-momentary').checked = tmpl.momentary;
 	
-	// Helper: Build POWERCELL NGX frame
-	function buildFrame(outputs, softstart) {
-		const data = [0,0,0,0,0,0,0,0];
-		for(const out of outputs) {
-			if(out <= 8) {
-				const bit = 8 - out;
-				if(softstart) {
-					// Soft-start bitmap: byte 2 bits 5-0 for outputs 1-6
-					if(out <= 6) data[1] |= (1 << (5 - (out - 1)));
-					else data[2] |= (1 << (13 - out));  // 7-8 in byte 3
-				} else {
-					// Track bitmap: byte 1 bits 7-0
-					data[0] |= (1 << bit);
+	// POWERCELL NGX uses address-specific PGNs: FF01-FF10
+	const pgn = 0xFF00 + tmpl.cell;
+	
+	// Build POWERCELL NGX format:
+	// Byte 1 bits 7-0: Track outputs 1-8
+	// Byte 2 bits 7-6: Track outputs 9-10
+	// Byte 2 bits 5-0 + Byte 3 bits 7-6: Soft-Start outputs 1-10
+	// Byte 3 bits 5-0 + Byte 4 bits 7-6: PWM enable outputs 1-8
+	// Bytes 5-8: PWM duty cycle (4 bits per output)
+	
+	function buildPowercellFrame(output, state, softStart, dualOutput) {
+		const data = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
+		
+		if(state) {
+			// Set the appropriate bit(s) based on output number
+			if(softStart) {
+				// Soft-Start: Byte 2 bits 5-0 + Byte 3 bits 7-6
+				if(output <= 6) {
+					data[1] |= (1 << (5 - (output - 1))); // Outputs 1-6 in byte 2
+				} else if(output <= 10) {
+					data[2] |= (1 << (13 - output)); // Outputs 7-10 in byte 3
 				}
-			} else if(out === 9) {
-				data[1] |= 0x80;  // Byte 2 bit 7
-			} else if(out === 10) {
-				data[1] |= 0x40;  // Byte 2 bit 6
+				if(dualOutput) {
+					if(dualOutput <= 6) {
+						data[1] |= (1 << (5 - (dualOutput - 1)));
+					} else if(dualOutput <= 10) {
+						data[2] |= (1 << (13 - dualOutput));
+					}
+				}
+			} else {
+				// Track: Byte 1 bits 7-0 (outputs 1-8), Byte 2 bits 7-6 (outputs 9-10)
+				if(output <= 8) {
+					data[0] |= (1 << (8 - output)); // Outputs 1-8 in byte 1
+				} else if(output === 9) {
+					data[1] |= 0x80; // Output 9 = bit 7 of byte 2
+				} else if(output === 10) {
+					data[1] |= 0x40; // Output 10 = bit 6 of byte 2
+				}
+				if(dualOutput) {
+					if(dualOutput <= 8) {
+						data[0] |= (1 << (8 - dualOutput));
+					} else if(dualOutput === 9) {
+						data[1] |= 0x80;
+					} else if(dualOutput === 10) {
+						data[1] |= 0x40;
+					}
+				}
 			}
 		}
+		// OFF state = all zeros (already initialized)
+		
 		return data;
 	}
 	
-	const pgn1 = 0xFF00 + tmpl.cell;
-	const dataOn1 = buildFrame(tmpl.outputs, tmpl.softstart);
+	const dataOn = buildPowercellFrame(tmpl.output, true, tmpl.softStart, tmpl.dual);
+	const dataOff = buildPowercellFrame(tmpl.output, false, tmpl.softStart, tmpl.dual);
 	
-	// Primary cell ON frame
+	// Populate CAN ON frame
 	document.getElementById('btn-can-enabled').checked = true;
-	document.getElementById('btn-can-pgn').value = pgn1.toString(16).toUpperCase();
+	document.getElementById('btn-can-pgn').value = pgn.toString(16).toUpperCase();
 	document.getElementById('btn-can-priority').value = '6';
-	document.getElementById('btn-can-src').value = '1E';
-	document.getElementById('btn-can-dest').value = 'FF';
-	document.getElementById('btn-can-data').value = dataOn1.map(b=>b.toString(16).toUpperCase().padStart(2,'0')).join(' ');
+	document.getElementById('btn-can-src').value = '1E'; // Default controller source address
+	document.getElementById('btn-can-dest').value = 'FF'; // Broadcast
+	document.getElementById('btn-can-data').value = dataOn.map(b=>b.toString(16).toUpperCase().padStart(2,'0')).join(' ');
 	
-	// Primary cell OFF frame
+	// Populate CAN OFF frame
 	document.getElementById('btn-can-off-enabled').checked = true;
-	document.getElementById('btn-can-off-pgn').value = pgn1.toString(16).toUpperCase();
+	document.getElementById('btn-can-off-pgn').value = pgn.toString(16).toUpperCase();
 	document.getElementById('btn-can-off-priority').value = '6';
 	document.getElementById('btn-can-off-src').value = '1E';
 	document.getElementById('btn-can-off-dest').value = 'FF';
-	document.getElementById('btn-can-off-data').value = '00 00 00 00 00 00 00 00';
+	document.getElementById('btn-can-off-data').value = dataOff.map(b=>b.toString(16).toUpperCase().padStart(2,'0')).join(' ');
 	
 	toggleCanFields();
-	
-	// Show info about dual-cell functions
-	if(tmpl.cell2) {
-		alert('This function uses both Cell ' + tmpl.cell + ' and Cell ' + tmpl.cell2 + '. You can add a second button for the second cell, or use the CAN library to send both frames.');
-	}
 }
 
 function renderPreview(){

@@ -650,39 +650,7 @@ void UIBuilder::actionButtonEvent(lv_event_t* e) {
         return;
     }
 
-    // Check if Infinitybox function is assigned
-    if (!config->infinitybox_function.empty()) {
-        // Use Infinitybox controller behavior engine
-        if (config->momentary) {
-            if (code == LV_EVENT_PRESSED) {
-                InfinityboxControl::InfinityboxController::instance().activateFunctionWithBehavior(
-                    config->infinitybox_function, InfinityboxControl::BehaviorType::MOMENTARY, true);
-            } else if (code == LV_EVENT_RELEASED) {
-                InfinityboxControl::InfinityboxController::instance().activateFunctionWithBehavior(
-                    config->infinitybox_function, InfinityboxControl::BehaviorType::MOMENTARY, false);
-            }
-        } else {
-            if (code == LV_EVENT_CLICKED) {
-                // Toggle logic - check current state
-                InfinityboxControl::Function* func = InfinityboxControl::InfinityboxController::instance().getFunction(config->infinitybox_function);
-                if (func) {
-                    bool new_state = (func->state == InfinityboxControl::FunctionState::OFF);
-                    
-                    // Determine behavior based on function's allowed behaviors
-                    InfinityboxControl::BehaviorType behavior = InfinityboxControl::BehaviorType::TOGGLE;
-                    if (!func->allowed_behaviors.empty()) {
-                        behavior = func->allowed_behaviors[0];  // Use first allowed behavior
-                    }
-                    
-                    InfinityboxControl::InfinityboxController::instance().activateFunctionWithBehavior(
-                        config->infinitybox_function, behavior, new_state);
-                }
-            }
-        }
-        return;
-    }
-
-    // Fallback to CAN message handling (for non-Infinitybox buttons)
+    // Use CAN message handling (Infinitybox functions populate CAN fields via web interface)
     if (config->momentary) {
         if (code == LV_EVENT_PRESSED) {
             CanManager::instance().sendButtonAction(*config);

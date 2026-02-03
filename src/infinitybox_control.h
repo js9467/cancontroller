@@ -249,17 +249,6 @@ private:
         uint16_t duration_ms;
     };
     std::map<std::string, TimedState> m_timed_states;
-    
-    // POWERCELL state tracking (full state per cell for authoritative frames)
-    struct PowercellState {
-        uint8_t track[2];      // Bytes 1-2: Track bitmap (10 outputs)
-        uint8_t softstart[2];  // Bytes 2-3 bits: Soft-start bitmap
-        uint8_t pwm_enable[2]; // Bytes 3-4 bits: PWM enable bitmap
-        uint8_t pwm_duty[8];   // Bytes 5-8: PWM duty cycles
-    };
-    std::map<uint8_t, PowercellState> m_powercell_states;  // Key = cell address
-    
-    void sendPowercellFrame(uint8_t cell_address);
 };
 
 // ===== CATEGORY DEFINITIONS =====
