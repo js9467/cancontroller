@@ -116,7 +116,7 @@ class BackupRestoreManager:
         print(f"[Version] Incremented to {new_version}")
         return new_version, increment_type
     
-    def backup_device(self, increment_type='build', version=None):
+    def backup_device(self, increment_type='build', version=None, upload_to_device=True):
         """Create a backup based on increment type:
         - Build/Minor: Increment version, build firmware, copy to versions/, push to git
         - Major: Full USB flash backup + all of the above
@@ -124,6 +124,7 @@ class BackupRestoreManager:
         Args:
             increment_type: 'major', 'minor', or 'build' (default)
             version: Optional version override
+            upload_to_device: Upload firmware to device via USB (default True)
         """
         if version is None:
             version, increment_type = self.increment_version(increment_type)
@@ -143,6 +144,14 @@ class BackupRestoreManager:
             if not self.build_firmware():
                 print("[Release] ✗ Build failed")
                 return None
+            
+            # Upload to device if requested
+            if upload_to_device:
+                print(f"\n[Release] Uploading firmware to device...")
+                if not self.upload_firmware():
+                    print("[Release] ⚠ Upload failed (continuing anyway)")
+                else:
+                    print(f"[Release] ✓ Device updated with v{version}")
             
             # Copy firmware to versions/ folder
             print(f"\n[Release] Preparing OTA firmware...")
@@ -445,6 +454,32 @@ pause
             return False
         except Exception as e:
             print(f"[Build] ✗ Build error: {e}")
+            return False
+    
+    def upload_firmware(self):
+        """Upload firmware to device using PlatformIO"""
+        try:
+            print("[Upload] Uploading to ESP32-S3...")
+            result = subprocess.run(
+                ['pio', 'run', '-e', 'waveshare_7in', '-t', 'upload'],
+                cwd=self.project_dir,
+                capture_output=True,
+                text=True,
+                timeout=120
+            )
+            
+            if result.returncode == 0:
+                print("[Upload] ✓ Upload successful")
+                return True
+            else:
+                print(f"[Upload] ✗ Upload failed: {result.stderr}")
+                return False
+                
+        except subprocess.TimeoutExpired:
+            print("[Upload] ✗ Upload timeout")
+            return False
+        except Exception as e:
+            print(f"[Upload] ✗ Upload error: {e}")
             return False
     
     def copy_firmware_for_ota(self, version):

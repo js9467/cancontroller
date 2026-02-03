@@ -193,13 +193,20 @@ class BackupRestoreGUI:
         )
         release_info = ttk.Label(parent, text=info_text,
                               font=('Segoe UI', 8), foreground='#ffc107', justify=tk.LEFT)
-        release_info.grid(row=2, column=0, sticky=tk.W, pady=(5, 20))
+        release_info.grid(row=2, column=0, sticky=tk.W, pady=(5, 10))
+        
+        # Upload to device checkbox
+        self.upload_to_device_var = tk.BooleanVar(value=True)
+        upload_check = ttk.Checkbutton(parent, 
+                                      text='📤 Upload firmware to device after build',
+                                      variable=self.upload_to_device_var)
+        upload_check.grid(row=3, column=0, sticky=tk.W, pady=(0, 20))
         
         # Backup button
         backup_btn = ttk.Button(parent, text='🔽 Create Backup', 
                                style='Action.TButton',
                                command=self.start_backup)
-        backup_btn.grid(row=3, column=0, pady=10)
+        backup_btn.grid(row=4, column=0, pady=10)
     
     def create_restore_tab(self, parent):
         """Create restore tab content"""
@@ -359,6 +366,7 @@ class BackupRestoreGUI:
                 self.disable_buttons()
                 self.manager.port = self.port_var.get()
                 increment_type = self.version_type_var.get()
+                upload_to_device = self.upload_to_device_var.get()
                 
                 # Show info for major release
                 if increment_type == 'major':
@@ -369,16 +377,22 @@ class BackupRestoreGUI:
                                        "• Auto-pushes to Git\n\n"
                                        "This will take several minutes...")
                 
-                backup_folder, version = self.manager.backup_device(increment_type=increment_type)
+                backup_folder, version = self.manager.backup_device(
+                    increment_type=increment_type,
+                    upload_to_device=upload_to_device
+                )
                 
                 self.refresh_backups()
                 self.current_version = version
                 
                 success_msg = f"Backup completed!\nVersion: v{version}\n\nLocation:\n{backup_folder}"
                 if increment_type == 'major':
-                    success_msg += "\n\n✓ FULL device backup (all sectors)\n✓ Source code + firmware pushed to Git"
+                    success_msg += "\n\n✓ FULL device backup (all sectors)\n✓ Firmware uploaded to device\n✓ Source code + firmware pushed to Git"
                 else:
-                    success_msg += "\n\n✓ Source code + firmware pushed to Git"
+                    if upload_to_device:
+                        success_msg += f"\n\n✓ Firmware uploaded to device\n✓ Firmware pushed to Git (versions/bronco_v{version}.bin)"
+                    else:
+                        success_msg += f"\n\n✓ Firmware pushed to Git (versions/bronco_v{version}.bin)\n⚠ Device NOT updated (upload disabled)"
                 
                 messagebox.showinfo("Success", success_msg)
             except Exception as e:
