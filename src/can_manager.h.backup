@@ -6,8 +6,9 @@
 
 #include "config_types.h"
 
-// Forward declaration
+// Forward declaration of ESP_IOExpander for CAN transceiver control
 class ESP_IOExpander;
+extern ESP_IOExpander* g_io_expander;  // Global expander instance (from main.cpp)
 
 // Struct for received CAN messages (different from CanMessage in config_types.h)
 struct CanRxMessage {
@@ -27,7 +28,6 @@ public:
     static constexpr gpio_num_t DEFAULT_TX_PIN = static_cast<gpio_num_t>(20);
     static constexpr gpio_num_t DEFAULT_RX_PIN = static_cast<gpio_num_t>(19);
 
-    void setExpander(ESP_IOExpander* exp) { expander_ = exp; }
     bool begin(gpio_num_t tx_pin = DEFAULT_TX_PIN, gpio_num_t rx_pin = DEFAULT_RX_PIN, std::uint32_t bitrate = 250000);
     void stop();
     bool sendButtonAction(const ButtonConfig& button);
@@ -37,23 +37,32 @@ public:
     bool receiveMessage(CanRxMessage& msg, uint32_t timeout_ms = 10);
     std::vector<CanRxMessage> receiveAll(uint32_t timeout_ms = 100);
 
+    // Infinitybox-specific command sequences (J1939 protocol)
+    bool sendInfinityboxOutput1On();
+    bool sendInfinityboxOutput1Off();
+    bool sendInfinityboxOutput9On();
+    bool sendInfinityboxOutput9Off();
+
     // Helper for sending J1939 PGN (used by background tasks)
     bool sendJ1939Pgn(uint8_t priority, uint32_t pgn, uint8_t source_addr, const uint8_t data[8]);
 
+    // CAN Mode Control - FORCEFULLY sets the transceiver enable pin
+    // This must be called BEFORE begin() to ensure transceiver is powered
+    static void setCanMode(bool enable);  // enable=true → CAN mode, enable=false → USB mode
+
+    // Diagnostic methods - verify by practical means, not register reads
+    void dumpHardwareStatus() const;        // Print RX pin state and TWAI bus status for debugging
+    void testReceive(uint32_t duration_ms = 5000) const;  // Simple sniffer - print all received frames
+    String getHardwareStatusJson() const;   // Return diagnostic info as JSON
+
     bool isReady() const { return ready_; }
-    bool isBusAlive() const { return bus_alive_; }
     gpio_num_t txPin() const { return tx_pin_; }
     gpio_num_t rxPin() const { return rx_pin_; }
 
 private:
     CanManager() = default;
-    
-    // Force USB_SEL to CAN mode using expander
-    void forceCanMux();
 
-    ESP_IOExpander* expander_ = nullptr;
     bool ready_ = false;
-    bool bus_alive_ = false;
     gpio_num_t tx_pin_ = DEFAULT_TX_PIN;
     gpio_num_t rx_pin_ = DEFAULT_RX_PIN;
     std::uint32_t bitrate_ = 250000;

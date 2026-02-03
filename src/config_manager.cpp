@@ -171,6 +171,18 @@ bool ConfigManager::save() const {
     return writeToStorage(json);
 }
 
+void ConfigManager::factoryReset() {
+    Serial.println("[ConfigManager] Factory reset - deleting config file");
+    if (LittleFS.exists(kConfigPath)) {
+        LittleFS.remove(kConfigPath);
+    }
+    if (LittleFS.exists("/config.tmp")) {
+        LittleFS.remove("/config.tmp");
+    }
+    // Reset to defaults in memory
+    config_ = buildDefaultConfig();
+}
+
 bool ConfigManager::resetToDefaults() {
     config_ = buildDefaultConfig();
     return save();
@@ -221,15 +233,36 @@ bool ConfigManager::loadFromStorage() {
 }
 
 bool ConfigManager::writeToStorage(const std::string& json) const {
-    File file = LittleFS.open(kConfigPath, FILE_WRITE);
+    // ATOMIC WRITE: Use temp file + rename to prevent corruption during brownout
+    const char* kTempPath = "/config.tmp";
+    
+    // Write to temp file first
+    File file = LittleFS.open(kTempPath, FILE_WRITE);
     if (!file) {
-        Serial.println("[ConfigManager] Could not open config file for writing");
+        Serial.println("[ConfigManager] Could not open temp file for writing");
         return false;
     }
 
     size_t written = file.print(json.c_str());
     file.close();
-    return written == json.size();
+    
+    if (written != json.size()) {
+        Serial.println("[ConfigManager] Incomplete write to temp file");
+        LittleFS.remove(kTempPath);
+        return false;
+    }
+    
+    // Atomic rename (remove old, rename temp)
+    if (LittleFS.exists(kConfigPath)) {
+        LittleFS.remove(kConfigPath);
+    }
+    
+    if (!LittleFS.rename(kTempPath, kConfigPath)) {
+        Serial.println("[ConfigManager] Failed to rename temp to config");
+        return false;
+    }
+    
+    return true;
 }
 
 DeviceConfig ConfigManager::buildDefaultConfig() const {
@@ -483,6 +516,11 @@ void ConfigManager::encodeConfig(const DeviceConfig& source, DynamicJsonDocument
             for (std::uint8_t i = 0; i < button.can_off.length; ++i) {
                 off_data_arr.add(button.can_off.data[i]);
             }
+            
+            btn_obj["infinitybox_function"] = button.infinitybox_function.c_str();
+            btn_obj["flash_frequency"] = button.flash_frequency;
+            btn_obj["fade_time"] = button.fade_time;
+            btn_obj["on_time"] = button.on_time;
         }
     }
 
@@ -709,6 +747,11 @@ bool ConfigManager::decodeConfig(JsonVariantConst json, DeviceConfig& target, st
                             button.can_off.length = static_cast<std::uint8_t>(i);  // Set length based on actual data bytes
                         }
                     }
+                    
+                    button.infinitybox_function = btn_obj["infinitybox_function"] | "";
+                    button.flash_frequency = btn_obj["flash_frequency"] | 500;
+                    button.fade_time = btn_obj["fade_time"] | 1000;
+                    button.on_time = btn_obj["on_time"] | 2000;
 
                     page.buttons.push_back(std::move(button));
                     ++button_index;

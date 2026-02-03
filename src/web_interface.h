@@ -495,12 +495,6 @@ function switchTab(tabName){
 					<button class="btn" onclick="importCanMessage('windows')">Windows</button>
 					<button class="btn" onclick="importCanMessage('locks')">Locks</button>
 					<button class="btn" onclick="importCanMessage('boards')">Running Boards</button>
-					<button class="btn" onclick="importCanMessage('powercell_front')">POWERCELL Front</button>
-					<button class="btn" onclick="importCanMessage('powercell_rear')">POWERCELL Rear</button>
-					<button class="btn" onclick="importCanMessage('imotion_df')">inMOTION DF</button>
-					<button class="btn" onclick="importCanMessage('imotion_pf')">inMOTION PF</button>
-					<button class="btn" onclick="importCanMessage('imotion_dr')">inMOTION DR</button>
-					<button class="btn" onclick="importCanMessage('imotion_pr')">inMOTION PR</button>
 				</div>
 				<div class="row" style="margin-top:10px;">
 					<button class="btn primary" onclick="addSuspensionPageTemplate()">Add Suspension Page (TCU S15)</button>
@@ -536,6 +530,18 @@ function switchTab(tabName){
 			<div><label>Border Width</label><input id="btn-border-width" type="number" min="0" max="10" /></div>
 			<div><label>Corner Radius</label><input id="btn-corner-radius" type="number" min="0" max="50" /></div>
 			<div class="row"><label><input id="btn-momentary" type="checkbox" /> Momentary</label></div>
+		</div>
+		<h4>Infinitybox IPM1 Function</h4>
+		<div class="grid two-col">
+			<div style="grid-column:1/-1;"><label>Function</label><select id="btn-infinitybox-function"><option value="">None (use CAN below)</option><option value="Left Turn Signal">Left Turn Signal</option><option value="Right Turn Signal">Right Turn Signal</option><option value="4-Ways">4-Ways</option><option value="Ignition">Ignition</option><option value="Starter">Starter</option><option value="Headlights">Headlights</option><option value="Parking Lights Front">Parking Lights Front</option><option value="High Beams">High Beams</option><option value="OPEN Front 8">OPEN Front 8</option><option value="Horn">Horn</option><option value="Cooling Fan">Cooling Fan</option><option value="Brake Lights">Brake Lights</option><option value="Interior Lights">Interior Lights</option><option value="Backup Lights">Backup Lights</option><option value="Parking Lights Rear">Parking Lights Rear</option><option value="OPEN Rear 7">OPEN Rear 7</option><option value="OPEN Rear 8">OPEN Rear 8</option><option value="OPEN Rear 9">OPEN Rear 9</option><option value="Fuel Pump">Fuel Pump</option><option value="Driver Window Up">Driver Window Up</option><option value="Driver Window Down">Driver Window Down</option><option value="Passenger Window Up">Passenger Window Up</option><option value="Passenger Window Down">Passenger Window Down</option><option value="Driver Door Lock">Driver Door Lock</option><option value="Driver Door Unlock">Driver Door Unlock</option><option value="Passenger Door Lock">Passenger Door Lock</option><option value="Passenger Door Unlock">Passenger Door Unlock</option><option value="AUX 03">AUX 03</option><option value="AUX 04">AUX 04</option><option value="Gauge Illumination">Gauge Illumination</option></select></div>
+			<div class="muted" style="grid-column:1/-1; font-size:0.85rem;">Select a function - it will be controlled by the behavior engine with proper CAN handling</div>
+		</div>
+		<h4>Behavior Timing</h4>
+		<div class="grid two-col">
+			<div><label>Flash Frequency (ms)</label><input id="btn-flash-frequency" type="number" min="50" max="5000" step="50" value="500" /></div>
+			<div><label>Fade Time (ms)</label><input id="btn-fade-time" type="number" min="100" max="10000" step="100" value="1000" /></div>
+			<div><label>On Time (ms)</label><input id="btn-on-time" type="number" min="100" max="30000" step="100" value="2000" /></div>
+			<div class="muted" style="grid-column:1/-1; font-size:0.85rem;">Flash frequency controls blink rate. Fade time controls smooth transitions. On time is for timed behaviors.</div>
 		</div>
 		<h4>CAN Frame</h4>
 		<div class="row" style="margin-bottom:10px;"><label><input id="btn-can-enabled" type="checkbox" onchange="toggleCanFields()" /> Send CAN on press</label></div>
@@ -653,10 +659,13 @@ function showBanner(msg,type='success'){
 }
 
 function ensurePages(){
+	console.log('[WEB] ensurePages() - current pages:', config.pages);
 	if(!config.pages || config.pages.length===0){
+		console.log('[WEB] No pages found, creating default Home page');
 		config.pages = [{ id:'page_0', name:'Home', rows:2, cols:2, buttons:[] }];
 		activePageIndex = 0;
 	}
+	console.log('[WEB] ensurePages() - final pages:', config.pages);
 }
 
 function renderPageSelect(){
@@ -1126,6 +1135,10 @@ function openButtonModal(row,col){
 		font_family: firstDefined(theme.button_font_family, 'montserrat'),
 		text_align: 'center',
 		momentary: false,
+		infinitybox_function: '',
+		flash_frequency: 500,
+		fade_time: 1000,
+		on_time: 2000,
 		can:{enabled:false,pgn:0,priority:6,source_address:0xF9,destination_address:0xFF,data:[0,0,0,0,0,0,0,0]},
 		can_off:{enabled:false,pgn:0,priority:6,source_address:0xF9,destination_address:0xFF,data:[0,0,0,0,0,0,0,0]}
 	};
@@ -1141,6 +1154,10 @@ function openButtonModal(row,col){
 	document.getElementById('btn-font-family').value = data.font_family || 'montserrat';
 	document.getElementById('btn-text-align').value = data.text_align || 'center';
 	document.getElementById('btn-momentary').checked = data.momentary || false;
+	document.getElementById('btn-infinitybox-function').value = data.infinitybox_function || '';
+	document.getElementById('btn-flash-frequency').value = firstDefined(data.flash_frequency, 500);
+	document.getElementById('btn-fade-time').value = firstDefined(data.fade_time, 1000);
+	document.getElementById('btn-on-time').value = firstDefined(data.on_time, 2000);
 	const canCfg = data.can || {};
 	document.getElementById('btn-can-enabled').checked = canCfg.enabled || false;
 	document.getElementById('btn-can-pgn').value = (canCfg.pgn || 0).toString(16).toUpperCase();
@@ -1194,6 +1211,10 @@ function saveButtonFromModal(){
 		font_name: document.getElementById('btn-font-family').value+'_16',
 		text_align: document.getElementById('btn-text-align').value,
 		momentary: document.getElementById('btn-momentary').checked,
+		infinitybox_function: document.getElementById('btn-infinitybox-function').value || '',
+		flash_frequency: parseInt(document.getElementById('btn-flash-frequency').value) || 500,
+		fade_time: parseInt(document.getElementById('btn-fade-time').value) || 1000,
+		on_time: parseInt(document.getElementById('btn-on-time').value) || 2000,
 		can: {
 			enabled: canEnabled,
 			pgn: canEnabled ? parseInt(document.getElementById('btn-can-pgn').value,16)||0 : 0,
@@ -1231,6 +1252,89 @@ function toggleCanFields(){
 	document.getElementById('can-config-wrapper').style.display = showOn ? 'grid' : 'none';
 	const showOff = document.getElementById('btn-can-off-enabled').checked;
 	document.getElementById('can-off-config-wrapper').style.display = showOff ? 'grid' : 'none';
+}
+
+function applyInfinityboxTemplate(){
+	const funcName = document.getElementById('btn-infinitybox-function').value;
+	if(!funcName) return;
+	
+	// POWERCELL NGX J1939 mappings based on actual wiring table
+	// Format: {cell, outputs: [array], label, momentary}
+	const templates = {
+		left_turn: {cell:1, outputs:[1], cell2:2, outputs2:[1], label:'Left Turn', momentary:true},
+		right_turn: {cell:1, outputs:[2], cell2:2, outputs2:[2], label:'Right Turn', momentary:true},
+		four_way: {cell:1, outputs:[1,2], cell2:2, outputs2:[1,2], label:'4-Ways', momentary:false},
+		ignition: {cell:1, outputs:[3], label:'Ignition', momentary:false},
+		starter: {cell:1, outputs:[4], label:'Starter', momentary:true},
+		headlights: {cell:1, outputs:[5], label:'Headlights', momentary:false, softstart:true},
+		parking_lights: {cell:1, outputs:[6], cell2:2, outputs2:[6], label:'Parking', momentary:false},
+		high_beams: {cell:1, outputs:[7], label:'High Beams', momentary:false},
+		horn: {cell:1, outputs:[9], label:'Horn', momentary:true},
+		cooling_fan: {cell:1, outputs:[10], label:'Cooling Fan', momentary:false},
+		brake_lights: {cell:2, outputs:[3], label:'Brake Lights', momentary:false},
+		interior_lights: {cell:2, outputs:[4], label:'Interior', momentary:false},
+		backup_lights: {cell:2, outputs:[5], label:'Backup', momentary:false},
+		fuel_pump: {cell:2, outputs:[10], label:'Fuel Pump', momentary:false}
+	};
+	
+	const tmpl = templates[funcName];
+	if(!tmpl) return;
+	
+	// Auto-populate label and momentary
+	const currentLabel = document.getElementById('btn-label').value;
+	if(!currentLabel || currentLabel.match(/^Button \d+$/)){
+		document.getElementById('btn-label').value = tmpl.label;
+	}
+	document.getElementById('btn-momentary').checked = tmpl.momentary;
+	
+	// Helper: Build POWERCELL NGX frame
+	function buildFrame(outputs, softstart) {
+		const data = [0,0,0,0,0,0,0,0];
+		for(const out of outputs) {
+			if(out <= 8) {
+				const bit = 8 - out;
+				if(softstart) {
+					// Soft-start bitmap: byte 2 bits 5-0 for outputs 1-6
+					if(out <= 6) data[1] |= (1 << (5 - (out - 1)));
+					else data[2] |= (1 << (13 - out));  // 7-8 in byte 3
+				} else {
+					// Track bitmap: byte 1 bits 7-0
+					data[0] |= (1 << bit);
+				}
+			} else if(out === 9) {
+				data[1] |= 0x80;  // Byte 2 bit 7
+			} else if(out === 10) {
+				data[1] |= 0x40;  // Byte 2 bit 6
+			}
+		}
+		return data;
+	}
+	
+	const pgn1 = 0xFF00 + tmpl.cell;
+	const dataOn1 = buildFrame(tmpl.outputs, tmpl.softstart);
+	
+	// Primary cell ON frame
+	document.getElementById('btn-can-enabled').checked = true;
+	document.getElementById('btn-can-pgn').value = pgn1.toString(16).toUpperCase();
+	document.getElementById('btn-can-priority').value = '6';
+	document.getElementById('btn-can-src').value = '1E';
+	document.getElementById('btn-can-dest').value = 'FF';
+	document.getElementById('btn-can-data').value = dataOn1.map(b=>b.toString(16).toUpperCase().padStart(2,'0')).join(' ');
+	
+	// Primary cell OFF frame
+	document.getElementById('btn-can-off-enabled').checked = true;
+	document.getElementById('btn-can-off-pgn').value = pgn1.toString(16).toUpperCase();
+	document.getElementById('btn-can-off-priority').value = '6';
+	document.getElementById('btn-can-off-src').value = '1E';
+	document.getElementById('btn-can-off-dest').value = 'FF';
+	document.getElementById('btn-can-off-data').value = '00 00 00 00 00 00 00 00';
+	
+	toggleCanFields();
+	
+	// Show info about dual-cell functions
+	if(tmpl.cell2) {
+		alert('This function uses both Cell ' + tmpl.cell + ' and Cell ' + tmpl.cell2 + '. You can add a second button for the second cell, or use the CAN library to send both frames.');
+	}
 }
 
 function renderPreview(){
@@ -1383,8 +1487,11 @@ function renderPreview(){
 }
 
 function renderNav(){
+	console.log('[WEB] renderNav() called');
 	ensurePages();
 	const nav = document.getElementById('preview-nav');
+	console.log('[WEB] preview-nav element:', nav);
+	console.log('[WEB] Rendering', config.pages.length, 'navigation pills');
 	const theme = config.theme || {};
 	nav.innerHTML = '';
 	nav.style.background = firstDefined(theme.surface_color, '#12141c');
@@ -1423,7 +1530,9 @@ function renderNav(){
 		};
 		chip.onclick = ()=>setActivePage(idx);
 		nav.appendChild(chip);
+		console.log('[WEB] Added nav pill:', p.name || 'Page '+(idx+1));
 	});
+	console.log('[WEB] renderNav() complete - nav children:', nav.children.length);
 }
 
 function updateHeaderFromInputs(){
@@ -1707,15 +1816,7 @@ function importCanMessage(type){
 	const templates = {
 		windows:{name:'Windows',pgn:0xFEF6,data:[255,255,255,255,255,255,255,255]},
 		locks:{name:'Locks',pgn:0xFECA,data:[0,0,0,0,255,255,255,255]},
-		boards:{name:'Running Boards',pgn:0xFE00,data:[1,0,0,0,255,255,255,255]},
-		// Infinitybox NGX (from email/docs): front listens FF011E, rear listens FF021E (priority omitted)
-		powercell_front:{name:'POWERCELL NGX Front (FF011E control)',pgn:0xFF01,data:[0,0,0,0,0,0,0,0],priority:6,source_address:0x1E,destination_address:0xFF},
-		powercell_rear:{name:'POWERCELL NGX Rear (FF021E control)',pgn:0xFF02,data:[0,0,0,0,0,0,0,0],priority:6,source_address:0x1E,destination_address:0xFF},
-		// inMOTION NGX listens on different proprietary PGNs; OFF uses a distinct payload
-		imotion_df:{name:'inMOTION NGX Driver Front (PGN FF03)',pgn:0xFF03,data:[0,0,0,0,0,0,0,0]},
-		imotion_pf:{name:'inMOTION NGX Passenger Front (PGN FF04)',pgn:0xFF04,data:[0,0,0,0,0,0,0,0]},
-		imotion_dr:{name:'inMOTION NGX Driver Rear (PGN FF05)',pgn:0xFF05,data:[0,0,0,0,0,0,0,0]},
-		imotion_pr:{name:'inMOTION NGX Passenger Rear (PGN FF06)',pgn:0xFF06,data:[0,0,0,0,0,0,0,0]}
+		boards:{name:'Running Boards',pgn:0xFE00,data:[1,0,0,0,255,255,255,255]}
 	};
 	const t = templates[type];
 	if(!t) return;
@@ -2406,11 +2507,15 @@ function hydrateDisplay(){
 }
 
 async function loadConfig(){
+	console.log('[WEB] loadConfig() called');
 	try{
 		const res = await fetch('/api/config');
 		config = await res.json();
+		console.log('[WEB] Config loaded:', config);
+		console.log('[WEB] Pages before ensurePages:', config.pages);
 		lvimgPreviewCache.clear();
 		ensurePages();
+		console.log('[WEB] Pages after ensurePages:', config.pages);
 		populateFontSelects();  // Must populate fonts BEFORE hydrating header fields
 		hydrateThemeFields();
 		hydrateHeaderFields();

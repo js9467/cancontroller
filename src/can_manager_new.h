@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <Arduino.h>
 #include <hal/gpio_types.h>
@@ -6,10 +6,10 @@
 
 #include "config_types.h"
 
-// Forward declaration
+// Forward declaration of ESP_IOExpander for CAN transceiver control
 class ESP_IOExpander;
 
-// Struct for received CAN messages (different from CanMessage in config_types.h)
+// Struct for received CAN messages
 struct CanRxMessage {
     uint32_t identifier;
     uint8_t data[8];
@@ -21,13 +21,13 @@ class CanManager {
 public:
     static CanManager& instance();
 
-    // GPIO pin configuration - VERIFIED WORKING:
-    // TX=GPIO20, RX=GPIO19 is the CORRECT configuration for this board
-    // (The pins were incorrectly swapped in a recent commit)
+    // Call this from main.cpp after expander init
+    void attachIoExpander(ESP_IOExpander* expander);
+
+    // GPIO pin configuration
     static constexpr gpio_num_t DEFAULT_TX_PIN = static_cast<gpio_num_t>(20);
     static constexpr gpio_num_t DEFAULT_RX_PIN = static_cast<gpio_num_t>(19);
 
-    void setExpander(ESP_IOExpander* exp) { expander_ = exp; }
     bool begin(gpio_num_t tx_pin = DEFAULT_TX_PIN, gpio_num_t rx_pin = DEFAULT_RX_PIN, std::uint32_t bitrate = 250000);
     void stop();
     bool sendButtonAction(const ButtonConfig& button);
@@ -40,23 +40,34 @@ public:
     // Helper for sending J1939 PGN (used by background tasks)
     bool sendJ1939Pgn(uint8_t priority, uint32_t pgn, uint8_t source_addr, const uint8_t data[8]);
 
+    // CAN Mode Control - FORCEFULLY sets the transceiver enable pin
+    void setCanMode(bool enable);  // enable=true → CAN mode, enable=false → USB mode
+    
+    // Verify transceiver is actually enabled
+    bool verifyTransceiverEnabled() const;
+
+    // Diagnostic methods
+    void dumpHardwareStatus() const;
+    void testReceive(uint32_t duration_ms = 5000) const;
+    String getHardwareStatusJson() const;
+
     bool isReady() const { return ready_; }
-    bool isBusAlive() const { return bus_alive_; }
     gpio_num_t txPin() const { return tx_pin_; }
     gpio_num_t rxPin() const { return rx_pin_; }
 
 private:
     CanManager() = default;
-    
-    // Force USB_SEL to CAN mode using expander
-    void forceCanMux();
 
-    ESP_IOExpander* expander_ = nullptr;
     bool ready_ = false;
-    bool bus_alive_ = false;
     gpio_num_t tx_pin_ = DEFAULT_TX_PIN;
     gpio_num_t rx_pin_ = DEFAULT_RX_PIN;
     std::uint32_t bitrate_ = 250000;
+    
+    ESP_IOExpander* io_ = nullptr;
 
     std::uint32_t buildIdentifier(const CanFrameConfig& frame) const;
+    
+    // Raw I2C helpers for CH422G control
+    bool rawReadGate(uint8_t& value) const;
+    bool rawWriteGate(uint8_t value) const;
 };

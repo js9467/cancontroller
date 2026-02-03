@@ -44,7 +44,12 @@ struct ButtonConfig {
     std::uint8_t border_width = 0;  // Button border width in pixels
     std::string border_color = "#FFFFFF";  // Button border color
     CanFrameConfig can;
-    CanFrameConfig can_off;  // Optional OFF/release frame (used by some modules like inMOTION NGX)
+    CanFrameConfig can_off;  // Optional OFF/release frame (used by some modules that require release frames)
+    std::string infinitybox_function = "";  // Infinitybox function name (e.g. "left_turn", "horn") - used as template
+    // Behavior timing parameters (milliseconds)
+    std::uint16_t flash_frequency = 500;  // Flash on/off interval in ms
+    std::uint16_t fade_time = 1000;       // Fade in/out duration in ms
+    std::uint16_t on_time = 2000;         // Timed behavior duration in ms
 };
 
 struct PageConfig {

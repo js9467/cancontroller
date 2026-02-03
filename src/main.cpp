@@ -5,45 +5,52 @@
  * Boots the LVGL runtime, loads configuration from LittleFS,
  * and exposes a WiFi + web interface for live customization.
  * Version display and OTA update support.
+ * 
+ * HARDWARE INITIALIZATION: Direct calls (no BSP abstraction).
+ * All core stability fixes are in this file:
+ *   1. Synchronous LVGL flush (no async callback)
+ *   2. Double-buffer LVGL (prevents tearing)
+ *   3. Mux watchdog (reasserts USB_SEL every 1s)
+ *   4. LVGL mutex created immediately after lv_init()
  */
 
 #include <Arduino.h>
-#include <ESP_IOExpander_Library.h>
 #include <ESP_Panel_Library.h>
 #include <ESP_Panel_Conf.h>
+#include <ESP_IOExpander_Library.h>
 #include <lvgl.h>
 #include <WiFi.h>
-#include <Wire.h>
 #include <string>
 #include <esp_ota_ops.h>
+#include <esp_system.h>
+#include <rom/rtc.h>
 
 #include "can_manager.h"
 #include "config_manager.h"
+#include "ipm1_can_system.h"
 #include "ui_builder.h"
 #include "ui_theme.h"
 #include "web_server.h"
 #include "ota_manager.h"
 #include "version_auto.h"
+#include "hardware_config.h"
+#include "infinitybox_control.h"
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <freertos/queue.h>
+#include <Preferences.h>
 
-// IO pin definitions for the Waveshare ESP32-S3-Touch-LCD-4.3 board
-#define TP_RST 1
-#define LCD_BL 2
-#define LCD_RST 3
-#define SD_CS 4
-#define USB_SEL 5
+// CAN message queue structure
+struct CanFrame {
+    uint32_t id;
+    bool ext;
+    uint8_t dlc;
+    uint8_t data[8];
+    uint32_t timestamp_ms;
+};
 
-// I2C definitions for the external IO expander (CH422G)
-#define I2C_MASTER_NUM 1
-#define I2C_MASTER_SDA_IO 8
-#define I2C_MASTER_SCL_IO 9
-
-// LVGL port configuration
-#define LVGL_TICK_PERIOD_MS     (2)
-#define LVGL_TASK_MAX_DELAY_MS  (500)
-#define LVGL_TASK_MIN_DELAY_MS  (1)
-#define LVGL_TASK_STACK_SIZE    (6 * 1024)
-#define LVGL_TASK_PRIORITY      (2)
-#define LVGL_BUF_SIZE           (ESP_PANEL_LCD_H_RES * 40)
+static QueueHandle_t g_can_queue = nullptr;
+static constexpr size_t CAN_QUEUE_SIZE = 128;
 
 enum class PanelVariant : uint8_t {
     kFourPointThreeInch = BRONCO_PANEL_VARIANT_4_3,
@@ -78,10 +85,123 @@ static const PanelConfig& SelectPanelConfig()
 ESP_Panel* panel = nullptr;
 SemaphoreHandle_t lvgl_mux = nullptr;
 static bool g_disable_ota = false;
+static ESP_IOExpander* g_expander = nullptr;
+static volatile bool g_safe_boot_requested = false;
+static volatile uint32_t g_can_frames_received = 0;
+Preferences g_prefs;
+
+// LVGL Task timing constants
+constexpr uint32_t LVGL_TASK_STACK_SIZE = 6 * 1024;
+constexpr uint32_t LVGL_TASK_PRIORITY = 2;
+constexpr uint32_t LVGL_TASK_MAX_DELAY_MS = 500;
+constexpr uint32_t LVGL_TASK_MIN_DELAY_MS = 1;
 
 // Forward declarations for LVGL helpers
 void lvgl_port_lock(int timeout_ms);
 void lvgl_port_unlock();
+
+// NOTE: Expander initialization moved to AFTER panel init
+// No early hardware init needed - panel handles everything
+
+// Safe boot detection: check if touch screen is being held during boot
+bool detect_safe_boot() {
+    if (!panel || !panel->getLcdTouch()) return false;
+    
+    panel->getLcdTouch()->readData();
+    bool touched = panel->getLcdTouch()->getTouchState();
+    
+    if (!touched) return false;
+    
+    TouchPoint point = panel->getLcdTouch()->getPoint();
+    // Top-left corner (within 100x100 pixels)
+    return (point.x < 100 && point.y < 100);
+}
+
+// Factory reset: wipe all persistent storage
+void factory_reset() {
+    Serial.println("\n[FACTORY RESET] Wiping all settings...");
+    
+    // Clear NVS
+    g_prefs.begin("app", false);
+    g_prefs.clear();
+    g_prefs.end();
+    
+    // Clear config manager storage
+    ConfigManager::instance().factoryReset();
+    
+    Serial.println("[FACTORY RESET] Complete. Rebooting...");
+    delay(1000);
+    ESP.restart();
+}
+
+// Mux watchdog - reasserts all control pins (SAFE_MASK) to prevent flips from library code
+// Runs every 1 second on core 1, ensuring USB_SEL stays HIGH and other outputs stable
+void mux_watchdog_task(void*) {
+    for (;;) {
+        vTaskDelay(pdMS_TO_TICKS(1000));
+        if (g_expander) {
+            // Reassert safe state using hardware_config.h constants
+            // (multiDigitalWrite returns void, so no error checking)
+            g_expander->multiDigitalWrite(HW_CH422G_SAFE_MASK, HIGH);
+        }
+    }
+}
+
+// CAN receive task - runs on core 1, never blocks UI
+// Pulls messages from TWAI and pushes to queue for processing
+void can_rx_task(void* param) {
+    Serial.println("[CAN-TASK] RX task started on core 1");
+    CanRxMessage msg;
+    
+    for (;;) {
+        // Non-blocking receive with short timeout
+        if (CanManager::instance().receiveMessage(msg, 50)) {
+            CanFrame frame;
+            frame.id = msg.identifier;
+            frame.ext = (msg.identifier & 0x80000000) != 0;  // Infer from ID
+            frame.dlc = msg.length;
+            memcpy(frame.data, msg.data, 8);
+            frame.timestamp_ms = millis();
+            
+            // Non-blocking queue send - drop if full (don't block CAN RX)
+            if (xQueueSend(g_can_queue, &frame, 0) == pdTRUE) {
+                g_can_frames_received++;
+            }
+        }
+        
+        // Always yield to prevent watchdog
+        vTaskDelay(pdMS_TO_TICKS(1));
+    }
+}
+
+// Health monitoring task - watches for memory leaks and system issues
+void health_monitor_task(void* param) {
+    Serial.println("[HEALTH] Monitor started");
+    uint32_t last_heap = 0;
+    uint32_t heap_drop_count = 0;
+    
+    for (;;) {
+        uint32_t heap = ESP.getFreeHeap();
+        uint32_t psram = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+        uint32_t can_fps = g_can_frames_received;
+        g_can_frames_received = 0;  // Reset counter
+        
+        // Detect sustained heap loss (possible leak)
+        if (last_heap > 0 && heap < last_heap - 1024) {
+            heap_drop_count++;
+            if (heap_drop_count > 5) {
+                Serial.printf("[HEALTH] WARNING: Heap dropped %lu bytes in 10s\n", last_heap - heap);
+            }
+        } else {
+            heap_drop_count = 0;
+        }
+        last_heap = heap;
+        
+        Serial.printf("[HEALTH] heap=%lu psram=%lu can_fps=%lu\n", heap, psram, can_fps);
+        
+        vTaskDelay(pdMS_TO_TICKS(2000));
+    }
+}
 
 #if ESP_PANEL_LCD_BUS_TYPE == ESP_PANEL_BUS_TYPE_RGB
 void lvgl_port_disp_flush(lv_disp_drv_t* disp, const lv_area_t* area, lv_color_t* color_p) {
@@ -91,11 +211,11 @@ void lvgl_port_disp_flush(lv_disp_drv_t* disp, const lv_area_t* area, lv_color_t
 #else
 void lvgl_port_disp_flush(lv_disp_drv_t* disp, const lv_area_t* area, lv_color_t* color_p) {
     panel->getLcd()->drawBitmap(area->x1, area->y1, area->x2 + 1, area->y2 + 1, color_p);
+    lv_disp_flush_ready(disp);  // Always call synchronously
 }
 
 bool notify_lvgl_flush_ready(void* user_ctx) {
-    lv_disp_drv_t* disp_driver = static_cast<lv_disp_drv_t*>(user_ctx);
-    lv_disp_flush_ready(disp_driver);
+    // No longer needed with synchronous flush
     return false;
 }
 #endif
@@ -118,11 +238,19 @@ void lvgl_port_tp_read(lv_indev_drv_t* indev, lv_indev_data_t* data) {
 #endif
 
 void lvgl_port_lock(int timeout_ms) {
+    // Guard: if mutex not yet created, don't crash - just return
+    if (!lvgl_mux) {
+        return;
+    }
     const TickType_t timeout_ticks = (timeout_ms < 0) ? portMAX_DELAY : pdMS_TO_TICKS(timeout_ms);
     xSemaphoreTakeRecursive(lvgl_mux, timeout_ticks);
 }
 
 void lvgl_port_unlock() {
+    // Guard: if mutex not yet created, don't crash
+    if (!lvgl_mux) {
+        return;
+    }
     xSemaphoreGiveRecursive(lvgl_mux);
 }
 
@@ -147,9 +275,35 @@ void lvgl_port_task(void* arg) {
 
 void setup() {
     Serial.begin(115200);
+    delay(100);  // Allow serial to stabilize
+    
+    // Print reset reason for diagnostics (brownout, WDT, panic, etc.)
+    esp_reset_reason_t reset_reason = esp_reset_reason();
+    Serial.println();
+    Serial.println("=================================");
+    Serial.println(" Bronco Controls - Web Config ");
+    Serial.println("=================================");
+    Serial.printf(" Firmware Version: %s\n", APP_VERSION);
+    Serial.print(" Reset Reason: ");
+    switch (reset_reason) {
+        case ESP_RST_POWERON:   Serial.println("Power-on"); break;
+        case ESP_RST_SW:        Serial.println("Software reset"); break;
+        case ESP_RST_PANIC:     Serial.println("Exception/panic"); break;
+        case ESP_RST_INT_WDT:   Serial.println("Interrupt watchdog"); break;
+        case ESP_RST_TASK_WDT:  Serial.println("Task watchdog"); break;
+        case ESP_RST_WDT:       Serial.println("Other watchdog"); break;
+        case ESP_RST_DEEPSLEEP: Serial.println("Deep sleep"); break;
+        case ESP_RST_BROWNOUT:  Serial.println("Brownout (power issue!)"); break;
+        case ESP_RST_SDIO:      Serial.println("SDIO"); break;
+        default:                Serial.printf("Unknown (%d)\n", reset_reason); break;
+    }
+    
+    // Print memory status
+    Serial.printf(" Free Heap: %lu bytes\n", esp_get_free_heap_size());
+    Serial.printf(" Free PSRAM: %lu bytes\n", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+    Serial.printf(" Total PSRAM: %lu bytes\n", heap_caps_get_total_size(MALLOC_CAP_SPIRAM));
     
     // CRITICAL: Mark OTA partition as valid IMMEDIATELY to prevent rollback
-    // This must be the FIRST thing we do after Serial starts
     const esp_partition_t* running = esp_ota_get_running_partition();
     esp_ota_img_states_t ota_state;
     if (esp_ota_get_state_partition(running, &ota_state) == ESP_OK) {
@@ -158,46 +312,47 @@ void setup() {
             esp_ota_mark_app_valid_cancel_rollback();
         }
     }
-    
-    Serial.println();
-    Serial.println("=================================");
-    Serial.println(" Bronco Controls - Web Config ");
-    Serial.println("=================================");
-    Serial.printf(" Firmware Version: %s\n", APP_VERSION);
 
     const PanelConfig &panelConfig = SelectPanelConfig();
     Serial.printf(" Panel Variant: %s\n", panelConfig.name);
+    Serial.println("=================================");
 
     // Initialize LVGL core
     lv_init();
+    
+    // CREATE LVGL MUTEX IMMEDIATELY after lv_init() before any lvgl_port_lock() calls
+    // This prevents undefined behavior if lock is called before mutex exists
+    lvgl_mux = xSemaphoreCreateRecursiveMutex();
+    if (!lvgl_mux) {
+        Serial.println("[ERROR] Failed to create LVGL mutex!");
+        while (true) delay(1000);
+    }
 
-    // Initialize display panel
+    // Create display panel - library will handle all I2C initialization
+    Serial.println("[PANEL] Creating ESP_Panel object...");
     panel = new ESP_Panel();
 
-    // Configure IO expander - panel->init() will initialize I2C for touch
-    ESP_IOExpander* expander = new ESP_IOExpander_CH422G(I2C_MASTER_NUM, ESP_IO_EXPANDER_I2C_CH422G_ADDRESS_000);
-    expander->init();
-    expander->begin();
-    expander->multiPinMode(TP_RST | LCD_RST | SD_CS | USB_SEL, OUTPUT);
-    expander->multiDigitalWrite(TP_RST | LCD_RST | SD_CS, HIGH);
-    
-    // CRITICAL: Set USB_SEL HIGH to enable CAN transceiver
-    // Without this, the SN65HVD230 CAN transceiver remains unpowered/disabled
-    // and GPIO19 RX will not receive any CAN messages
-    expander->digitalWrite(USB_SEL, HIGH);
-    Serial.println("[Boot] IO Expander configured (USB_SEL=HIGH for CAN transceiver)");
-    panel->addIOExpander(expander);
-
-    // LVGL draw buffers in PSRAM
+    // LVGL draw buffers - DOUBLE BUFFER in PSRAM for safety
+    Serial.println("[LVGL] Allocating double buffers in PSRAM...");
     static lv_disp_draw_buf_t draw_buf;
-    uint8_t* buf = static_cast<uint8_t*>(heap_caps_calloc(1, LVGL_BUF_SIZE * sizeof(lv_color_t), MALLOC_CAP_SPIRAM));
-    if (!buf) {
-        Serial.println("[Error] Unable to allocate LVGL buffer in PSRAM");
-        while (true) {
-            delay(1000);
-        }
+    const uint32_t buf_sz = ESP_PANEL_LCD_H_RES * 40;
+    const uint32_t buf_bytes = buf_sz * sizeof(lv_color_t);
+    
+    uint8_t* buf1 = static_cast<uint8_t*>(heap_caps_calloc(1, buf_bytes, MALLOC_CAP_SPIRAM));
+    if (!buf1) {
+        Serial.printf("[ERROR] Unable to allocate LVGL buffer 1 (%lu bytes)\n", buf_bytes);
+        Serial.printf("[ERROR] Free PSRAM: %lu bytes\n", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+        while (true) delay(1000);
     }
-    lv_disp_draw_buf_init(&draw_buf, buf, nullptr, LVGL_BUF_SIZE);
+    uint8_t* buf2 = static_cast<uint8_t*>(heap_caps_calloc(1, buf_bytes, MALLOC_CAP_SPIRAM));
+    if (!buf2) {
+        Serial.printf("[ERROR] Unable to allocate LVGL buffer 2 (%lu bytes)\n", buf_bytes);
+        Serial.printf("[ERROR] Free PSRAM: %lu bytes\n", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+        while (true) delay(1000);
+    }
+    lv_disp_draw_buf_init(&draw_buf, buf1, buf2, buf_sz);
+    Serial.printf("[LVGL] ✓ Allocated 2x %lu byte buffers in PSRAM\n", buf_bytes);
+    Serial.printf("[LVGL] Free PSRAM after allocation: %lu bytes\n", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
 
     // Register display driver
     static lv_disp_drv_t disp_drv;
@@ -220,25 +375,68 @@ void setup() {
     panel->init();
     Serial.println("[Boot] ✓ panel->init() completed");
     
-#if ESP_PANEL_LCD_BUS_TYPE != ESP_PANEL_BUS_TYPE_RGB
-    panel->getLcd()->setCallback(notify_lvgl_flush_ready, &disp_drv);
-#endif
-    
     Serial.println("[Boot] Calling panel->begin()...");
     panel->begin();
     Serial.println("[Boot] ✓ panel->begin() completed");
+    
+    // NOW create and configure expander AFTER panel owns I2C
+    Serial.println("[EXPANDER] Creating CH422G expander...");
+    g_expander = new ESP_IOExpander_CH422G(HW_I2C_BUS_NUM, ESP_IO_EXPANDER_I2C_CH422G_ADDRESS_000);
+    if (g_expander) {
+        g_expander->init();
+        g_expander->begin();
+        
+        // Configure expander pins using hardware_config.h constants
+        g_expander->multiPinMode(HW_CH422G_SAFE_MASK, OUTPUT);
+        g_expander->multiDigitalWrite(HW_CH422G_SAFE_MASK, HIGH);
+        Serial.println("[EXPANDER] ✓ CAN mux set to USB_SEL HIGH");
+    } else {
+        Serial.println("[EXPANDER] ✗ Failed to create expander");
+    }
+    
+    // SAFE BOOT CHECK: Hold top-left corner during boot to factory reset
+    Serial.println("\n[SAFE BOOT] Checking for factory reset request (hold top-left)...");
+    delay(500);  // Give touch controller time to stabilize
+    
+    for (int i = 0; i < 30; i++) {  // Check for 3 seconds
+        if (detect_safe_boot()) {
+            Serial.printf("[SAFE BOOT] Detected! Hold for %d more...\n", 30 - i);
+            g_safe_boot_requested = true;
+        } else if (g_safe_boot_requested) {
+            // Released early
+            g_safe_boot_requested = false;
+            Serial.println("[SAFE BOOT] Released - cancelled");
+            break;
+        }
+        delay(100);
+    }
+    
+    if (g_safe_boot_requested) {
+        factory_reset();  // This will reboot
+    }
+    Serial.println("[SAFE BOOT] Normal boot\n");
 
-    // Re-confirm USB_SEL is HIGH after panel initialization
-    // The ESP_IOExpander may have been reset during panel->init()
-    // USB_SEL (bit 5) must be HIGH to power the CAN transceiver
-    delay(50);
-    if (expander) {
-        expander->digitalWrite(USB_SEL, HIGH);
-        Serial.println("[Boot] USB_SEL re-confirmed HIGH for CAN transceiver");
+    // Create CAN message queue
+    g_can_queue = xQueueCreate(CAN_QUEUE_SIZE, sizeof(CanFrame));
+    if (!g_can_queue) {
+        Serial.println("[ERROR] Failed to create CAN queue!");
     }
 
-    // === CAN INITIALIZATION (after I2C is ready) ===
+    // Start mux watchdog to keep USB_SEL HIGH
+    xTaskCreatePinnedToCore(mux_watchdog_task, "mux_wd", 4096, nullptr, 1, nullptr, 1);
+    Serial.println("[WATCHDOG] ✓ Mux watchdog started");
+    
+    // Start CAN RX task on core 1 (separate from UI)
+    xTaskCreatePinnedToCore(can_rx_task, "can_rx", 4096, nullptr, 3, nullptr, 1);
+    Serial.println("[CAN-TASK] ✓ CAN RX task started on core 1");
+    
+    // Start health monitor
+    xTaskCreatePinnedToCore(health_monitor_task, "health", 3072, nullptr, 1, nullptr, 1);
+    Serial.println("[HEALTH] ✓ Health monitor started");
+
+    // === CAN INITIALIZATION ===
     Serial.println("\n[CAN] Initializing CAN bus...");
+    CanManager::instance().setExpander(g_expander);
     CanManager::instance().begin();
     
     if (CanManager::instance().isReady()) {
@@ -261,13 +459,39 @@ void setup() {
         Serial.println("[Boot] ✗ ERROR: Backlight is NULL!");
     }
 
-    // Start LVGL background task
-    lvgl_mux = xSemaphoreCreateRecursiveMutex();
+    // Start LVGL background task (note: lvgl_mux already created at top of setup())
     xTaskCreate(lvgl_port_task, "lvgl", LVGL_TASK_STACK_SIZE, nullptr, LVGL_TASK_PRIORITY, nullptr);
 
-    // Load configuration from flash
-    if (!ConfigManager::instance().begin()) {
+    // Boot-safe config bypass: if reset was due to panic/WDT, offer recovery
+    bool skip_config = false;
+    if (reset_reason == ESP_RST_PANIC || reset_reason == ESP_RST_INT_WDT || 
+        reset_reason == ESP_RST_TASK_WDT || reset_reason == ESP_RST_WDT) {
+        Serial.println("[BOOT] WARNING: Last reset was abnormal - config may be corrupted");
+        Serial.println("[BOOT] To skip config loading, send 'safe' command in next 3 seconds...");
+        uint32_t safe_start = millis();
+        while (millis() - safe_start < 3000) {
+            if (Serial.available()) {
+                String cmd = Serial.readStringUntil('\n');
+                cmd.trim();
+                if (cmd == "safe") {
+                    skip_config = true;
+                    Serial.println("[BOOT] SAFE MODE: Skipping config load, using defaults");
+                    break;
+                }
+            }
+            delay(100);
+        }
+    }
+
+    // Load configuration from flash (unless safe mode)
+    if (skip_config) {
+        Serial.println("[Config] Safe mode - not loading config from flash");
+    } else if (!ConfigManager::instance().begin()) {
         Serial.println("[Config] Failed to mount LittleFS; factory defaults applied.");
+    }
+
+    if (!Ipm1CanSystem::instance().begin()) {
+        Serial.println("[IPM1] Failed to load system JSON; default system retained");
     }
 
     // Auto-detect firmware version if it differs from APP_VERSION (after OTA update)
@@ -279,7 +503,6 @@ void setup() {
         Serial.println("[Boot] Version updated and saved");
     }
 
-    // CAN was already initialized before panel (see above)
     // Build the themed UI once before networking spins up
     lvgl_port_lock(-1);
     UITheme::init();
@@ -290,6 +513,14 @@ void setup() {
     // Launch WiFi access point + web server
     WebServerManager::instance().begin();
     OTAUpdateManager::instance().begin();
+    
+    // Initialize Infinitybox control system
+    Serial.println("[IBOX] Initializing Infinitybox IPM1 control system...");
+    if (InfinityboxControl::InfinityboxController::instance().begin(&Ipm1CanSystem::instance())) {
+        Serial.println("[IBOX] ✓ Infinitybox system ready");
+    } else {
+        Serial.println("[IBOX] ✗ Failed to initialize Infinitybox system");
+    }
 
     Serial.println("=================================");
     Serial.println(" Touch the screen or open http://192.168.4.250 ");
@@ -301,6 +532,11 @@ void loop() {
     static uint32_t ap_start_ms = 0;
     static bool ap_shutdown_complete = false;
     static std::string last_ota_status_pushed;
+    static uint32_t canmon_start_ms = 0;
+    static int canmon_count = 0;
+    static bool canmon_active = false;
+    static uint32_t last_can_stats_ms = 0;
+    static uint32_t can_frames_processed = 0;
     
     // Serial command handler for brightness testing
     if (Serial.available()) {
@@ -358,10 +594,10 @@ void loop() {
                 delay(400);
             }
         } else if (cmd.startsWith("canpoll ")) {
-            // Poll POWERCELL NGX: canpoll <address>
+            // Poll Powercell module: canpoll <address> (non-blocking)
             int address = cmd.substring(8).toInt();
             if (address >= 1 && address <= 16) {
-                Serial.printf("[CAN] Polling POWERCELL NGX at address %d\n", address);
+                Serial.printf("[CAN] Sending poll to address %d (check with canmon for response)\n", address);
                 
                 // Build polling CAN ID: FF4X with source address 0x63
                 uint32_t pgn = 0xFF40 + (address == 16 ? 0 : address);
@@ -374,48 +610,26 @@ void loop() {
                 frame.data = {0x11, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
                 
                 if (CanManager::instance().sendFrame(frame)) {
-                    Serial.println("[CAN] Poll message sent - listening for response...");
-                    
-                    // Listen for response (FF5X)
-                    uint32_t start = millis();
-                    while (millis() - start < 1000) {
-                        CanRxMessage msg;
-                        if (CanManager::instance().receiveMessage(msg, 50)) {
-                            Serial.printf("[CAN] RX ID: 0x%08lX, DLC: %d, Data: ", msg.identifier, msg.length);
-                            for (uint8_t i = 0; i < msg.length; i++) {
-                                Serial.printf("%02X ", msg.data[i]);
-                            }
-                            Serial.println();
-                        }
-                    }
+                    Serial.println("[CAN] ✓ Poll sent");
                 } else {
-                    Serial.println("[CAN] Failed to send poll message");
+                    Serial.println("[CAN] ✗ Failed to send poll");
                 }
             } else {
                 Serial.println("[CMD] Usage: canpoll <1-16>");
             }
         } else if (cmd == "canmon") {
-            // Monitor CAN bus for 10 seconds
-            Serial.println("[CAN] Monitoring CAN bus for 10 seconds...");
-            uint32_t start = millis();
-            int count = 0;
-            while (millis() - start < 10000) {
-                CanRxMessage msg;
-                if (CanManager::instance().receiveMessage(msg, 100)) {
-                    count++;
-                    Serial.printf("[CAN] #%d ID: 0x%08lX, DLC: %d, Data: ", count, msg.identifier, msg.length);
-                    for (uint8_t i = 0; i < msg.length; i++) {
-                        Serial.printf("%02X ", msg.data[i]);
-                    }
-                    Serial.println();
-                }
+            // Start non-blocking CAN monitoring
+            if (!canmon_active) {
+                canmon_active = true;
+                canmon_start_ms = millis();
+                canmon_count = 0;
+                Serial.println("[CAN] *** Monitoring CAN bus for 10 seconds (non-blocking) ***");
             }
-            Serial.printf("[CAN] Monitoring complete. Received %d messages.\n", count);
         } else if (cmd.startsWith("canconfig ")) {
-            // Send configuration to POWERCELL NGX: canconfig <address>
+            // Send configuration to Powercell module: canconfig <address>
             int address = cmd.substring(10).toInt();
             if (address >= 1 && address <= 16) {
-                Serial.printf("[CAN] Configuring POWERCELL NGX at address %d\n", address);
+                Serial.printf("[CAN] Configuring Powercell at address %d\n", address);
                 Serial.println("[CAN] Config: 250kb/s, 10s LOC timer, 250ms reporting, 200Hz PWM");
                 
                 // Build configuration CAN ID: FF4X with source address 0x63
@@ -430,7 +644,7 @@ void loop() {
                 frame.data = {0x99, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
                 
                 if (CanManager::instance().sendFrame(frame)) {
-                    Serial.println("[CAN] Configuration sent! Power cycle the POWERCELL NGX to apply.");
+                    Serial.println("[CAN] Configuration sent! Power cycle the Powercell to apply.");
                 } else {
                     Serial.println("[CAN] Failed to send configuration");
                 }
@@ -512,6 +726,109 @@ void loop() {
         } else if (cmd == "otaon") {
             g_disable_ota = false;
             Serial.println("[OTA] Auto-update enabled");
+        } else if (cmd.startsWith("ibox ")) {
+            // Infinitybox control commands: ibox <function> <action> [params]
+            String params = cmd.substring(5);
+            params.trim();
+            int spaceIdx = params.indexOf(' ');
+            
+            if (spaceIdx > 0) {
+                String function = params.substring(0, spaceIdx);
+                String action = params.substring(spaceIdx + 1);
+                action.trim();
+                
+                // Convert underscores to spaces for function names
+                function.replace('_', ' ');
+                
+                // Parse action
+                if (action == "on") {
+                    if (InfinityboxControl::InfinityboxController::instance().activateFunction(function.c_str(), true)) {
+                        Serial.printf("[IBOX] ✓ %s ON\n", function.c_str());
+                    } else {
+                        Serial.printf("[IBOX] ✗ Failed to activate %s\n", function.c_str());
+                    }
+                } else if (action == "off") {
+                    if (InfinityboxControl::InfinityboxController::instance().deactivateFunction(function.c_str())) {
+                        Serial.printf("[IBOX] ✓ %s OFF\n", function.c_str());
+                    } else {
+                        Serial.printf("[IBOX] ✗ Failed to deactivate %s\n", function.c_str());
+                    }
+                } else if (action == "flash") {
+                    if (InfinityboxControl::InfinityboxController::instance().activateFunctionFlash(function.c_str(), 500, 500, 0)) {
+                        Serial.printf("[IBOX] ✓ %s FLASHING\n", function.c_str());
+                    } else {
+                        Serial.printf("[IBOX] ✗ Failed to flash %s\n", function.c_str());
+                    }
+                } else if (action.startsWith("fade ")) {
+                    int level = action.substring(5).toInt();
+                    if (level >= 0 && level <= 100) {
+                        if (InfinityboxControl::InfinityboxController::instance().activateFunctionFade(function.c_str(), level, 1000)) {
+                            Serial.printf("[IBOX] ✓ %s FADE to %d%%\n", function.c_str(), level);
+                        } else {
+                            Serial.printf("[IBOX] ✗ Failed to fade %s\n", function.c_str());
+                        }
+                    } else {
+                        Serial.println("[CMD] Usage: ibox <function> fade <0-100>");
+                    }
+                } else {
+                    Serial.println("[CMD] Actions: on, off, flash, fade <level>");
+                }
+            } else {
+                Serial.println("[CMD] Usage: ibox <function> <action>");
+                Serial.println("[CMD] Example: ibox headlights on");
+                Serial.println("[CMD] Example: ibox left_turn_signal_front flash");
+                Serial.println("[CMD] Example: ibox interior_lights fade 50");
+            }
+        } else if (cmd == "iboxlist") {
+            auto names = InfinityboxControl::InfinityboxController::instance().getAllFunctionNames();
+            Serial.printf("\n=== Infinitybox Functions (%d) ===\n", names.size());
+            for (const auto& name : names) {
+                const auto* func = InfinityboxControl::InfinityboxController::instance().getFunction(name);
+                if (func) {
+                    Serial.printf("  %s\n", name.c_str());
+                    Serial.print("    Behaviors: ");
+                    for (size_t i = 0; i < func->allowed_behaviors.size(); i++) {
+                        Serial.print(InfinityboxControl::behaviorToString(func->allowed_behaviors[i]));
+                        if (i < func->allowed_behaviors.size() - 1) Serial.print(", ");
+                    }
+                    Serial.println();
+                    if (!func->requires.empty()) {
+                        Serial.print("    Requires: ");
+                        for (size_t i = 0; i < func->requires.size(); i++) {
+                            Serial.print(func->requires[i].c_str());
+                            if (i < func->requires.size() - 1) Serial.print(", ");
+                        }
+                        Serial.println();
+                    }
+                    if (!func->blocked_when.empty()) {
+                        Serial.print("    Blocked when: ");
+                        for (size_t i = 0; i < func->blocked_when.size(); i++) {
+                            Serial.print(func->blocked_when[i].c_str());
+                            if (i < func->blocked_when.size() - 1) Serial.print(", ");
+                        }
+                        Serial.println();
+                    }
+                }
+            }
+            Serial.println("================================\n");
+        } else if (cmd == "iboxstatus") {
+            InfinityboxControl::InfinityboxController::instance().printStatus();
+        } else if (cmd == "security on") {
+            InfinityboxControl::InfinityboxController::instance().setSecurityActive(true);
+        } else if (cmd == "security off") {
+            InfinityboxControl::InfinityboxController::instance().setSecurityActive(false);
+        } else if (cmd == "ignition on") {
+            InfinityboxControl::InfinityboxController::instance().setIgnitionOn(true);
+            InfinityboxControl::InfinityboxController::instance().activateFunction("Ignition", true);
+        } else if (cmd == "ignition off") {
+            InfinityboxControl::InfinityboxController::instance().setIgnitionOn(false);
+            InfinityboxControl::InfinityboxController::instance().deactivateFunction("Ignition");
+        } else if (cmd == "otaoff") {
+            g_disable_ota = true;
+            Serial.println("[OTA] Auto-update disabled for testing");
+        } else if (cmd == "otaon") {
+            g_disable_ota = false;
+            Serial.println("[OTA] Auto-update enabled");
         } else if (cmd == "help" || cmd == "?") {
             Serial.println("\n=== Serial Commands ===");
             Serial.println("BRIGHTNESS:");
@@ -519,19 +836,61 @@ void loop() {
             Serial.println("  brightness <0-100> - Set brightness");
             Serial.println("  blinfo           - Print backlight pin/PWM info");
             Serial.println("  btest            - Step brightness 100->0->100");
-            Serial.println("CAN BUS (Infinitybox POWERCELL NGX):");
+            Serial.println("CAN BUS (Powercell modules):");
             Serial.println("  canstatus        - Show CAN bus status");
-            Serial.println("  canpoll <1-16>   - Poll POWERCELL NGX at address");
-            Serial.println("  canconfig <1-16> - Configure POWERCELL NGX (default settings)");
+            Serial.println("  canpoll <1-16>   - Poll Powercell at address");
+            Serial.println("  canconfig <1-16> - Configure Powercell (default settings)");
             Serial.println("  canmon           - Monitor CAN bus for 10 seconds");
             Serial.println("  cansend <pgn> <data> - Send raw CAN frame");
             Serial.println("                     Example: cansend FF41 11 00 00 00 00 00 00 00");
+            Serial.println("INFINITYBOX (IPM1 System):");
+            Serial.println("  ibox <function> on|off|flash - Control function");
+            Serial.println("  ibox <function> fade <0-100> - Fade to level");
+            Serial.println("  iboxlist         - List all functions and behaviors");
+            Serial.println("  iboxstatus       - Show active functions and state");
+            Serial.println("  security on|off  - Enable/disable security interlock");
+            Serial.println("  ignition on|off  - Turn ignition on/off");
             Serial.println("GENERAL:");
             Serial.println("  help or ?        - Show this help");
             Serial.println("======================\n");
         } else if (cmd.length() > 0) {
             Serial.printf("[CMD] Unknown command: '%s' (type 'help' for commands)\n", cmd.c_str());
         }
+    }
+    
+    // ===== CAN QUEUE PROCESSING (non-blocking, from dedicated task) =====
+    CanFrame frame;
+    while (xQueueReceive(g_can_queue, &frame, 0) == pdTRUE) {
+        can_frames_processed++;
+        
+        // Only print if actively monitoring (not every frame!)
+        if (canmon_active) {
+            canmon_count++;
+            Serial.printf("[CAN] #%d ID: 0x%08lX, DLC: %d, Data: ", canmon_count, frame.id, frame.dlc);
+            for (uint8_t i = 0; i < frame.dlc; i++) {
+                Serial.printf("%02X ", frame.data[i]);
+            }
+            Serial.println();
+        }
+        
+        // TODO: Process CAN data and update UI model here
+        // Do NOT call LVGL functions directly - set flags/state instead
+    }
+    
+    // Print CAN stats periodically (not every frame)
+    uint32_t now_ms = millis();
+    if (now_ms - last_can_stats_ms >= 5000) {
+        if (can_frames_processed > 0) {
+            Serial.printf("[CAN-STATS] Processed %lu frames in last 5s\n", can_frames_processed);
+        }
+        can_frames_processed = 0;
+        last_can_stats_ms = now_ms;
+    }
+    
+    // Check if monitoring period ended
+    if (canmon_active && (now_ms - canmon_start_ms >= 10000)) {
+        Serial.printf("[CAN] *** Monitoring complete. Displayed %d messages. ***\n", canmon_count);
+        canmon_active = false;
     }
     
     // Record AP start time on first loop
@@ -575,6 +934,9 @@ void loop() {
             last_ota_status_pushed = ota_status;
         }
     }
+
+    // Update Infinitybox behavior engines (flash, fade, timed)
+    InfinityboxControl::InfinityboxController::instance().loop();
 
     WebServerManager::instance().loop();
     vTaskDelay(pdMS_TO_TICKS(50));

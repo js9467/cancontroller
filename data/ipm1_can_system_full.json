@@ -1,0 +1,44 @@
+{
+  "meta": {
+    "system": "Infinitybox IPM1",
+    "revision": "REV1",
+    "source": "Front Engine Standard System Assignments",
+    "purpose": "Complete UI + CAN behavioral model"
+  },
+  "devices": [
+    { "id": "pc_front", "type": "powercell", "address": 1 },
+    { "id": "pc_rear", "type": "powercell", "address": 2 },
+    { "id": "im_df", "type": "inmotion", "address": 3 },
+    { "id": "im_pf", "type": "inmotion", "address": 4 },
+    { "id": "im_dr", "type": "inmotion", "address": 5 },
+    { "id": "im_pr", "type": "inmotion", "address": 6 },
+    { "id": "mastercell", "type": "mastercell" }
+  ],
+  "functions": [
+    { "name": "Left Turn Signal Front", "device": "pc_front", "output": 1, "behaviors": ["flash", "flash_timed"], "requires": ["ignition"] },
+    { "name": "Right Turn Signal Front", "device": "pc_front", "output": 2, "behaviors": ["flash", "flash_timed"], "requires": ["ignition"] },
+    { "name": "4-Ways", "device": "pc_front", "outputs": [1, 2], "behaviors": ["flash"] },
+    { "name": "Ignition", "device": "pc_front", "output": 3, "behaviors": ["toggle"] },
+    { "name": "Starter", "device": "pc_front", "output": 4, "behaviors": ["momentary"], "blocked_when": ["security"] },
+    { "name": "Headlights", "device": "pc_front", "output": 5, "behaviors": ["toggle", "scene", "fade"] },
+    { "name": "Parking Lights Front", "device": "pc_front", "output": 6, "behaviors": ["toggle"] },
+    { "name": "High Beams", "device": "pc_front", "output": 7, "behaviors": ["momentary", "toggle"] },
+    { "name": "Horn", "device": "pc_front", "output": 9, "behaviors": ["momentary"] },
+    { "name": "Cooling Fan", "device": "pc_front", "output": 10, "behaviors": ["toggle", "timed"] },
+    { "name": "Left Turn Signal Rear", "device": "pc_rear", "output": 1, "behaviors": ["flash", "flash_timed"] },
+    { "name": "Right Turn Signal Rear", "device": "pc_rear", "output": 2, "behaviors": ["flash", "flash_timed"] },
+    { "name": "Brake Lights", "device": "pc_rear", "output": 3, "behaviors": ["toggle"] },
+    { "name": "Interior Lights", "device": "pc_rear", "output": 4, "behaviors": ["toggle", "fade", "timed"] },
+    { "name": "Backup Lights", "device": "pc_rear", "output": 5, "behaviors": ["toggle"] },
+    { "name": "Parking Lights Rear", "device": "pc_rear", "output": 6, "behaviors": ["toggle"] },
+    { "name": "Fuel Pump", "device": "pc_rear", "output": 10, "behaviors": ["toggle"], "blocked_when": ["security"] },
+    { "name": "Driver Window Up", "device": "im_df", "output": "relay_1a", "behaviors": ["momentary"] },
+    { "name": "Driver Window Down", "device": "im_df", "output": "relay_1b", "behaviors": ["momentary"] },
+    { "name": "Driver Door Lock", "device": "im_df", "output": "relay_2a", "behaviors": ["one_shot"] },
+    { "name": "Driver Door Unlock", "device": "im_df", "output": "relay_2b", "behaviors": ["one_shot"] },
+    { "name": "Passenger Window Up", "device": "im_pf", "output": "relay_1a", "behaviors": ["momentary"] },
+    { "name": "Passenger Window Down", "device": "im_pf", "output": "relay_1b", "behaviors": ["momentary"] },
+    { "name": "AUX 03", "device": "im_df", "output": "aux_03", "behaviors": ["toggle", "flash", "fade", "timed"], "renameable": true },
+    { "name": "AUX 04", "device": "im_df", "output": "aux_04", "behaviors": ["toggle", "flash", "fade", "timed"], "renameable": true }
+  ]
+}

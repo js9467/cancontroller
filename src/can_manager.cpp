@@ -3,13 +3,29 @@
 
 #include <driver/twai.h>
 #include <freertos/FreeRTOS.h>
-#include <Wire.h>
 
 #include <algorithm>
+
+// No longer needed - expander handles mux
+// Wire removed to prevent I2C conflict with panel library
+
+// No longer needed - expander handles mux
+// Wire removed to prevent I2C conflict with panel library
+
+// MUX control now handled by g_expander in main.cpp
+// This function is deprecated but kept for compatibility
+static void force_can_mux_direct() {
+    // No-op: mux is set by main.cpp after panel init
+    // See force_can_mux_hardware() and mux_watchdog_task()
+}
 
 CanManager& CanManager::instance() {
     static CanManager manager;
     return manager;
+}
+
+void CanManager::forceCanMux() {
+    force_can_mux_direct();
 }
 
 bool CanManager::begin(gpio_num_t tx_pin, gpio_num_t rx_pin, std::uint32_t bitrate) {
@@ -17,16 +33,17 @@ bool CanManager::begin(gpio_num_t tx_pin, gpio_num_t rx_pin, std::uint32_t bitra
     rx_pin_ = rx_pin;
     bitrate_ = bitrate;
 
-    Serial.printf("[CanManager] Initializing TWAI on TX=GPIO%d, RX=GPIO%d, Bitrate=%lu\n", tx_pin_, rx_pin_, bitrate_);
+    Serial.printf("[CanManager] Initializing TWAI on TX=GPIO%d, RX=GPIO%d, Bitrate=%lu\\n", tx_pin_, rx_pin_, bitrate_);
 
-    // NOTE: CAN transceiver power (USB_SEL) is controlled by main.cpp via ESP_IOExpander
-    // The expander sets USB_SEL HIGH before calling this function
-    // Do NOT write to CH422G here - it would conflict with expander management
+    // CRITICAL: Assert CAN mux immediately before TWAI operations
+    Serial.println("[CanManager] Forcing USB_SEL to CAN mode...");
+    forceCanMux();
 
-    twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT(tx_pin_, rx_pin_, TWAI_MODE_NORMAL);
+    // Start in LISTEN_ONLY to verify bus traffic before allowing TX
+    twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT(tx_pin_, rx_pin_, TWAI_MODE_LISTEN_ONLY);
     g_config.tx_queue_len = 8;
     g_config.rx_queue_len = 16;
-    g_config.alerts_enabled = TWAI_ALERT_TX_SUCCESS | TWAI_ALERT_TX_FAILED | TWAI_ALERT_BUS_ERROR | TWAI_ALERT_BUS_OFF | TWAI_ALERT_ERR_PASS;
+    g_config.alerts_enabled = TWAI_ALERT_RX_DATA | TWAI_ALERT_BUS_ERROR | TWAI_ALERT_BUS_OFF | TWAI_ALERT_ERR_PASS;
 
     if (bitrate_ != 250000) {
         Serial.println("[CanManager] Unsupported bitrate requested. Falling back to 250 kbps.");
@@ -43,8 +60,56 @@ bool CanManager::begin(gpio_num_t tx_pin, gpio_num_t rx_pin, std::uint32_t bitra
 
     if (twai_start() != ESP_OK) {
         Serial.println("[CanManager] Failed to start TWAI driver");
+        twai_driver_uninstall();  // Clean up on failure
         ready_ = false;
         return false;
+    }
+
+    Serial.println("[CanManager] TWAI started in LISTEN_ONLY mode, checking for bus traffic...");
+    
+    // Count RX frames for 1 second to verify bus is alive
+    uint32_t rx_count = 0;
+    uint32_t start_time = millis();
+    while (millis() - start_time < 1000) {
+        twai_message_t msg;
+        if (twai_receive(&msg, pdMS_TO_TICKS(10)) == ESP_OK) {
+            rx_count++;
+        }
+    }
+    
+    Serial.printf("[CanManager] Received %lu frames in 1 second\\n", rx_count);
+    
+    if (rx_count >= 3) {
+        bus_alive_ = true;
+        Serial.println("[CanManager] Bus traffic detected - switching to NORMAL mode");
+        
+        // Switch to NORMAL mode for TX/RX
+        twai_stop();
+        twai_driver_uninstall();
+        
+        // CRITICAL: Re-assert CAN mux before reinstalling TWAI
+        Serial.println("[CanManager] Re-asserting CAN mux before NORMAL mode...");
+        forceCanMux();
+        
+        g_config.mode = TWAI_MODE_NORMAL;
+        g_config.alerts_enabled = TWAI_ALERT_TX_SUCCESS | TWAI_ALERT_TX_FAILED | TWAI_ALERT_BUS_ERROR | TWAI_ALERT_BUS_OFF | TWAI_ALERT_ERR_PASS;
+        
+        if (twai_driver_install(&g_config, &t_config, &f_config) != ESP_OK) {
+            Serial.println("[CanManager] Failed to reinstall TWAI in NORMAL mode");
+            ready_ = false;
+            return false;
+        }
+        
+        if (twai_start() != ESP_OK) {
+            Serial.println("[CanManager] Failed to restart TWAI in NORMAL mode");
+            twai_driver_uninstall();  // Clean up on failure
+            ready_ = false;
+            return false;
+        }
+    } else {
+        Serial.println("[CanManager] WARNING: No bus traffic detected - staying in LISTEN_ONLY (RX only)");
+        Serial.println("[CanManager]   TX will be blocked until bus traffic is seen");
+        bus_alive_ = false;
     }
 
     ready_ = true;
@@ -83,6 +148,15 @@ bool CanManager::sendFrame(const CanFrameConfig& frame) {
         Serial.println("[CanManager] TWAI bus not initialized");
         return false;
     }
+
+    // Block TX if bus is not alive (prevents timeout hell)
+    if (!bus_alive_) {
+        Serial.println("[CanManager] TX blocked - no bus traffic detected (use LISTEN_ONLY or check wiring)");
+        return false;
+    }
+
+    // Re-assert CAN mux before TX (belt and suspenders)
+    forceCanMux();
 
     // Check for bus errors and recover if needed
     twai_status_info_t status;
@@ -216,185 +290,4 @@ bool CanManager::sendJ1939Pgn(uint8_t priority, uint32_t pgn, uint8_t source_add
                   (unsigned long)pgn, data[0], data[1], data[2], data[3], 
                   data[4], data[5], data[6], data[7]);
     return true;
-}
-
-// Background task for Infinitybox Output1 ON sequence
-static void infinityboxOutput1OnTask(void* pvParameters) {
-    const uint8_t SA_TOOL = 0x80;
-    const uint32_t PGN_FF01 = 0x00FF01;
-    const uint32_t PGN_FF02 = 0x00FF02;
-
-    vTaskDelay(pdMS_TO_TICKS(100));  // Let web handler return first
-
-    Serial.println("[Task] Infinitybox Output1 ON sequence starting");
-
-    // Baseline FF02 00
-    uint8_t ff02_00[8] = {0x00, 0, 0, 0, 0, 0, 0, 0};
-    if (CanManager::instance().sendJ1939Pgn(6, PGN_FF02, SA_TOOL, ff02_00)) {
-        vTaskDelay(pdMS_TO_TICKS(10));
-
-        // FF01 A0 00
-        uint8_t ff01_a0[8] = {0xA0, 0x00, 0, 0, 0, 0, 0, 0};
-        if (CanManager::instance().sendJ1939Pgn(6, PGN_FF01, SA_TOOL, ff01_a0)) {
-            vTaskDelay(pdMS_TO_TICKS(10));
-
-            // FF02 80 00
-            uint8_t ff02_80[8] = {0x80, 0x00, 0, 0, 0, 0, 0, 0};
-            if (CanManager::instance().sendJ1939Pgn(6, PGN_FF02, SA_TOOL, ff02_80)) {
-                vTaskDelay(pdMS_TO_TICKS(10));
-
-                // FF01 20 00
-                uint8_t ff01_20[8] = {0x20, 0x00, 0, 0, 0, 0, 0, 0};
-                if (CanManager::instance().sendJ1939Pgn(6, PGN_FF01, SA_TOOL, ff01_20)) {
-                    vTaskDelay(pdMS_TO_TICKS(10));
-
-                    // FF02 back to 00
-                    CanManager::instance().sendJ1939Pgn(6, PGN_FF02, SA_TOOL, ff02_00);
-                }
-            }
-        }
-    }
-
-    Serial.println("[Task] Infinitybox Output1 ON sequence complete");
-    vTaskDelete(NULL);
-}
-
-// Non-blocking wrapper - starts background task
-bool CanManager::sendInfinityboxOutput1On() {
-    if (!ready_) {
-        Serial.println("[CanManager] TWAI not ready");
-        return false;
-    }
-    if (xTaskCreate(infinityboxOutput1OnTask, "Inf1On", 2048, NULL, 1, NULL) == pdTRUE) {
-        Serial.println("[CanManager] Started Output1 ON background task");
-        return true;
-    }
-    return false;
-}
-
-// Background task for Infinitybox Output1 OFF sequence
-static void infinityboxOutput1OffTask(void* pvParameters) {
-    const uint8_t SA_TOOL = 0x80;
-    const uint32_t PGN_FF01 = 0x00FF01;
-    const uint32_t PGN_FF02 = 0x00FF02;
-
-    Serial.println("[Task] Infinitybox Output1 OFF sequence starting");
-
-    uint8_t ff02_00[8] = {0x00, 0, 0, 0, 0, 0, 0, 0};
-    uint8_t ff01_20[8] = {0x20, 0x00, 0, 0, 0, 0, 0, 0};
-
-    CanManager::instance().sendJ1939Pgn(6, PGN_FF02, SA_TOOL, ff02_00);
-    vTaskDelay(pdMS_TO_TICKS(10));
-    CanManager::instance().sendJ1939Pgn(6, PGN_FF01, SA_TOOL, ff01_20);
-    vTaskDelay(pdMS_TO_TICKS(10));
-    CanManager::instance().sendJ1939Pgn(6, PGN_FF02, SA_TOOL, ff02_00);
-
-    Serial.println("[Task] Infinitybox Output1 OFF sequence complete");
-    vTaskDelete(NULL);
-}
-
-// Non-blocking wrapper - starts background task
-bool CanManager::sendInfinityboxOutput1Off() {
-    if (!ready_) {
-        Serial.println("[CanManager] TWAI not ready");
-        return false;
-    }
-    if (xTaskCreate(infinityboxOutput1OffTask, "Inf1Off", 2048, NULL, 1, NULL) == pdTRUE) {
-        Serial.println("[CanManager] Started Output1 OFF background task");
-        return true;
-    }
-    return false;
-}
-
-// Background task for Infinitybox Output9 ON sequence
-// EXACT 5-message sequence from working sketch
-static void infinityboxOutput9OnTask(void* pvParameters) {
-    const uint8_t SA_TOOL = 0x80;
-    const uint32_t PGN_FF01 = 0x00FF01;
-    const uint32_t PGN_FF02 = 0x00FF02;
-
-    vTaskDelay(pdMS_TO_TICKS(100));  // Let web handler return first
-
-    Serial.println("[Task] Infinitybox Output9 ON sequence starting (5 messages)");
-
-    uint8_t ff02_00[8] = {0x00, 0, 0, 0, 0, 0, 0, 0};
-    uint8_t ff02_80[8] = {0x80, 0x00, 0, 0, 0, 0, 0, 0};
-    uint8_t ff01_2080[8] = {0x20, 0x80, 0, 0, 0, 0, 0, 0};
-
-    // Message 1: FF02 00
-    if (CanManager::instance().sendJ1939Pgn(6, PGN_FF02, SA_TOOL, ff02_00)) {
-        vTaskDelay(pdMS_TO_TICKS(10));
-        // Message 2: FF01 20 80
-        if (CanManager::instance().sendJ1939Pgn(6, PGN_FF01, SA_TOOL, ff01_2080)) {
-            vTaskDelay(pdMS_TO_TICKS(10));
-            // Message 3: FF02 80
-            if (CanManager::instance().sendJ1939Pgn(6, PGN_FF02, SA_TOOL, ff02_80)) {
-                vTaskDelay(pdMS_TO_TICKS(10));
-                // Message 4: FF01 20 80 (repeat)
-                if (CanManager::instance().sendJ1939Pgn(6, PGN_FF01, SA_TOOL, ff01_2080)) {
-                    vTaskDelay(pdMS_TO_TICKS(10));
-                    // Message 5: FF02 00
-                    CanManager::instance().sendJ1939Pgn(6, PGN_FF02, SA_TOOL, ff02_00);
-                }
-            }
-        }
-    }
-
-    Serial.println("[Task] Infinitybox Output9 ON sequence complete");
-    vTaskDelete(NULL);
-}
-
-// Non-blocking wrapper - starts background task
-bool CanManager::sendInfinityboxOutput9On() {
-    if (!ready_) {
-        Serial.println("[CanManager] TWAI not ready");
-        return false;
-    }
-    if (xTaskCreate(infinityboxOutput9OnTask, "Inf9On", 4096, NULL, 1, NULL) == pdTRUE) {
-        Serial.println("[CanManager] Started Output9 ON background task");
-        return true;
-    }
-    return false;
-}
-
-// Background task for Infinitybox Output9 OFF sequence
-// EXACT 3-message sequence from working sketch
-static void infinityboxOutput9OffTask(void* pvParameters) {
-    const uint8_t SA_TOOL = 0x80;
-    const uint32_t PGN_FF01 = 0x00FF01;
-    const uint32_t PGN_FF02 = 0x00FF02;
-
-    vTaskDelay(pdMS_TO_TICKS(100));  // Let web handler return first
-
-    Serial.println("[Task] Infinitybox Output9 OFF sequence starting (3 messages)");
-
-    uint8_t ff02_00[8] = {0x00, 0, 0, 0, 0, 0, 0, 0};
-    uint8_t ff01_20[8] = {0x20, 0x00, 0, 0, 0, 0, 0, 0};
-
-    // Message 1: FF02 00
-    if (CanManager::instance().sendJ1939Pgn(6, PGN_FF02, SA_TOOL, ff02_00)) {
-        vTaskDelay(pdMS_TO_TICKS(10));
-        // Message 2: FF01 20 00
-        if (CanManager::instance().sendJ1939Pgn(6, PGN_FF01, SA_TOOL, ff01_20)) {
-            vTaskDelay(pdMS_TO_TICKS(10));
-            // Message 3: FF02 00
-            CanManager::instance().sendJ1939Pgn(6, PGN_FF02, SA_TOOL, ff02_00);
-        }
-    }
-
-    Serial.println("[Task] Infinitybox Output9 OFF sequence complete");
-    vTaskDelete(NULL);
-}
-
-// Non-blocking wrapper - starts background task
-bool CanManager::sendInfinityboxOutput9Off() {
-    if (!ready_) {
-        Serial.println("[CanManager] TWAI not ready");
-        return false;
-    }
-    if (xTaskCreate(infinityboxOutput9OffTask, "Inf9Off", 4096, NULL, 1, NULL) == pdTRUE) {
-        Serial.println("[CanManager] Started Output9 OFF background task");
-        return true;
-    }
-    return false;
 }

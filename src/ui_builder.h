@@ -38,6 +38,21 @@ private:
     void buildEmptyState();
     void buildPage(std::size_t index);
     void updateNavSelection();
+    
+    // Infinitybox UI methods
+    void buildInfinityboxPage(std::size_t category_index);
+    void buildInfinityboxDrivingPage();
+    void buildInfinityboxExteriorPage();
+    void buildInfinityboxInteriorPage();
+    void buildInfinityboxBodyPage();
+    void buildInfinityboxPowertrainPage();
+    void buildInfinityboxAuxPage();
+    lv_obj_t* createFunctionToggle(lv_obj_t* parent, const char* label, const char* function_name);
+    lv_obj_t* createFunctionMomentary(lv_obj_t* parent, const char* label, const char* function_name);
+    lv_obj_t* createFunctionFlash(lv_obj_t* parent, const char* label, const char* function_name);
+    static void infinityboxToggleEvent(lv_event_t* e);
+    static void infinityboxMomentaryEvent(lv_event_t* e);
+    static void infinityboxFlashEvent(lv_event_t* e);
     void updateHeaderBranding();
     void createInfoModal();
     void showInfoModal();

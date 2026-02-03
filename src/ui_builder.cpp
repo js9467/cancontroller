@@ -18,6 +18,7 @@
 #include "ui_theme.h"
 #include "assets/images.h"
 #include "version_auto.h"
+#include "infinitybox_control.h"
 
 extern ESP_Panel* panel;
 
@@ -27,7 +28,9 @@ UIBuilder& UIBuilder::instance() {
 }
 
 void UIBuilder::begin() {
+    Serial.println("\n===== UIBuilder::begin() START =====");
     config_ = &ConfigManager::instance().getConfig();
+    Serial.printf("Config loaded, pages count: %d\n", config_ ? config_->pages.size() : -1);
 
     // Apply display settings before constructing UI
     loadSleepIcon();
@@ -306,98 +309,98 @@ void UIBuilder::createBaseScreen() {
 }
 
 void UIBuilder::buildNavigation() {
+    Serial.println("\n=== buildNavigation() called ===");
     lv_obj_clean(nav_bar_);
     nav_buttons_.clear();
 
-    if (!config_ || config_->pages.empty()) {
-        return;
-    }
-
+    // First, add config-driven pages
     std::size_t index = 0;
-    nav_buttons_.reserve(config_->pages.size());
+    if (config_ && !config_->pages.empty()) {
+        nav_buttons_.reserve(config_->pages.size() + 6);  // +6 for Infinitybox categories
 
-    for (const auto& page : config_->pages) {
-        lv_obj_t* btn = lv_btn_create(nav_bar_);
-        // Don't remove all styles - keep base rendering intact for child labels
-        lv_obj_clear_flag(btn, LV_OBJ_FLAG_SCROLLABLE);
+        for (const auto& page : config_->pages) {
+            lv_obj_t* btn = lv_btn_create(nav_bar_);
+            // Don't remove all styles - keep base rendering intact for child labels
+            lv_obj_clear_flag(btn, LV_OBJ_FLAG_SCROLLABLE);
 
-        // Use page-specific inactive color, fall back to theme nav_button_color
-        lv_color_t inactive_color = !page.nav_inactive_color.empty() ?
-            colorFromHex(page.nav_inactive_color, UITheme::COLOR_SURFACE) :
-            colorFromHex(config_->theme.nav_button_color, UITheme::COLOR_SURFACE);
+            // Use page-specific inactive color, fall back to theme nav_button_color
+            lv_color_t inactive_color = !page.nav_inactive_color.empty() ?
+                colorFromHex(page.nav_inactive_color, UITheme::COLOR_SURFACE) :
+                colorFromHex(config_->theme.nav_button_color, UITheme::COLOR_SURFACE);
 
-        lv_obj_set_style_bg_color(btn, inactive_color, 0);
-        lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
+            lv_obj_set_style_bg_color(btn, inactive_color, 0);
+            lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
 
-        // Use page-specific active color, fall back to theme nav_button_active_color
-        lv_color_t active_color = !page.nav_color.empty() ?
-            colorFromHex(page.nav_color, UITheme::COLOR_ACCENT) :
-            colorFromHex(config_->theme.nav_button_active_color, UITheme::COLOR_ACCENT);
-        lv_obj_set_style_bg_color(btn, active_color, LV_STATE_CHECKED);
-        lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, LV_STATE_CHECKED);
+            // Use page-specific active color, fall back to theme nav_button_active_color
+            lv_color_t active_color = !page.nav_color.empty() ?
+                colorFromHex(page.nav_color, UITheme::COLOR_ACCENT) :
+                colorFromHex(config_->theme.nav_button_active_color, UITheme::COLOR_ACCENT);
+            lv_obj_set_style_bg_color(btn, active_color, LV_STATE_CHECKED);
+            lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, LV_STATE_CHECKED);
 
-        lv_color_t border_color = colorFromHex(config_->theme.border_color, UITheme::COLOR_BORDER);
-        lv_obj_set_style_border_width(btn, config_->theme.border_width, 0);
-        lv_obj_set_style_border_color(btn, border_color, 0);
-        lv_obj_set_style_border_width(btn, config_->theme.border_width, LV_STATE_CHECKED);
-        lv_obj_set_style_border_color(btn, border_color, LV_STATE_CHECKED);
-        const bool page_has_nav_radius = page.nav_button_radius >= 0 && page.nav_button_radius <= 50;
-        const std::uint8_t nav_radius = page_has_nav_radius
-            ? static_cast<std::uint8_t>(page.nav_button_radius)
-            : ((config_->theme.nav_button_radius || config_->theme.nav_button_radius == 0)
-                ? config_->theme.nav_button_radius
-                : (config_->theme.button_radius ? config_->theme.button_radius : 20));
-        lv_obj_set_style_radius(btn, nav_radius, 0);
-        lv_obj_set_style_radius(btn, nav_radius, LV_STATE_CHECKED);
-        lv_obj_set_style_pad_left(btn, UITheme::SPACE_MD, 0);
-        lv_obj_set_style_pad_right(btn, UITheme::SPACE_MD, 0);
-        lv_obj_set_style_pad_top(btn, UITheme::SPACE_SM, 0);
-        lv_obj_set_style_pad_bottom(btn, UITheme::SPACE_SM, 0);
-        lv_obj_set_style_min_width(btn, 140, 0);
-        lv_obj_set_style_max_width(btn, 320, 0);
-        lv_obj_set_height(btn, 46);
-        lv_obj_set_style_shadow_width(btn, 12, 0);
-        lv_obj_set_style_shadow_color(btn, lv_color_hex(0x000000), 0);
-        lv_obj_set_style_shadow_opa(btn, LV_OPA_20, 0);
-        lv_obj_set_style_shadow_width(btn, 12, LV_STATE_CHECKED);
-        lv_obj_set_style_shadow_color(btn, lv_color_hex(0x000000), LV_STATE_CHECKED);
-        lv_obj_set_style_shadow_opa(btn, LV_OPA_20, LV_STATE_CHECKED);
-        lv_obj_add_flag(btn, LV_OBJ_FLAG_CHECKABLE);
-        lv_obj_add_event_cb(btn, navButtonEvent, LV_EVENT_CLICKED,
-                            reinterpret_cast<void*>(static_cast<uintptr_t>(index)));
+            lv_color_t border_color = colorFromHex(config_->theme.border_color, UITheme::COLOR_BORDER);
+            lv_obj_set_style_border_width(btn, config_->theme.border_width, 0);
+            lv_obj_set_style_border_color(btn, border_color, 0);
+            lv_obj_set_style_border_width(btn, config_->theme.border_width, LV_STATE_CHECKED);
+            lv_obj_set_style_border_color(btn, border_color, LV_STATE_CHECKED);
+            const bool page_has_nav_radius = page.nav_button_radius >= 0 && page.nav_button_radius <= 50;
+            const std::uint8_t nav_radius = page_has_nav_radius
+                ? static_cast<std::uint8_t>(page.nav_button_radius)
+                : ((config_->theme.nav_button_radius || config_->theme.nav_button_radius == 0)
+                    ? config_->theme.nav_button_radius
+                    : (config_->theme.button_radius ? config_->theme.button_radius : 20));
+            lv_obj_set_style_radius(btn, nav_radius, 0);
+            lv_obj_set_style_radius(btn, nav_radius, LV_STATE_CHECKED);
+            lv_obj_set_style_pad_left(btn, UITheme::SPACE_MD, 0);
+            lv_obj_set_style_pad_right(btn, UITheme::SPACE_MD, 0);
+            lv_obj_set_style_pad_top(btn, UITheme::SPACE_SM, 0);
+            lv_obj_set_style_pad_bottom(btn, UITheme::SPACE_SM, 0);
+            lv_obj_set_style_min_width(btn, 140, 0);
+            lv_obj_set_style_max_width(btn, 320, 0);
+            lv_obj_set_height(btn, 46);
+            lv_obj_set_style_shadow_width(btn, 12, 0);
+            lv_obj_set_style_shadow_color(btn, lv_color_hex(0x000000), 0);
+            lv_obj_set_style_shadow_opa(btn, LV_OPA_20, 0);
+            lv_obj_set_style_shadow_width(btn, 12, LV_STATE_CHECKED);
+            lv_obj_set_style_shadow_color(btn, lv_color_hex(0x000000), LV_STATE_CHECKED);
+            lv_obj_set_style_shadow_opa(btn, LV_OPA_20, LV_STATE_CHECKED);
+            lv_obj_add_flag(btn, LV_OBJ_FLAG_CHECKABLE);
+            lv_obj_add_event_cb(btn, navButtonEvent, LV_EVENT_CLICKED,
+                                reinterpret_cast<void*>(static_cast<uintptr_t>(index)));
 
-        // Create label - keep it simple like the working test
-        lv_obj_t* label = lv_label_create(btn);
-        
-        // Get label text
-        std::string nav_label_text;
-        if (!page.nav_text.empty()) {
-            nav_label_text = page.nav_text;
-        } else if (!page.name.empty()) {
-            nav_label_text = page.name;
-        } else if (!page.id.empty()) {
-            nav_label_text = page.id;
-        } else {
-            nav_label_text = "Page " + std::to_string(index + 1);
+            // Create label - keep it simple like the working test
+            lv_obj_t* label = lv_label_create(btn);
+            
+            // Get label text
+            std::string nav_label_text;
+            if (!page.nav_text.empty()) {
+                nav_label_text = page.nav_text;
+            } else if (!page.name.empty()) {
+                nav_label_text = page.name;
+            } else if (!page.id.empty()) {
+                nav_label_text = page.id;
+            } else {
+                nav_label_text = "Page " + std::to_string(index + 1);
+            }
+            lv_label_set_text(label, nav_label_text.c_str());
+            
+            // Get text color: p.nav_text_color || theme.nav_button_text_color || theme.text_primary || '#f2f4f8'
+            lv_color_t nav_text_color = lv_color_hex(0xf2f4f8);  // Default
+            if (!page.nav_text_color.empty()) {
+                nav_text_color = colorFromHex(page.nav_text_color, nav_text_color);
+            } else if (!config_->theme.nav_button_text_color.empty()) {
+                nav_text_color = colorFromHex(config_->theme.nav_button_text_color, nav_text_color);
+            } else if (!config_->theme.text_primary.empty()) {
+                nav_text_color = colorFromHex(config_->theme.text_primary, nav_text_color);
+            }
+            
+            lv_obj_set_style_text_color(label, nav_text_color, 0);
+            lv_obj_set_style_text_font(label, &lv_font_montserrat_16, 0);
+            lv_obj_center(label);
+
+            nav_buttons_.push_back(btn);
+            ++index;
         }
-        lv_label_set_text(label, nav_label_text.c_str());
-        
-        // Get text color: p.nav_text_color || theme.nav_button_text_color || theme.text_primary || '#f2f4f8'
-        lv_color_t nav_text_color = lv_color_hex(0xf2f4f8);  // Default
-        if (!page.nav_text_color.empty()) {
-            nav_text_color = colorFromHex(page.nav_text_color, nav_text_color);
-        } else if (!config_->theme.nav_button_text_color.empty()) {
-            nav_text_color = colorFromHex(config_->theme.nav_button_text_color, nav_text_color);
-        } else if (!config_->theme.text_primary.empty()) {
-            nav_text_color = colorFromHex(config_->theme.text_primary, nav_text_color);
-        }
-        
-        lv_obj_set_style_text_color(label, nav_text_color, 0);
-        lv_obj_set_style_text_font(label, &lv_font_montserrat_16, 0);
-        lv_obj_center(label);
-
-        nav_buttons_.push_back(btn);
-        ++index;
     }
 
     updateNavSelection();
@@ -432,6 +435,16 @@ void UIBuilder::buildEmptyState() {
 }
 
 void UIBuilder::buildPage(std::size_t index) {
+    // Calculate config page count
+    std::size_t config_page_count = (config_ && !config_->pages.empty()) ? config_->pages.size() : 0;
+    
+    // Check if this is an Infinitybox page
+    if (index >= config_page_count && index < config_page_count + 6) {
+        buildInfinityboxPage(index - config_page_count);
+        return;
+    }
+
+    // Original config-driven page logic
     if (!config_ || index >= config_->pages.size()) {
         buildEmptyState();
         return;
@@ -637,6 +650,39 @@ void UIBuilder::actionButtonEvent(lv_event_t* e) {
         return;
     }
 
+    // Check if Infinitybox function is assigned
+    if (!config->infinitybox_function.empty()) {
+        // Use Infinitybox controller behavior engine
+        if (config->momentary) {
+            if (code == LV_EVENT_PRESSED) {
+                InfinityboxControl::InfinityboxController::instance().activateFunctionWithBehavior(
+                    config->infinitybox_function, InfinityboxControl::BehaviorType::MOMENTARY, true);
+            } else if (code == LV_EVENT_RELEASED) {
+                InfinityboxControl::InfinityboxController::instance().activateFunctionWithBehavior(
+                    config->infinitybox_function, InfinityboxControl::BehaviorType::MOMENTARY, false);
+            }
+        } else {
+            if (code == LV_EVENT_CLICKED) {
+                // Toggle logic - check current state
+                InfinityboxControl::Function* func = InfinityboxControl::InfinityboxController::instance().getFunction(config->infinitybox_function);
+                if (func) {
+                    bool new_state = (func->state == InfinityboxControl::FunctionState::OFF);
+                    
+                    // Determine behavior based on function's allowed behaviors
+                    InfinityboxControl::BehaviorType behavior = InfinityboxControl::BehaviorType::TOGGLE;
+                    if (!func->allowed_behaviors.empty()) {
+                        behavior = func->allowed_behaviors[0];  // Use first allowed behavior
+                    }
+                    
+                    InfinityboxControl::InfinityboxController::instance().activateFunctionWithBehavior(
+                        config->infinitybox_function, behavior, new_state);
+                }
+            }
+        }
+        return;
+    }
+
+    // Fallback to CAN message handling (for non-Infinitybox buttons)
     if (config->momentary) {
         if (code == LV_EVENT_PRESSED) {
             CanManager::instance().sendButtonAction(*config);
@@ -2237,3 +2283,294 @@ uint32_t UIBuilder::nextUtf8Codepoint(const std::string& text, std::size_t& inde
     ++index;
     return 0;
 }
+
+// ============================================================================
+// Infinitybox UI Implementation
+// ============================================================================
+
+void UIBuilder::buildInfinityboxPage(std::size_t category_index) {
+    switch (category_index) {
+        case 0: buildInfinityboxDrivingPage(); break;
+        case 1: buildInfinityboxExteriorPage(); break;
+        case 2: buildInfinityboxInteriorPage(); break;
+        case 3: buildInfinityboxBodyPage(); break;
+        case 4: buildInfinityboxPowertrainPage(); break;
+        case 5: buildInfinityboxAuxPage(); break;
+        default: buildEmptyState(); break;
+    }
+}
+
+void UIBuilder::buildInfinityboxDrivingPage() {
+    if (!page_container_) return;
+
+    lv_obj_clean(page_container_);
+    lv_obj_remove_style_all(page_container_);
+    lv_obj_set_width(page_container_, lv_pct(100));
+    lv_obj_set_flex_grow(page_container_, 1);
+    lv_obj_set_style_bg_color(page_container_, lv_color_hex(0x0F0F0F), 0);
+    lv_obj_set_style_bg_opa(page_container_, LV_OPA_COVER, 0);
+    lv_obj_set_style_radius(page_container_, 0, 0);
+    lv_obj_set_style_pad_all(page_container_, UITheme::SPACE_MD, 0);
+    lv_obj_set_style_border_width(page_container_, 0, 0);
+    lv_obj_set_layout(page_container_, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(page_container_, LV_FLEX_FLOW_ROW_WRAP);
+    lv_obj_set_flex_align(page_container_, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_style_pad_gap(page_container_, UITheme::SPACE_SM, 0);
+
+    // Turn Signals
+    createFunctionFlash(page_container_, "Left Front Turn", "Left Turn Signal Front");
+    createFunctionFlash(page_container_, "Right Front Turn", "Right Turn Signal Front");
+    createFunctionFlash(page_container_, "Left Rear Turn", "Left Turn Signal Rear");
+    createFunctionFlash(page_container_, "Right Rear Turn", "Right Turn Signal Rear");
+    createFunctionFlash(page_container_, "4-Way Flashers", "4-Way Flashers");
+    
+    // Horn and Lights
+    createFunctionMomentary(page_container_, "Horn", "Horn");
+    createFunctionToggle(page_container_, "High Beams", "High Beams");
+}
+
+void UIBuilder::buildInfinityboxExteriorPage() {
+    if (!page_container_) return;
+
+    lv_obj_clean(page_container_);
+    lv_obj_remove_style_all(page_container_);
+    lv_obj_set_width(page_container_, lv_pct(100));
+    lv_obj_set_flex_grow(page_container_, 1);
+    lv_obj_set_style_bg_color(page_container_, lv_color_hex(0x0F0F0F), 0);
+    lv_obj_set_style_bg_opa(page_container_, LV_OPA_COVER, 0);
+    lv_obj_set_style_radius(page_container_, 0, 0);
+    lv_obj_set_style_pad_all(page_container_, UITheme::SPACE_MD, 0);
+    lv_obj_set_style_border_width(page_container_, 0, 0);
+    lv_obj_set_layout(page_container_, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(page_container_, LV_FLEX_FLOW_ROW_WRAP);
+    lv_obj_set_flex_align(page_container_, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_style_pad_gap(page_container_, UITheme::SPACE_SM, 0);
+
+    createFunctionToggle(page_container_, "Headlights", "Headlights");
+    createFunctionToggle(page_container_, "Parking Lights", "Parking Lights");
+    createFunctionToggle(page_container_, "Backup Lights", "Backup Lights");
+    createFunctionToggle(page_container_, "Brake Lights", "Brake Lights");
+}
+
+void UIBuilder::buildInfinityboxInteriorPage() {
+    if (!page_container_) return;
+
+    lv_obj_clean(page_container_);
+    lv_obj_remove_style_all(page_container_);
+    lv_obj_set_width(page_container_, lv_pct(100));
+    lv_obj_set_flex_grow(page_container_, 1);
+    lv_obj_set_style_bg_color(page_container_, lv_color_hex(0x0F0F0F), 0);
+    lv_obj_set_style_bg_opa(page_container_, LV_OPA_COVER, 0);
+    lv_obj_set_style_radius(page_container_, 0, 0);
+    lv_obj_set_style_pad_all(page_container_, UITheme::SPACE_MD, 0);
+    lv_obj_set_style_border_width(page_container_, 0, 0);
+    lv_obj_set_layout(page_container_, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(page_container_, LV_FLEX_FLOW_ROW_WRAP);
+    lv_obj_set_flex_align(page_container_, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_style_pad_gap(page_container_, UITheme::SPACE_SM, 0);
+
+    createFunctionToggle(page_container_, "Interior Lights", "Interior Lights");
+    createFunctionToggle(page_container_, "Gauge Illumination", "Gauge Illumination");
+}
+
+void UIBuilder::buildInfinityboxBodyPage() {
+    if (!page_container_) return;
+
+    lv_obj_clean(page_container_);
+    lv_obj_remove_style_all(page_container_);
+    lv_obj_set_width(page_container_, lv_pct(100));
+    lv_obj_set_flex_grow(page_container_, 1);
+    lv_obj_set_style_bg_color(page_container_, lv_color_hex(0x0F0F0F), 0);
+    lv_obj_set_style_bg_opa(page_container_, LV_OPA_COVER, 0);
+    lv_obj_set_style_radius(page_container_, 0, 0);
+    lv_obj_set_style_pad_all(page_container_, UITheme::SPACE_MD, 0);
+    lv_obj_set_style_border_width(page_container_, 0, 0);
+    lv_obj_set_layout(page_container_, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(page_container_, LV_FLEX_FLOW_ROW_WRAP);
+    lv_obj_set_flex_align(page_container_, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_style_pad_gap(page_container_, UITheme::SPACE_SM, 0);
+
+    // Door locks with timed behavior
+    createFunctionMomentary(page_container_, "Lock Doors", "Door Locks");
+    createFunctionMomentary(page_container_, "Unlock Doors", "Door Unlocks");
+    
+    // Windows
+    createFunctionMomentary(page_container_, "Driver Window Up", "Driver Window Up");
+    createFunctionMomentary(page_container_, "Driver Window Down", "Driver Window Down");
+    createFunctionMomentary(page_container_, "Pass Window Up", "Passenger Window Up");
+    createFunctionMomentary(page_container_, "Pass Window Down", "Passenger Window Down");
+}
+
+void UIBuilder::buildInfinityboxPowertrainPage() {
+    if (!page_container_) return;
+
+    lv_obj_clean(page_container_);
+    lv_obj_remove_style_all(page_container_);
+    lv_obj_set_width(page_container_, lv_pct(100));
+    lv_obj_set_flex_grow(page_container_, 1);
+    lv_obj_set_style_bg_color(page_container_, lv_color_hex(0x0F0F0F), 0);
+    lv_obj_set_style_bg_opa(page_container_, LV_OPA_COVER, 0);
+    lv_obj_set_style_radius(page_container_, 0, 0);
+    lv_obj_set_style_pad_all(page_container_, UITheme::SPACE_MD, 0);
+    lv_obj_set_style_border_width(page_container_, 0, 0);
+    lv_obj_set_layout(page_container_, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(page_container_, LV_FLEX_FLOW_ROW_WRAP);
+    lv_obj_set_flex_align(page_container_, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_style_pad_gap(page_container_, UITheme::SPACE_SM, 0);
+
+    createFunctionToggle(page_container_, "Ignition", "Ignition");
+    createFunctionMomentary(page_container_, "Starter", "Starter");
+    createFunctionToggle(page_container_, "Fuel Pump", "Fuel Pump");
+    createFunctionToggle(page_container_, "Cooling Fan", "Cooling Fan");
+}
+
+void UIBuilder::buildInfinityboxAuxPage() {
+    if (!page_container_) return;
+
+    lv_obj_clean(page_container_);
+    lv_obj_remove_style_all(page_container_);
+    lv_obj_set_width(page_container_, lv_pct(100));
+    lv_obj_set_flex_grow(page_container_, 1);
+    lv_obj_set_style_bg_color(page_container_, lv_color_hex(0x0F0F0F), 0);
+    lv_obj_set_style_bg_opa(page_container_, LV_OPA_COVER, 0);
+    lv_obj_set_style_radius(page_container_, 0, 0);
+    lv_obj_set_style_pad_all(page_container_, UITheme::SPACE_MD, 0);
+    lv_obj_set_style_border_width(page_container_, 0, 0);
+    lv_obj_set_layout(page_container_, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(page_container_, LV_FLEX_FLOW_ROW_WRAP);
+    lv_obj_set_flex_align(page_container_, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_style_pad_gap(page_container_, UITheme::SPACE_SM, 0);
+
+    createFunctionToggle(page_container_, "AUX 03", "AUX 03");
+    createFunctionToggle(page_container_, "AUX 04", "AUX 04");
+    
+    // Info label for reserved functions
+    lv_obj_t* info = lv_label_create(page_container_);
+    lv_label_set_text(info, "Additional AUX inputs/outputs can be mapped via serial commands");
+    lv_obj_set_style_text_color(info, lv_color_hex(0x888888), 0);
+    lv_obj_set_style_text_font(info, UITheme::FONT_CAPTION, 0);
+    lv_obj_set_width(info, lv_pct(100));
+}
+
+// Widget creation helpers
+lv_obj_t* UIBuilder::createFunctionToggle(lv_obj_t* parent, const char* label, const char* function_name) {
+    lv_obj_t* btn = lv_btn_create(parent);
+    lv_obj_remove_style_all(btn);
+    lv_obj_set_size(btn, 180, 90);
+    lv_obj_set_style_bg_color(btn, lv_color_hex(0x333333), 0);
+    lv_obj_set_style_bg_color(btn, lv_color_hex(0xFF6600), LV_STATE_CHECKED);
+    lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
+    lv_obj_set_style_radius(btn, 12, 0);
+    lv_obj_set_style_border_width(btn, 2, 0);
+    lv_obj_set_style_border_color(btn, lv_color_hex(0x555555), 0);
+    lv_obj_set_style_pad_all(btn, UITheme::SPACE_SM, 0);
+    lv_obj_add_flag(btn, LV_OBJ_FLAG_CHECKABLE);
+    lv_obj_add_event_cb(btn, infinityboxToggleEvent, LV_EVENT_VALUE_CHANGED, (void*)function_name);
+
+    lv_obj_t* lbl = lv_label_create(btn);
+    lv_label_set_text(lbl, label);
+    lv_obj_set_style_text_color(lbl, lv_color_hex(0xFFFFFF), 0);
+    lv_obj_set_style_text_font(lbl, UITheme::FONT_BODY, 0);
+    lv_label_set_long_mode(lbl, LV_LABEL_LONG_WRAP);
+    lv_obj_set_width(lbl, lv_pct(100));
+    lv_obj_center(lbl);
+
+    return btn;
+}
+
+lv_obj_t* UIBuilder::createFunctionMomentary(lv_obj_t* parent, const char* label, const char* function_name) {
+    lv_obj_t* btn = lv_btn_create(parent);
+    lv_obj_remove_style_all(btn);
+    lv_obj_set_size(btn, 180, 90);
+    lv_obj_set_style_bg_color(btn, lv_color_hex(0x333333), 0);
+    lv_obj_set_style_bg_color(btn, lv_color_hex(0x00AA00), LV_STATE_PRESSED);
+    lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
+    lv_obj_set_style_radius(btn, 12, 0);
+    lv_obj_set_style_border_width(btn, 2, 0);
+    lv_obj_set_style_border_color(btn, lv_color_hex(0x555555), 0);
+    lv_obj_set_style_pad_all(btn, UITheme::SPACE_SM, 0);
+    lv_obj_add_event_cb(btn, infinityboxMomentaryEvent, LV_EVENT_PRESSED, (void*)function_name);
+    lv_obj_add_event_cb(btn, infinityboxMomentaryEvent, LV_EVENT_RELEASED, (void*)function_name);
+
+    lv_obj_t* lbl = lv_label_create(btn);
+    lv_label_set_text(lbl, label);
+    lv_obj_set_style_text_color(lbl, lv_color_hex(0xFFFFFF), 0);
+    lv_obj_set_style_text_font(lbl, UITheme::FONT_BODY, 0);
+    lv_label_set_long_mode(lbl, LV_LABEL_LONG_WRAP);
+    lv_obj_set_width(lbl, lv_pct(100));
+    lv_obj_center(lbl);
+
+    return btn;
+}
+
+lv_obj_t* UIBuilder::createFunctionFlash(lv_obj_t* parent, const char* label, const char* function_name) {
+    lv_obj_t* btn = lv_btn_create(parent);
+    lv_obj_remove_style_all(btn);
+    lv_obj_set_size(btn, 180, 90);
+    lv_obj_set_style_bg_color(btn, lv_color_hex(0x333333), 0);
+    lv_obj_set_style_bg_color(btn, lv_color_hex(0xFFAA00), LV_STATE_CHECKED);
+    lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
+    lv_obj_set_style_radius(btn, 12, 0);
+    lv_obj_set_style_border_width(btn, 2, 0);
+    lv_obj_set_style_border_color(btn, lv_color_hex(0x555555), 0);
+    lv_obj_set_style_pad_all(btn, UITheme::SPACE_SM, 0);
+    lv_obj_add_flag(btn, LV_OBJ_FLAG_CHECKABLE);
+    lv_obj_add_event_cb(btn, infinityboxFlashEvent, LV_EVENT_VALUE_CHANGED, (void*)function_name);
+
+    lv_obj_t* lbl = lv_label_create(btn);
+    lv_label_set_text(lbl, label);
+    lv_obj_set_style_text_color(lbl, lv_color_hex(0xFFFFFF), 0);
+    lv_obj_set_style_text_font(lbl, UITheme::FONT_BODY, 0);
+    lv_label_set_long_mode(lbl, LV_LABEL_LONG_WRAP);
+    lv_obj_set_width(lbl, lv_pct(100));
+    lv_obj_center(lbl);
+
+    return btn;
+}
+
+// Event handlers
+void UIBuilder::infinityboxToggleEvent(lv_event_t* e) {
+    lv_obj_t* btn = lv_event_get_target(e);
+    const char* function_name = (const char*)lv_event_get_user_data(e);
+    bool is_checked = lv_obj_has_state(btn, LV_STATE_CHECKED);
+    
+    Serial.print("Infinitybox Toggle: ");
+    Serial.print(function_name);
+    Serial.println(is_checked ? " ON" : " OFF");
+    
+    InfinityboxControl::InfinityboxController::instance().activateFunction(function_name, is_checked);
+}
+
+void UIBuilder::infinityboxMomentaryEvent(lv_event_t* e) {
+    const char* function_name = (const char*)lv_event_get_user_data(e);
+    lv_event_code_t code = lv_event_get_code(e);
+    
+    if (code == LV_EVENT_PRESSED) {
+        Serial.print("Infinitybox Momentary PRESS: ");
+        Serial.println(function_name);
+        InfinityboxControl::InfinityboxController::instance().activateFunction(function_name, true);
+    } else if (code == LV_EVENT_RELEASED) {
+        Serial.print("Infinitybox Momentary RELEASE: ");
+        Serial.println(function_name);
+        InfinityboxControl::InfinityboxController::instance().activateFunction(function_name, false);
+    }
+}
+
+void UIBuilder::infinityboxFlashEvent(lv_event_t* e) {
+    lv_obj_t* btn = lv_event_get_target(e);
+    const char* function_name = (const char*)lv_event_get_user_data(e);
+    bool is_checked = lv_obj_has_state(btn, LV_STATE_CHECKED);
+    
+    Serial.print("Infinitybox Flash: ");
+    Serial.print(function_name);
+    Serial.println(is_checked ? " START" : " STOP");
+    
+    if (is_checked) {
+        // Start flashing with default behavior (500ms on, 500ms off)
+        InfinityboxControl::InfinityboxController::instance().activateFunctionFlash(function_name, 500, 500);
+    } else {
+        // Stop flashing
+        InfinityboxControl::InfinityboxController::instance().deactivateFunction(function_name);
+    }
+}
+

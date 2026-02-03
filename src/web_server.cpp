@@ -7,6 +7,7 @@
 
 #include "can_manager.h"
 #include "config_manager.h"
+#include "ipm1_can_system.h"
 #include "ota_manager.h"
 #include "ui_builder.h"
 #include "suspension_page_template.h"
@@ -616,49 +617,28 @@ void WebServerManager::setupRoutes() {
         request->send(200, "application/json", payload);
     });
 
-    // Infinitybox Output1 ON
-    server_.on("/api/infinitybox/output1/on", HTTP_POST, [](AsyncWebServerRequest* request) {
-        bool success = CanManager::instance().sendInfinityboxOutput1On();
-        DynamicJsonDocument response(256);
-        response["success"] = success;
-        response["message"] = success ? "Output1 ON sent" : "Failed to send Output1 ON";
-        String payload;
-        serializeJson(response, payload);
-        request->send(success ? 200 : 500, "application/json", payload);
+    // IPM1 system definition (UI contract)
+    server_.on("/api/ipm1/system", HTTP_GET, [](AsyncWebServerRequest* request) {
+        String payload = Ipm1CanSystem::instance().getSystemJson();
+        request->send(200, "application/json", payload);
     });
 
-    // Infinitybox Output1 OFF
-    server_.on("/api/infinitybox/output1/off", HTTP_POST, [](AsyncWebServerRequest* request) {
-        bool success = CanManager::instance().sendInfinityboxOutput1Off();
-        DynamicJsonDocument response(256);
-        response["success"] = success;
-        response["message"] = success ? "Output1 OFF sent" : "Failed to send Output1 OFF";
-        String payload;
-        serializeJson(response, payload);
-        request->send(success ? 200 : 500, "application/json", payload);
-    });
-
-    // Infinitybox Output9 ON
-    server_.on("/api/infinitybox/output9/on", HTTP_POST, [](AsyncWebServerRequest* request) {
-        bool success = CanManager::instance().sendInfinityboxOutput9On();
-        DynamicJsonDocument response(256);
-        response["success"] = success;
-        response["message"] = success ? "Output9 ON sent" : "Failed to send Output9 ON";
-        String payload;
-        serializeJson(response, payload);
-        request->send(success ? 200 : 500, "application/json", payload);
-    });
-
-    // Infinitybox Output9 OFF
-    server_.on("/api/infinitybox/output9/off", HTTP_POST, [](AsyncWebServerRequest* request) {
-        bool success = CanManager::instance().sendInfinityboxOutput9Off();
-        DynamicJsonDocument response(256);
-        response["success"] = success;
-        response["message"] = success ? "Output9 OFF sent" : "Failed to send Output9 OFF";
-        String payload;
-        serializeJson(response, payload);
-        request->send(success ? 200 : 500, "application/json", payload);
-    });
+    // IPM1 action endpoint (circuit-first)
+    auto* ipm1_action = new AsyncCallbackJsonWebHandler("/api/ipm1/action",
+        [](AsyncWebServerRequest* request, JsonVariant& json) {
+            DynamicJsonDocument response(512);
+            JsonObject resp = response.to<JsonObject>();
+            String error;
+            bool success = Ipm1CanSystem::instance().handleAction(json, error, resp);
+            resp["success"] = success;
+            if (!success) {
+                resp["error"] = error;
+            }
+            String payload;
+            serializeJson(response, payload);
+            request->send(success ? 200 : 400, "application/json", payload);
+        });
+    server_.addHandler(ipm1_action);
 
     // Suspension template preview (static HTML)
     server_.on("/suspension", HTTP_GET, [](AsyncWebServerRequest* request) {
