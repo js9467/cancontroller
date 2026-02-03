@@ -65,10 +65,14 @@ class BackupRestoreManager:
         
         return "1.3.78"  # Default fallback
     
-    def increment_version(self):
-        """Increment the build number and update all version files"""
+    def increment_version(self, increment_type='build'):
+        """Increment version number (major, minor, or build) and update all version files
+        
+        Args:
+            increment_type: 'major', 'minor', or 'build' (default)
+        """
         # Read current state
-        version_state = {"major": 1, "minor": 3, "build": 78}
+        version_state = {"major": 2, "minor": 1, "build": 4}
         if self.version_state_file.exists():
             try:
                 with open(self.version_state_file, 'r', encoding='utf-8-sig') as f:
@@ -78,11 +82,25 @@ class BackupRestoreManager:
                 print(f"[Warning] Could not read version state file: {e}")
                 pass
         
-        # Increment build number
-        version_state['build'] += 1
+        # Increment version based on type
+        if increment_type == 'major':
+            version_state['major'] += 1
+            version_state['minor'] = 0
+            version_state['build'] = 0
+            print(f"[Version] MAJOR version increment")
+        elif increment_type == 'minor':
+            version_state['minor'] += 1
+            version_state['build'] = 0
+            print(f"[Version] MINOR version increment")
+        else:  # build
+            version_state['build'] += 1
+            print(f"[Version] Build increment")
+        
         new_version = f"{version_state['major']}.{version_state['minor']}.{version_state['build']}"
         
         # Save updated state
+        version_state['last_increment'] = increment_type
+        version_state['last_update'] = datetime.now().isoformat()
         with open(self.version_state_file, 'w', encoding='utf-8') as f:
             json.dump(version_state, f, indent=2)
         
@@ -96,20 +114,63 @@ class BackupRestoreManager:
         self.version_header.write_text(header_content, encoding='utf-8')
         
         print(f"[Version] Incremented to {new_version}")
-        return new_version
+        return new_version, increment_type
     
-    def backup_device(self, version=None):
-        """Create a complete backup of the ESP32-S3 device"""
+    def backup_device(self, increment_type='build', version=None):
+        """Create a backup based on increment type:
+        - Build/Minor: Increment version, build firmware, copy to versions/, push to git
+        - Major: Full USB flash backup + all of the above
+        
+        Args:
+            increment_type: 'major', 'minor', or 'build' (default)
+            version: Optional version override
+        """
         if version is None:
-            version = self.increment_version()
+            version, increment_type = self.increment_version(increment_type)
         
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        backup_name = f"bronco_v{version}_{timestamp}"
+        is_major = increment_type == 'major'
+        
+        # Build/Minor: Just build firmware and push to git (no USB backup)
+        if not is_major:
+            print(f"\n{'='*60}")
+            print(f"[Release] {increment_type.upper()} version increment")
+            print(f"[Release] Version: {version}")
+            print(f"[Release] Building firmware...")
+            print(f"{'='*60}\n")
+            
+            # Build firmware with PlatformIO
+            if not self.build_firmware():
+                print("[Release] ✗ Build failed")
+                return None
+            
+            # Copy firmware to versions/ folder
+            print(f"\n[Release] Preparing OTA firmware...")
+            if not self.copy_firmware_for_ota(version):
+                print("[Release] ✗ Firmware copy failed")
+                return None
+            
+            # Push to git
+            print(f"\n[Git] Pushing to repository...")
+            if not self.git_push_all(version, False):
+                print("[Git] ✗ Git push failed")
+                return None
+            
+            print(f"\n{'='*60}")
+            print(f"[Release] ✓ Complete!")
+            print(f"[Release] Version {version} built and pushed to Git")
+            print(f"[Release] Firmware: versions/bronco_v{version}.bin")
+            print(f"{'='*60}\n")
+            
+            return None, version
+        
+        # MAJOR: Full USB flash backup
+        backup_name = f"bronco_v{version}_{timestamp}_FULL"
         backup_folder = self.backups_dir / backup_name
         backup_folder.mkdir(exist_ok=True)
         
         print(f"\n{'='*60}")
-        print(f"[Backup] Starting full device backup")
+        print(f"[Backup] MAJOR RELEASE - Full USB flash backup")
         print(f"[Backup] Version: {version}")
         print(f"[Backup] Location: {backup_folder}")
         print(f"{'='*60}\n")
@@ -125,7 +186,7 @@ class BackupRestoreManager:
             'regions': {}
         }
         
-        # Backup each flash region
+        # Backup each flash region from USB
         total_regions = len(self.FLASH_REGIONS)
         for idx, (region_name, region_info) in enumerate(self.FLASH_REGIONS.items(), 1):
             offset = region_info['offset']
@@ -168,8 +229,8 @@ class BackupRestoreManager:
                 print(f"    ✗ Error: {e}")
                 return None
         
-        # Create full flash dump (optional, for complete safety)
-        print(f"\n[Backup] Creating full flash dump...")
+        # Create full flash dump (16MB complete image)
+        print(f"\n[Backup] Creating full 16MB flash dump...")
         full_dump = backup_folder / 'full_flash_16MB.bin'
         try:
             cmd = [
@@ -200,9 +261,24 @@ class BackupRestoreManager:
         # Create restore script
         self.create_restore_script(backup_folder, metadata)
         
+        # Build firmware
+        print(f"\n[Backup] Building firmware...")
+        if not self.build_firmware():
+            print("[Backup] ⚠ Build failed (continuing anyway)")
+        
+        # Copy firmware.bin for OTA distribution
+        print(f"\n[Backup] Preparing OTA firmware...")
+        self.copy_firmware_for_ota(version)
+        
+        # Push ALL versions to git automatically
+        print(f"\n[Git] Pushing to repository...")
+        self.git_push_all(version, True)
+        
         print(f"\n{'='*60}")
         print(f"[Backup] ✓ Complete! Backup saved to:")
         print(f"         {backup_folder}")
+        print(f"[Backup] FULL DEVICE BACKUP (Major Release)")
+        print(f"[Backup] Source code + firmware pushed to Git")
         print(f"{'='*60}\n")
         
         return backup_folder, version
@@ -345,85 +421,106 @@ pause
         
         return True
     
-    def upload_to_github(self, backup_folder, version):
-        """Upload backup to GitHub repository"""
-        print(f"\n[GitHub] Uploading backup to repository...")
-        
-        # Try to get token from environment first
-        github_token = os.environ.get('GITHUB_TOKEN')
-        
-        # If not in environment, try Windows Credential Manager
-        if not github_token:
-            try:
-                import subprocess
-                result = subprocess.run(
-                    ['git', 'credential', 'fill'],
-                    input=b'protocol=https\nhost=github.com\n\n',
-                    capture_output=True,
-                    timeout=5
-                )
-                if result.returncode == 0:
-                    output = result.stdout.decode('utf-8')
-                    for line in output.split('\n'):
-                        if line.startswith('password='):
-                            github_token = line.split('=', 1)[1].strip()
-                            print("[GitHub] Retrieved token from Windows Credential Manager")
-                            break
-            except Exception as e:
-                print(f"[GitHub] Could not retrieve token from credential manager: {e}")
-        
-        if not github_token:
-            print("[GitHub] ✗ No GitHub token found")
-            print("[GitHub] Set GITHUB_TOKEN environment variable or ensure git credentials are configured")
-            return False
-        
-        backup_path = Path(backup_folder)
-        
-        # Create ZIP archive
-        import zipfile
-        zip_name = f"bronco_v{version}.zip"
-        zip_path = backup_path.parent / zip_name
-        
-        print(f"[GitHub] Creating archive: {zip_name}")
-        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            for file in backup_path.rglob('*'):
-                if file.is_file():
-                    arcname = file.relative_to(backup_path.parent)
-                    zipf.write(file, arcname)
-                    print(f"    + {arcname}")
-        
-        # Upload to GitHub
-        api_url = f"https://api.github.com/repos/{self.github_repo}/contents/{self.github_folder}/{zip_name}"
-        
-        with open(zip_path, 'rb') as f:
-            content = base64.b64encode(f.read()).decode('utf-8')
-        
-        headers = {
-            'Authorization': f'token {github_token}',
-            'Accept': 'application/vnd.github.v3+json'
-        }
-        
-        data = {
-            'message': f'Add backup version {version}',
-            'content': content,
-            'branch': self.github_branch
-        }
-        
+    def build_firmware(self):
+        """Build firmware using PlatformIO"""
         try:
-            print(f"[GitHub] Uploading to {self.github_repo}/{self.github_folder}...")
-            response = requests.put(api_url, headers=headers, json=data, timeout=300)
+            print("[Build] Running PlatformIO build...")
+            result = subprocess.run(
+                ['pio', 'run', '-e', 'waveshare_7in'],
+                cwd=self.project_dir,
+                capture_output=True,
+                text=True,
+                timeout=300
+            )
             
-            if response.status_code in [200, 201]:
-                print(f"[GitHub] ✓ Upload successful!")
-                print(f"[GitHub] URL: https://github.com/{self.github_repo}/tree/{self.github_branch}/{self.github_folder}")
+            if result.returncode == 0:
+                print("[Build] ✓ Build successful")
                 return True
             else:
-                print(f"[GitHub] ✗ Upload failed: {response.status_code}")
-                print(f"[GitHub] Response: {response.text}")
+                print(f"[Build] ✗ Build failed: {result.stderr}")
                 return False
                 
+        except subprocess.TimeoutExpired:
+            print("[Build] ✗ Build timeout")
+            return False
         except Exception as e:
-            print(f"[GitHub] ✗ Error: {e}")
+            print(f"[Build] ✗ Build error: {e}")
+            return False
+    
+    def copy_firmware_for_ota(self, version):
+        """Copy firmware.bin to versions folder for OTA distribution
+        
+        This copies the built firmware from PlatformIO to versions/ folder
+        with the correct naming for OTA updates.
+        """
+        # PlatformIO build output location
+        firmware_source = self.project_dir / '.pio' / 'build' / 'waveshare_7in' / 'firmware.bin'
+        
+        if not firmware_source.exists():
+            print(f"\n[OTA] ⚠ Firmware not found: {firmware_source}")
+            print(f"[OTA] Run 'pio run -e waveshare_7in' first to build firmware")
+            return False
+        
+        # Versions folder for OTA binaries
+        versions_dir = self.project_dir / 'versions'
+        versions_dir.mkdir(exist_ok=True)
+        
+        # OTA firmware naming: bronco_v{VERSION}.bin
+        ota_firmware = versions_dir / f"bronco_v{version}.bin"
+        
+        print(f"\n[OTA] Copying firmware for OTA distribution...")
+        print(f"[OTA] Source: {firmware_source}")
+        print(f"[OTA] Destination: {ota_firmware}")
+        
+        try:
+            import shutil
+            shutil.copy2(firmware_source, ota_firmware)
+            size_mb = ota_firmware.stat().st_size / (1024 * 1024)
+            print(f"[OTA] ✓ Firmware copied ({size_mb:.2f} MB)")
+            print(f"[OTA] Ready for OTA distribution")
+            print(f"\n[Next Steps]")
+            print(f"  1. Test the firmware on a device first")
+            print(f"  2. Upload to GitHub: git add {ota_firmware}")
+            print(f"  3. Commit: git commit -m 'Add OTA firmware v{version}'")
+            print(f"  4. Push: git push")
+            print(f"  5. Users can now OTA update to v{version}")
+            return True
+        except Exception as e:
+            print(f"[OTA] ✗ Copy failed: {e}")
+            return False
+    
+    def git_push_all(self, version, is_major=False):
+        """Commit all source code and push to git repository"""
+        try:
+            print(f"[Git] Adding all source files...")
+            
+            # Add all source files
+            subprocess.run(['git', 'add', '.'], cwd=self.project_dir, check=True)
+            
+            # Commit with version
+            if is_major:
+                commit_msg = f"Major release v{version} - Full device backup"
+            else:
+                commit_msg = f"Release v{version}"
+            print(f"[Git] Committing: {commit_msg}")
+            subprocess.run(['git', 'commit', '-m', commit_msg], cwd=self.project_dir, check=True)
+            
+            # Push to remote
+            print(f"[Git] Pushing to remote repository...")
+            result = subprocess.run(['git', 'push'], cwd=self.project_dir, capture_output=True, text=True)
+            
+            if result.returncode == 0:
+                print(f"[Git] ✓ Successfully pushed to repository")
+                return True
+            else:
+                print(f"[Git] ✗ Push failed: {result.stderr}")
+                return False
+                
+        except subprocess.CalledProcessError as e:
+            print(f"[Git] ✗ Error: {e}")
+            return False
+        except Exception as e:
+            print(f"[Git] ✗ Unexpected error: {e}")
             return False
     
     def list_backups(self):

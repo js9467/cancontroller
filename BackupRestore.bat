@@ -1,6 +1,6 @@
 @echo off
 REM Bronco Controls - Backup & Restore Manager Launcher
-REM Simple launcher for Windows users
+REM Double-click this file to launch the GUI application
 
 echo ============================================================
 echo   Bronco Controls - Backup ^& Restore Manager
@@ -19,20 +19,34 @@ if errorlevel 1 (
     exit /b 1
 )
 
-REM Install requirements if needed
-if not exist ".venv\" (
+REM Check if backup_restore_gui.py exists
+if not exist "backup_restore_gui.py" (
+    echo [ERROR] backup_restore_gui.py not found!
+    echo Please run this from the Bronco-Controls directory.
+    echo.
+    pause
+    exit /b 1
+)
+
+REM Install requirements if needed (first run only)
+if not exist ".deps_installed" (
     echo [Setup] First-time setup - installing dependencies...
-    python -m pip install --quiet requests esptool
+    python -m pip install --quiet --upgrade pip
+    python -m pip install --quiet requests esptool pyserial
+    echo. > .deps_installed
+    echo [Setup] Dependencies installed!
     echo.
 )
 
 REM Launch GUI
-echo [Launch] Starting Backup ^& Restore Manager...
+echo [Launch] Starting Backup ^& Restore Manager GUI...
 echo.
 python backup_restore_gui.py
 
 if errorlevel 1 (
     echo.
-    echo [ERROR] Failed to start application!
+    echo [ERROR] Application exited with error!
+    echo Check console output above for details.
+    echo.
     pause
 )

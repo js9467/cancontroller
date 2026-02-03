@@ -151,26 +151,52 @@ class BackupRestoreGUI:
                               font=('Segoe UI', 9))
         info_label.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 20))
         
-        # Version preview
+        # Version preview and type selection
         version_frame = ttk.Frame(parent)
         version_frame.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
         
-        ttk.Label(version_frame, text="Next Version:", 
+        ttk.Label(version_frame, text='Version Type:', 
                  font=('Segoe UI', 10, 'bold')).grid(row=0, column=0, sticky=tk.W)
         
-        next_ver = self.get_next_version()
-        ttk.Label(version_frame, text=f"v{next_ver}", 
-                 font=('Segoe UI', 14, 'bold'), 
-                 foreground='#667eea').grid(row=0, column=1, sticky=tk.W, padx=(10, 0))
+        # Version type radio buttons
+        self.version_type_var = tk.StringVar(value='build')
         
-        # GitHub upload option
-        self.upload_var = tk.BooleanVar(value=False)
-        upload_check = ttk.Checkbutton(parent, text="📤 Upload to GitHub (requires GITHUB_TOKEN)", 
-                                       variable=self.upload_var)
-        upload_check.grid(row=2, column=0, sticky=tk.W, pady=(0, 20))
+        radio_frame = ttk.Frame(version_frame)
+        radio_frame.grid(row=0, column=1, sticky=tk.W, padx=(10, 0))
+        
+        ttk.Radiobutton(radio_frame, text='Build (x.x.N)', 
+                       variable=self.version_type_var, value='build',
+                       command=self.update_version_preview).grid(row=0, column=0, padx=5)
+        ttk.Radiobutton(radio_frame, text='Minor (x.N.0)', 
+                       variable=self.version_type_var, value='minor',
+                       command=self.update_version_preview).grid(row=0, column=1, padx=5)
+        ttk.Radiobutton(radio_frame, text='MAJOR (N.0.0) - FULL BACKUP', 
+                       variable=self.version_type_var, value='major',
+                       command=self.update_version_preview).grid(row=0, column=2, padx=5)
+        
+        # Next version display
+        preview_frame = ttk.Frame(version_frame)
+        preview_frame.grid(row=1, column=0, columnspan=2, sticky=tk.W, pady=(10, 0))
+        
+        ttk.Label(preview_frame, text='Next Version:', 
+                 font=('Segoe UI', 10, 'bold')).grid(row=0, column=0, sticky=tk.W)
+        
+        self.next_version_label = ttk.Label(preview_frame, text=f"v{self.get_next_version('build')}", 
+                 font=('Segoe UI', 14, 'bold'), 
+                 foreground='#667eea')
+        self.next_version_label.grid(row=0, column=1, sticky=tk.W, padx=(10, 0))
+        
+        # Info about releases
+        info_text = (
+            "⚠️ MAJOR: Full device backup (all sectors) - requires USB connection\n"
+            "ℹ️ ALL versions automatically push to Git + copy firmware for OTA"
+        )
+        release_info = ttk.Label(parent, text=info_text,
+                              font=('Segoe UI', 8), foreground='#ffc107', justify=tk.LEFT)
+        release_info.grid(row=2, column=0, sticky=tk.W, pady=(5, 20))
         
         # Backup button
-        backup_btn = ttk.Button(parent, text="🔽 Create Backup", 
+        backup_btn = ttk.Button(parent, text='🔽 Create Backup', 
                                style='Action.TButton',
                                command=self.start_backup)
         backup_btn.grid(row=3, column=0, pady=10)
@@ -273,12 +299,34 @@ class BackupRestoreGUI:
                              command=self.start_test)
         test_btn.grid(row=2, column=0, pady=20)
     
-    def get_next_version(self):
-        """Calculate next version number"""
+    def get_next_version(self, increment_type='build'):
+        """Calculate next version number based on increment type"""
         current = self.current_version
-        parts = current.split('.')
-        parts[-1] = str(int(parts[-1]) + 1)
-        return '.'.join(parts)
+        parts = [int(p) for p in current.split('.')]
+        
+        if increment_type == 'major':
+            parts[0] += 1
+            parts[1] = 0
+            parts[2] = 0
+        elif increment_type == 'minor':
+            parts[1] += 1
+            parts[2] = 0
+        else:  # build
+            parts[2] += 1
+        
+        return '.'.join(str(p) for p in parts)
+    
+    def update_version_preview(self):
+        """Update the version preview when type changes"""
+        version_type = self.version_type_var.get()
+        next_ver = self.get_next_version(version_type)
+        self.next_version_label.config(text=f"v{next_ver}")
+        
+        # Change color for major releases
+        if version_type == 'major':
+            self.next_version_label.config(foreground='#dc3545')  # Red for major
+        else:
+            self.next_version_label.config(foreground='#667eea')  # Blue for normal
     
     def refresh_backups(self):
         """Refresh the backups list"""
@@ -310,15 +358,29 @@ class BackupRestoreGUI:
             try:
                 self.disable_buttons()
                 self.manager.port = self.port_var.get()
-                backup_folder, version = self.manager.backup_device()
+                increment_type = self.version_type_var.get()
                 
-                if backup_folder and self.upload_var.get():
-                    self.manager.upload_to_github(backup_folder, version)
+                # Show info for major release
+                if increment_type == 'major':
+                    messagebox.showinfo("Major Release", 
+                                       "MAJOR VERSION RELEASE\n\n"
+                                       "• Full device backup (all sectors)\n"
+                                       "• Requires USB connection\n"
+                                       "• Auto-pushes to Git\n\n"
+                                       "This will take several minutes...")
+                
+                backup_folder, version = self.manager.backup_device(increment_type=increment_type)
                 
                 self.refresh_backups()
                 self.current_version = version
-                messagebox.showinfo("Success", 
-                                   f"Backup completed!\nVersion: v{version}\n\nLocation:\n{backup_folder}")
+                
+                success_msg = f"Backup completed!\nVersion: v{version}\n\nLocation:\n{backup_folder}"
+                if increment_type == 'major':
+                    success_msg += "\n\n✓ FULL device backup (all sectors)\n✓ Source code + firmware pushed to Git"
+                else:
+                    success_msg += "\n\n✓ Source code + firmware pushed to Git"
+                
+                messagebox.showinfo("Success", success_msg)
             except Exception as e:
                 messagebox.showerror("Error", f"Backup failed:\n{str(e)}")
             finally:
