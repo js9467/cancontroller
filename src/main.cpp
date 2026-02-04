@@ -35,6 +35,7 @@
 #include "version_auto.h"
 #include "hardware_config.h"
 #include "infinitybox_control.h"
+#include "behavioral_output_integration.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <freertos/queue.h>
@@ -275,7 +276,12 @@ void lvgl_port_task(void* arg) {
 
 void setup() {
     Serial.begin(115200);
-    delay(100);  // Allow serial to stabilize
+    Serial.flush();
+    delay(500);  // Allow serial to stabilize - increased delay
+    
+    // CRITICAL: Print immediately to confirm setup() is reached
+    Serial.println("\n\n\n*** SETUP() STARTED ***");
+    Serial.flush();
     
     // Print reset reason for diagnostics (brownout, WDT, panic, etc.)
     esp_reset_reason_t reset_reason = esp_reset_reason();
@@ -513,17 +519,23 @@ void setup() {
     // Launch WiFi access point + web server
     WebServerManager::instance().begin();
     OTAUpdateManager::instance().begin();
-    
-    // Initialize Infinitybox control system
+
+    // Initialize Behavioral Output System first (provides behavior engine + CAN frame synthesis)
+    Serial.println("[BEHAVIORAL] Initializing behavioral output control framework...");
+    initBehavioralOutputSystem(&WebServerManager::instance().getServer());
+    Serial.println("[BEHAVIORAL] ✓ Behavioral output system ready");
+
+    // Initialize Infinitybox control system with behavior engine linkage
     Serial.println("[IBOX] Initializing Infinitybox IPM1 control system...");
-    if (InfinityboxControl::InfinityboxController::instance().begin(&Ipm1CanSystem::instance())) {
+    if (InfinityboxControl::InfinityboxController::instance().begin(&Ipm1CanSystem::instance(), &behaviorEngine)) {
         Serial.println("[IBOX] ✓ Infinitybox system ready");
     } else {
         Serial.println("[IBOX] ✗ Failed to initialize Infinitybox system");
     }
 
-    Serial.println("=================================");
+    Serial.println("=================================" );
     Serial.println(" Touch the screen or open http://192.168.4.250 ");
+    Serial.println(" Behavioral UI: http://192.168.4.250/behavioral ");
     Serial.println("=================================");
 }
 
@@ -937,6 +949,9 @@ void loop() {
 
     // Update Infinitybox behavior engines (flash, fade, timed)
     InfinityboxControl::InfinityboxController::instance().loop();
+
+    // Update Behavioral Output System
+    updateBehavioralOutputSystem();
 
     WebServerManager::instance().loop();
     vTaskDelay(pdMS_TO_TICKS(50));

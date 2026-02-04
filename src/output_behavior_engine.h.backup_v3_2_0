@@ -1,0 +1,458 @@
+#pragma once
+
+#include <Arduino.h>
+#include <vector>
+#include <map>
+#include <functional>
+
+/**
+ * ╔═══════════════════════════════════════════════════════════════════════════╗
+ * ║  BEHAVIORAL OUTPUT CONTROL FRAMEWORK                                      ║
+ * ║                                                                           ║
+ * ║  Purpose: Provide intent-based control abstraction for POWERCELL NGX     ║
+ * ║           and other CAN-controlled output devices.                       ║
+ * ║                                                                           ║
+ * ║  Architecture:                                                            ║
+ * ║    1. Output Definition Layer - Define outputs with behaviors            ║
+ * ║    2. Behavior Engine - Execute timing and state transitions             ║
+ * ║    3. Scene System - Coordinate multiple outputs                         ║
+ * ║    4. Frame Synthesizer - Merge behaviors into CAN frames                ║
+ * ║                                                                           ║
+ * ║  Key Principle:                                                           ║
+ * ║    POWERCELL NGX receives COMPLETE STATE FRAMES only.                    ║
+ * ║    All behaviors (flash, fade, scenes) are synthesized by this engine.   ║
+ * ╚═══════════════════════════════════════════════════════════════════════════╝
+ */
+
+namespace BehavioralOutput {
+
+// ═══════════════════════════════════════════════════════════════════════════
+// BEHAVIOR TYPES
+// ═══════════════════════════════════════════════════════════════════════════
+
+enum class BehaviorType : uint8_t {
+    STEADY,       // Constant on/off state
+    FLASH,        // Alternating on/off with configurable duty cycle
+    PULSE,        // Smooth fade in/out (breathing effect)
+    FADE_IN,      // One-time fade from 0 to target
+    FADE_OUT,     // One-time fade from current to 0
+    STROBE,       // Rapid flashing
+    PATTERN,      // Custom timing pattern
+    HOLD_TIMED,   // Steady state for a fixed duration
+    RAMP,         // Linear transition over time
+    SCENE_REF     // Reference to a scene
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PATTERN DEFINITION
+// ═══════════════════════════════════════════════════════════════════════════
+
+struct PatternStep {
+    uint8_t value;          // 0-255 output level
+    uint16_t duration_ms;   // How long this step lasts
+    bool softTransition;    // Smooth transition to next step
+};
+
+struct Pattern {
+    String name;
+    std::vector<PatternStep> steps;
+    bool loop;              // Repeat pattern indefinitely
+    uint8_t loopCount;      // If not infinite, how many times (0 = infinite)
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// BEHAVIOR CONFIGURATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+struct BehaviorConfig {
+    BehaviorType type = BehaviorType::STEADY;
+    
+    // Target output level (0-255)
+    uint8_t targetValue = 255;
+    
+    // Timing parameters
+    uint16_t period_ms = 1000;      // For FLASH, PULSE, STROBE
+    uint8_t dutyCycle = 50;         // Percentage on-time (0-100)
+    uint16_t duration_ms = 0;       // Total behavior duration (0 = infinite)
+    uint16_t fadeTime_ms = 500;     // For fade behaviors
+    
+    // Flash/Strobe specific
+    uint16_t onTime_ms = 500;
+    uint16_t offTime_ms = 500;
+    
+    // Pattern reference
+    String patternName = "";
+    
+    // Priority (higher wins conflicts)
+    uint8_t priority = 100;
+    
+    // Soft start (for POWERCELL NGX PWM enable)
+    bool softStart = false;
+    
+    // Auto-off when complete
+    bool autoOff = true;
+    
+    // Timestamp when behavior was activated
+    unsigned long activatedAt = 0;
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// OUTPUT DEFINITION
+// ═══════════════════════════════════════════════════════════════════════════
+
+struct OutputChannel {
+    String id;                      // Unique identifier
+    String name;                    // User-friendly name
+    String description = "";
+    
+    // Physical mapping
+    uint8_t cellAddress = 1;        // POWERCELL cell address
+    uint8_t outputNumber = 1;       // Output 1-10 on that cell
+    
+    // Current behavior
+    BehaviorConfig behavior;
+    
+    // Current computed state
+    uint8_t currentValue = 0;
+    bool isActive = false;
+    
+    // Scene membership
+    std::vector<String> sceneIds;
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SCENE DEFINITION
+// ═══════════════════════════════════════════════════════════════════════════
+
+struct SceneOutput {
+    String outputId;
+    BehaviorConfig behavior;
+};
+
+struct Scene {
+    String id;
+    String name;
+    String description = "";
+    
+    std::vector<SceneOutput> outputs;
+    
+    // Scene behavior
+    uint16_t duration_ms = 0;       // 0 = permanent until deactivated
+    uint8_t priority = 100;
+    bool exclusive = false;          // Deactivate other scenes when activated
+    
+    // Activation state
+    bool isActive = false;
+    unsigned long activatedAt = 0;
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// BEHAVIOR ENGINE
+// ═══════════════════════════════════════════════════════════════════════════
+
+class BehaviorEngine {
+public:
+    BehaviorEngine() : _lastUpdate(0), _updateInterval(20) {}
+    
+    // ───────────────────────────────────────────────────────────────────────
+    // OUTPUT MANAGEMENT
+    // ───────────────────────────────────────────────────────────────────────
+    
+    void addOutput(const OutputChannel& output) {
+        _outputs[output.id] = output;
+    }
+    
+    void removeOutput(const String& id) {
+        _outputs.erase(id);
+    }
+    
+    OutputChannel* getOutput(const String& id) {
+        auto it = _outputs.find(id);
+        return (it != _outputs.end()) ? &it->second : nullptr;
+    }
+    
+    // ───────────────────────────────────────────────────────────────────────
+    // BEHAVIOR CONTROL
+    // ───────────────────────────────────────────────────────────────────────
+    
+    bool setBehavior(const String& outputId, const BehaviorConfig& behavior) {
+        auto* output = getOutput(outputId);
+        if (!output) return false;
+        
+        output->behavior = behavior;
+        output->behavior.activatedAt = millis();
+        output->isActive = true;
+        
+        return true;
+    }
+    
+    bool deactivateOutput(const String& outputId) {
+        auto* output = getOutput(outputId);
+        if (!output) return false;
+        
+        output->isActive = false;
+        output->currentValue = 0;
+        return true;
+    }
+    
+    // ───────────────────────────────────────────────────────────────────────
+    // PATTERN MANAGEMENT
+    // ───────────────────────────────────────────────────────────────────────
+    
+    void addPattern(const Pattern& pattern) {
+        _patterns[pattern.name] = pattern;
+    }
+    
+    Pattern* getPattern(const String& name) {
+        auto it = _patterns.find(name);
+        return (it != _patterns.end()) ? &it->second : nullptr;
+    }
+    
+    // ───────────────────────────────────────────────────────────────────────
+    // SCENE MANAGEMENT
+    // ───────────────────────────────────────────────────────────────────────
+    
+    void addScene(const Scene& scene) {
+        _scenes[scene.id] = scene;
+    }
+    
+    void removeScene(const String& id) {
+        _scenes.erase(id);
+    }
+    
+    bool activateScene(const String& sceneId) {
+        auto it = _scenes.find(sceneId);
+        if (it == _scenes.end()) return false;
+        
+        Scene& scene = it->second;
+        
+        // Handle exclusivity
+        if (scene.exclusive) {
+            for (auto& [id, s] : _scenes) {
+                if (id != sceneId) s.isActive = false;
+            }
+        }
+        
+        scene.isActive = true;
+        scene.activatedAt = millis();
+        
+        // Apply scene outputs
+        for (const auto& sceneOutput : scene.outputs) {
+            setBehavior(sceneOutput.outputId, sceneOutput.behavior);
+        }
+        
+        return true;
+    }
+    
+    bool deactivateScene(const String& sceneId) {
+        auto it = _scenes.find(sceneId);
+        if (it == _scenes.end()) return false;
+        
+        Scene& scene = it->second;
+        scene.isActive = false;
+        
+        // Deactivate all outputs in this scene
+        for (const auto& sceneOutput : scene.outputs) {
+            deactivateOutput(sceneOutput.outputId);
+        }
+        
+        return true;
+    }
+    
+    // ───────────────────────────────────────────────────────────────────────
+    // CORE ENGINE LOOP
+    // ───────────────────────────────────────────────────────────────────────
+    
+    void update() {
+        unsigned long now = millis();
+        
+        // Throttle updates
+        if (now - _lastUpdate < _updateInterval) return;
+        _lastUpdate = now;
+        
+        // Update all active outputs
+        for (auto& [id, output] : _outputs) {
+            if (output.isActive) {
+                _updateOutput(output, now);
+            }
+        }
+        
+        // Update scenes (check for duration expiry)
+        for (auto& [id, scene] : _scenes) {
+            if (scene.isActive && scene.duration_ms > 0) {
+                if (now - scene.activatedAt >= scene.duration_ms) {
+                    deactivateScene(id);
+                }
+            }
+        }
+    }
+    
+    void setUpdateInterval(uint16_t interval_ms) {
+        _updateInterval = interval_ms;
+    }
+    
+    // ───────────────────────────────────────────────────────────────────────
+    // STATE RETRIEVAL
+    // ───────────────────────────────────────────────────────────────────────
+    
+    const std::map<String, OutputChannel>& getOutputs() const {
+        return _outputs;
+    }
+    
+    const std::map<String, Scene>& getScenes() const {
+        return _scenes;
+    }
+    
+    // Helper methods for checking if outputs/scenes exist
+    std::vector<String> getAllOutputs() const {
+        std::vector<String> ids;
+        for (const auto& [id, output] : _outputs) {
+            ids.push_back(id);
+        }
+        return ids;
+    }
+    
+    std::vector<String> getAllScenes() const {
+        std::vector<String> ids;
+        for (const auto& [id, scene] : _scenes) {
+            ids.push_back(id);
+        }
+        return ids;
+    }
+
+private:
+    std::map<String, OutputChannel> _outputs;
+    std::map<String, Pattern> _patterns;
+    std::map<String, Scene> _scenes;
+    
+    unsigned long _lastUpdate;
+    uint16_t _updateInterval;
+    
+    // ───────────────────────────────────────────────────────────────────────
+    // BEHAVIOR COMPUTATION
+    // ───────────────────────────────────────────────────────────────────────
+    
+    void _updateOutput(OutputChannel& output, unsigned long now) {
+        const BehaviorConfig& behavior = output.behavior;
+        unsigned long elapsed = now - behavior.activatedAt;
+        
+        // Check duration expiry
+        if (behavior.duration_ms > 0 && elapsed >= behavior.duration_ms) {
+            if (behavior.autoOff) {
+                output.isActive = false;
+                output.currentValue = 0;
+            }
+            return;
+        }
+        
+        // Compute current value based on behavior type
+        switch (behavior.type) {
+            case BehaviorType::STEADY:
+                output.currentState = (behavior.targetValue > 0);
+                output.softStart = behavior.softStart;
+                break;
+                
+            case BehaviorType::FLASH:
+                output.currentState = _computeFlash(behavior, elapsed);
+                break;
+                
+            case BehaviorType::PULSE:
+                output.currentState = _computePulse(behavior, elapsed);
+                break;
+                
+            case BehaviorType::FADE_IN:
+                output.currentState = _computeFadeIn(behavior, elapsed);
+                output.softStart = true;  // Enable soft-start for fade
+                break;
+                
+            case BehaviorType::FADE_OUT:
+                output.currentState = _computeFadeOut(behavior, elapsed);
+                break;
+                
+            case BehaviorType::STROBE:
+                output.currentState = _computeStrobe(behavior, elapsed);
+                break;
+                
+            case BehaviorType::PATTERN:
+                output.currentState = _computePattern(behavior, elapsed);
+                break;
+                
+            case BehaviorType::HOLD_TIMED:
+                output.currentState = (behavior.targetValue > 0);
+                break;
+                
+            case BehaviorType::RAMP:
+                output.currentValue = _computeRamp(behavior, elapsed);
+                break;
+                
+            default:
+                output.currentValue = 0;
+                break;
+        }
+    }
+    
+    bool _computeFlash(const BehaviorConfig& cfg, unsigned long elapsed) {
+        unsigned long cyclePos = elapsed % cfg.period_ms;
+        unsigned long onDuration = (cfg.period_ms * cfg.dutyCycle) / 100;
+        return (cyclePos < onDuration);
+    }
+    
+    bool _computePulse(const BehaviorConfig& cfg, unsigned long elapsed) {
+        // For POWERCELL NGX: Pulse is ON for duration, then OFF
+        return (elapsed < cfg.duration_ms);
+    }
+    
+    bool _computeFadeIn(const BehaviorConfig& cfg, unsigned long elapsed) {
+        // For POWERCELL NGX: Set ON with soft-start enabled (handled in OutputChannel.softStart)
+        return true;
+    }
+    
+    bool _computeFadeOut(const BehaviorConfig& cfg, unsigned long elapsed) {
+        // POWERCELL NGX doesn't support fade-out natively
+        // Turn OFF after fade time
+        return (elapsed < cfg.fadeTime_ms);
+    }
+    
+    bool _computeStrobe(const BehaviorConfig& cfg, unsigned long elapsed) {
+        // Fast flash: use configured on/off times
+        unsigned long onTime = cfg.onTime_ms > 0 ? cfg.onTime_ms : 50;
+        unsigned long offTime = cfg.offTime_ms > 0 ? cfg.offTime_ms : 50;
+        unsigned long period = onTime + offTime;
+        unsigned long cyclePos = elapsed % period;
+        return (cyclePos < onTime);
+    }
+        return (cyclePos < onTime) ? cfg.targetValue : 0;
+    }
+    
+    uint8_t _computePattern(const BehaviorConfig& cfg, unsigned long elapsed) {
+        Pattern* pattern = const_cast<BehaviorEngine*>(this)->getPattern(cfg.patternName);
+        if (!pattern || pattern->steps.empty()) return 0;
+        
+        unsigned long patternDuration = 0;
+        for (const auto& step : pattern->steps) {
+            patternDuration += step.duration_ms;
+        }
+        
+        unsigned long cyclePos = pattern->loop ? (elapsed % patternDuration) : elapsed;
+        
+        unsigned long stepStart = 0;
+        for (size_t i = 0; i < pattern->steps.size(); i++) {
+            const auto& step = pattern->steps[i];
+            if (cyclePos < stepStart + step.duration_ms) {
+                // TODO: Implement softTransition interpolation
+                return step.value;
+            }
+            stepStart += step.duration_ms;
+        }
+        
+        return 0;
+    }
+    
+    uint8_t _computeRamp(const BehaviorConfig& cfg, unsigned long elapsed) {
+        if (cfg.fadeTime_ms == 0) return cfg.targetValue;
+        if (elapsed >= cfg.fadeTime_ms) return cfg.targetValue;
+        return (uint8_t)((cfg.targetValue * elapsed) / cfg.fadeTime_ms);
+    }
+};
+
+} // namespace BehavioralOutput

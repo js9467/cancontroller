@@ -13,6 +13,7 @@
 #include "suspension_page_template.h"
 #include "version_auto.h"
 #include "web_interface.h"
+#include "behavioral_output_integration.h"
 
 namespace {
 const IPAddress kApIp(192, 168, 4, 250);
@@ -185,39 +186,47 @@ void WebServerManager::setupRoutes() {
     // iOS and macOS - expects "Success" but we return wrong content to trigger portal
     server_.on("/hotspot-detect.html", HTTP_GET, [](AsyncWebServerRequest* request) {
         Serial.println("[WEB] GET /hotspot-detect.html");
+        String redirectUrl = "http://" + request->host() + "/";
         AsyncWebServerResponse* response = request->beginResponse(200, "text/html", 
-            "<!DOCTYPE html><html><head><meta http-equiv='refresh' content='0; url=http://192.168.4.250/'></head><body></body></html>");
+            "<!DOCTYPE html><html><head><meta http-equiv='refresh' content='0; url=" + redirectUrl + "'></head><body></body></html>");
         response->addHeader("Cache-Control", "no-cache, no-store, must-revalidate");
         response->addHeader("Pragma", "no-cache");
         response->addHeader("Expires", "0");
         request->send(response);
     });
     server_.on("/library/test/success.html", HTTP_GET, [](AsyncWebServerRequest* request) {
+        String redirectUrl = "http://" + request->host() + "/";
         AsyncWebServerResponse* response = request->beginResponse(200, "text/html", 
-            "<!DOCTYPE html><html><head><meta http-equiv='refresh' content='0; url=http://192.168.4.250/'></head><body></body></html>");
+            "<!DOCTYPE html><html><head><meta http-equiv='refresh' content='0; url=" + redirectUrl + "'></head><body></body></html>");
         response->addHeader("Cache-Control", "no-cache, no-store, must-revalidate");
         request->send(response);
     });
     // Android - expects 204 No Content, we return different to trigger portal
     server_.on("/generate_204", HTTP_GET, [](AsyncWebServerRequest* request) {
-        request->redirect("http://192.168.4.250/");
+        String redirectUrl = "http://" + request->host() + "/";
+        request->redirect(redirectUrl);
     });
     // Windows connectivity tests
     server_.on("/connecttest.txt", HTTP_GET, [](AsyncWebServerRequest* request) {
-        request->redirect("http://192.168.4.250/");
+        String redirectUrl = "http://" + request->host() + "/";
+        request->redirect(redirectUrl);
     });
     server_.on("/ncsi.txt", HTTP_GET, [](AsyncWebServerRequest* request) {
-        request->redirect("http://192.168.4.250/");
+        String redirectUrl = "http://" + request->host() + "/";
+        request->redirect(redirectUrl);
     });
     server_.on("/redirect", HTTP_GET, [](AsyncWebServerRequest* request) {
-        request->redirect("http://192.168.4.250/");
+        String redirectUrl = "http://" + request->host() + "/";
+        request->redirect(redirectUrl);
     });
     // Additional Microsoft connectivity endpoints
     server_.on("/connectivity-check", HTTP_GET, [](AsyncWebServerRequest* request) {
-        request->redirect("http://192.168.4.250/");
+        String redirectUrl = "http://" + request->host() + "/";
+        request->redirect(redirectUrl);
     });
     server_.on("/microsoft-connectivity-check", HTTP_GET, [](AsyncWebServerRequest* request) {
-        request->redirect("http://192.168.4.250/");
+        String redirectUrl = "http://" + request->host() + "/";
+        request->redirect(redirectUrl);
     });
     
     // Main configuration page
@@ -265,6 +274,53 @@ void WebServerManager::setupRoutes() {
 
         doc["uptime_ms"] = millis();
         doc["heap"] = ESP.getFreeHeap();
+        String payload;
+        serializeJson(doc, payload);
+        request->send(200, "application/json", payload);
+    });
+
+    // Behavioral output/scene lists for button configuration
+    server_.on("/api/behavioral/options", HTTP_GET, [](AsyncWebServerRequest* request) {
+        DynamicJsonDocument doc(4096);
+        
+        // Get available outputs
+        JsonArray outputs = doc.createNestedArray("outputs");
+        auto outputList = behaviorEngine.getAllOutputs();
+        for (const auto& id : outputList) {
+            auto* output = behaviorEngine.getOutput(id);
+            if (output) {
+                JsonObject obj = outputs.createNestedObject();
+                obj["id"] = output->id;
+                obj["name"] = output->name;
+                obj["description"] = output->description;
+            }
+        }
+        
+        // Get available scenes  
+        JsonArray scenes = doc.createNestedArray("scenes");
+        auto sceneList = behaviorEngine.getAllScenes();
+        for (const auto& id : sceneList) {
+            auto& allScenes = behaviorEngine.getScenes();
+            auto it = allScenes.find(id);
+            if (it != allScenes.end()) {
+                JsonObject obj = scenes.createNestedObject();
+                obj["id"] = it->second.id;
+                obj["name"] = it->second.name;
+                obj["description"] = it->second.description;
+            }
+        }
+        
+        // Behavior types for output mode
+        JsonArray behaviors = doc.createNestedArray("behavior_types");
+        behaviors.add("steady");
+        behaviors.add("flash");
+        behaviors.add("pulse");
+        behaviors.add("fade_in");
+        behaviors.add("fade_out");
+        behaviors.add("strobe");
+        behaviors.add("hold_timed");
+        behaviors.add("ramp");
+        
         String payload;
         serializeJson(doc, payload);
         request->send(200, "application/json", payload);

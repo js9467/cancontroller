@@ -65,18 +65,23 @@ const char* functionStateToString(FunctionState state) {
 
 InfinityboxController::InfinityboxController() 
     : m_can_system(nullptr)
+    , m_behavior_engine(nullptr)
     , m_security_active(false)
     , m_ignition_on(false)
 {
 }
 
-bool InfinityboxController::begin(Ipm1CanSystem* can_system) {
+bool InfinityboxController::begin(Ipm1CanSystem* can_system, BehavioralOutput::BehaviorEngine* behavior_engine) {
     if (!can_system) {
         Serial.println("[IBOX] ERROR: CAN system is null");
         return false;
     }
     
     m_can_system = can_system;
+    m_behavior_engine = behavior_engine;
+    if (!m_behavior_engine) {
+        Serial.println("[IBOX] WARNING: Behavior engine not attached - falling back to legacy CAN mode");
+    }
     
     // Load default JSON schema
     // Device definitions
@@ -104,6 +109,7 @@ bool InfinityboxController::begin(Ipm1CanSystem* can_system) {
         f.outputs = {{"pc_front", 1, "output_1"}};
         f.allowed_behaviors = {BehaviorType::FLASH, BehaviorType::FLASH_TIMED};
         f.requires = {"ignition"};
+        f.behavior_output_ids = {"left_turn_front"};
         addFunction(f);
     }
     {
@@ -112,6 +118,7 @@ bool InfinityboxController::begin(Ipm1CanSystem* can_system) {
         f.outputs = {{"pc_front", 2, "output_2"}};
         f.allowed_behaviors = {BehaviorType::FLASH, BehaviorType::FLASH_TIMED};
         f.requires = {"ignition"};
+        f.behavior_output_ids = {"right_turn_front"};
         addFunction(f);
     }
     {
@@ -119,6 +126,7 @@ bool InfinityboxController::begin(Ipm1CanSystem* can_system) {
         f.name = "4-Ways";
         f.outputs = {{"pc_front", 1, "output_1"}, {"pc_front", 2, "output_2"}};
         f.allowed_behaviors = {BehaviorType::FLASH};
+        f.behavior_scene_id = "hazard";
         addFunction(f);
     }
     
@@ -128,6 +136,7 @@ bool InfinityboxController::begin(Ipm1CanSystem* can_system) {
         f.name = "Ignition";
         f.outputs = {{"pc_front", 3, "output_3"}};
         f.allowed_behaviors = {BehaviorType::TOGGLE};
+        f.behavior_output_ids = {"ignition"};
         addFunction(f);
     }
     {
@@ -136,6 +145,7 @@ bool InfinityboxController::begin(Ipm1CanSystem* can_system) {
         f.outputs = {{"pc_front", 4, "output_4"}};
         f.allowed_behaviors = {BehaviorType::MOMENTARY};
         f.blocked_when = {"security"};
+        f.behavior_output_ids = {"starter"};
         addFunction(f);
     }
     
@@ -145,6 +155,7 @@ bool InfinityboxController::begin(Ipm1CanSystem* can_system) {
         f.name = "Headlights";
         f.outputs = {{"pc_front", 5, "output_5"}};
         f.allowed_behaviors = {BehaviorType::TOGGLE, BehaviorType::SCENE, BehaviorType::FADE};
+        f.behavior_output_ids = {"headlights"};
         addFunction(f);
     }
     {
@@ -152,6 +163,7 @@ bool InfinityboxController::begin(Ipm1CanSystem* can_system) {
         f.name = "Parking Lights Front";
         f.outputs = {{"pc_front", 6, "output_6"}};
         f.allowed_behaviors = {BehaviorType::TOGGLE};
+        f.behavior_output_ids = {"parking_front"};
         addFunction(f);
     }
     {
@@ -159,6 +171,7 @@ bool InfinityboxController::begin(Ipm1CanSystem* can_system) {
         f.name = "High Beams";
         f.outputs = {{"pc_front", 7, "output_7"}};
         f.allowed_behaviors = {BehaviorType::MOMENTARY, BehaviorType::TOGGLE};
+        f.behavior_output_ids = {"high_beams"};
         addFunction(f);
     }
     {
@@ -166,6 +179,7 @@ bool InfinityboxController::begin(Ipm1CanSystem* can_system) {
         f.name = "Horn";
         f.outputs = {{"pc_front", 9, "output_9"}};
         f.allowed_behaviors = {BehaviorType::MOMENTARY};
+        f.behavior_output_ids = {"horn"};
         addFunction(f);
     }
     {
@@ -173,6 +187,7 @@ bool InfinityboxController::begin(Ipm1CanSystem* can_system) {
         f.name = "Cooling Fan";
         f.outputs = {{"pc_front", 10, "output_10"}};
         f.allowed_behaviors = {BehaviorType::TOGGLE, BehaviorType::TIMED};
+        f.behavior_output_ids = {"cooling_fan"};
         addFunction(f);
     }
     
@@ -182,6 +197,7 @@ bool InfinityboxController::begin(Ipm1CanSystem* can_system) {
         f.name = "Left Turn Signal Rear";
         f.outputs = {{"pc_rear", 1, "output_1"}};
         f.allowed_behaviors = {BehaviorType::FLASH, BehaviorType::FLASH_TIMED};
+        f.behavior_output_ids = {"left_turn_rear"};
         addFunction(f);
     }
     {
@@ -189,6 +205,7 @@ bool InfinityboxController::begin(Ipm1CanSystem* can_system) {
         f.name = "Right Turn Signal Rear";
         f.outputs = {{"pc_rear", 2, "output_2"}};
         f.allowed_behaviors = {BehaviorType::FLASH, BehaviorType::FLASH_TIMED};
+        f.behavior_output_ids = {"right_turn_rear"};
         addFunction(f);
     }
     {
@@ -196,6 +213,7 @@ bool InfinityboxController::begin(Ipm1CanSystem* can_system) {
         f.name = "Brake Lights";
         f.outputs = {{"pc_rear", 3, "output_3"}};
         f.allowed_behaviors = {BehaviorType::TOGGLE};
+        f.behavior_output_ids = {"brake_lights"};
         addFunction(f);
     }
     {
@@ -203,6 +221,7 @@ bool InfinityboxController::begin(Ipm1CanSystem* can_system) {
         f.name = "Interior Lights";
         f.outputs = {{"pc_rear", 4, "output_4"}};
         f.allowed_behaviors = {BehaviorType::TOGGLE, BehaviorType::FADE, BehaviorType::TIMED};
+        f.behavior_output_ids = {"interior_lights"};
         addFunction(f);
     }
     {
@@ -210,6 +229,7 @@ bool InfinityboxController::begin(Ipm1CanSystem* can_system) {
         f.name = "Backup Lights";
         f.outputs = {{"pc_rear", 5, "output_5"}};
         f.allowed_behaviors = {BehaviorType::TOGGLE};
+        f.behavior_output_ids = {"backup_lights"};
         addFunction(f);
     }
     {
@@ -217,6 +237,7 @@ bool InfinityboxController::begin(Ipm1CanSystem* can_system) {
         f.name = "Parking Lights Rear";
         f.outputs = {{"pc_rear", 6, "output_6"}};
         f.allowed_behaviors = {BehaviorType::TOGGLE};
+        f.behavior_output_ids = {"parking_rear"};
         addFunction(f);
     }
     {
@@ -225,6 +246,7 @@ bool InfinityboxController::begin(Ipm1CanSystem* can_system) {
         f.outputs = {{"pc_rear", 10, "output_10"}};
         f.allowed_behaviors = {BehaviorType::TOGGLE};
         f.blocked_when = {"security"};
+        f.behavior_output_ids = {"fuel_pump"};
         addFunction(f);
     }
     
@@ -444,12 +466,18 @@ bool InfinityboxController::activateFunctionWithBehavior(const std::string& name
         case BehaviorType::TOGGLE:
         case BehaviorType::MOMENTARY:
             func->state = state ? FunctionState::ON : FunctionState::OFF;
+            if (applyBehaviorOutputs(*func, behavior, state)) {
+                return true;
+            }
             return sendCanCommand(*func, state);
             
         case BehaviorType::FLASH:
         case BehaviorType::FLASH_TIMED:
             if (state) {
                 func->state = FunctionState::FLASHING;
+                if (applyBehaviorOutputs(*func, behavior, true)) {
+                    return true;
+                }
                 FlashState fs;
                 fs.last_toggle_ms = millis();
                 fs.current_state = false;
@@ -457,18 +485,33 @@ bool InfinityboxController::activateFunctionWithBehavior(const std::string& name
                 return true;  // Flash engine will handle
             } else {
                 func->state = FunctionState::OFF;
+                if (applyBehaviorOutputs(*func, behavior, false)) {
+                    return true;
+                }
                 m_flash_states.erase(name);
                 return sendCanCommand(*func, false);
             }
             
         case BehaviorType::TIMED:
         case BehaviorType::ONE_SHOT:
+            if (applyBehaviorOutputs(*func, behavior, state)) {
+                func->state = state ? FunctionState::ON : FunctionState::OFF;
+                return true;
+            }
             func->state = FunctionState::ON;
             TimedState ts;
             ts.start_ms = millis();
             ts.duration_ms = 500;  // Default 500ms
             m_timed_states[name] = ts;
             return sendCanCommand(*func, true);
+
+        case BehaviorType::SCENE:
+            if (applyBehaviorOutputs(*func, behavior, state)) {
+                func->state = state ? FunctionState::ON : FunctionState::OFF;
+                return true;
+            }
+            Serial.printf("[IBOX] SCENE behavior requested for %s but no scene binding found\n", name.c_str());
+            return false;
             
         default:
             return false;
@@ -490,7 +533,11 @@ bool InfinityboxController::activateFunctionFade(const std::string& name, uint8_
     func->active_behavior = BehaviorType::FADE;
     func->owner_start_ms = millis();
     func->state = FunctionState::FADING;
-    
+
+    if (applyFadeBehavior(*func, level, duration_ms)) {
+        return true;
+    }
+
     FadeState fs;
     fs.start_ms = millis();
     fs.start_level = 0;  // TODO: Get current level from feedback
@@ -518,7 +565,11 @@ bool InfinityboxController::activateFunctionFlash(const std::string& name, uint1
     func->active_behavior = behavior;
     func->owner_start_ms = millis();
     func->state = FunctionState::FLASHING;
-    
+
+    if (applyFlashBehavior(*func, on_ms, off_ms, duration_ms)) {
+        return true;
+    }
+
     FlashState fs;
     fs.last_toggle_ms = millis();
     fs.current_state = false;
@@ -537,7 +588,9 @@ bool InfinityboxController::deactivateFunction(const std::string& name) {
     if (!func) return false;
     
     func->state = FunctionState::OFF;
-    sendCanCommand(*func, false);
+    if (!deactivateBehaviorOutputs(*func)) {
+        sendCanCommand(*func, false);
+    }
     releaseOwnership(name);
     
     return true;
@@ -639,6 +692,9 @@ void InfinityboxController::updateFlashEngines() {
         FlashState& fs = pair.second;
         Function* func = getFunction(name);
         if (!func) continue;
+        if (usesBehaviorEngine(*func)) {
+            continue;
+        }
         
         // Check if flash timed out
         if (func->active_behavior == BehaviorType::FLASH_TIMED && 
@@ -668,6 +724,10 @@ void InfinityboxController::updateFadeEngines() {
         Function* func = getFunction(name);
         
         if (!func) {
+            it = m_fade_states.erase(it);
+            continue;
+        }
+        if (usesBehaviorEngine(*func)) {
             it = m_fade_states.erase(it);
             continue;
         }
@@ -702,6 +762,10 @@ void InfinityboxController::updateTimedEngines() {
             it = m_timed_states.erase(it);
             continue;
         }
+        if (usesBehaviorEngine(*func)) {
+            it = m_timed_states.erase(it);
+            continue;
+        }
         
         if (now_ms - ts.start_ms >= ts.duration_ms) {
             // Timer expired - turn off
@@ -713,6 +777,160 @@ void InfinityboxController::updateTimedEngines() {
             ++it;
         }
     }
+}
+
+bool InfinityboxController::usesBehaviorEngine(const Function& func) const {
+    if (!m_behavior_engine) {
+        return false;
+    }
+    return !func.behavior_output_ids.empty() || !func.behavior_scene_id.empty();
+}
+
+static uint8_t clampPercentToByte(uint8_t percent) {
+    if (percent >= 100) {
+        return 255;
+    }
+    return static_cast<uint8_t>((static_cast<uint32_t>(percent) * 255) / 100);
+}
+
+bool InfinityboxController::applyBehaviorOutputs(Function& func, BehaviorType behavior, bool state) {
+    if (!usesBehaviorEngine(func)) {
+        return false;
+    }
+
+    // Scene binding takes priority
+    if (!func.behavior_scene_id.empty()) {
+        if (state) {
+            m_behavior_engine->activateScene(func.behavior_scene_id.c_str());
+        } else {
+            m_behavior_engine->deactivateScene(func.behavior_scene_id.c_str());
+        }
+        return true;
+    }
+
+    bool success = true;
+    for (const auto& binding : func.behavior_output_ids) {
+        String outputId = binding.c_str();
+
+        if (!state) {
+            success &= m_behavior_engine->deactivateOutput(outputId);
+            continue;
+        }
+
+        BehavioralOutput::BehaviorConfig cfg;
+        cfg.targetValue = 255;
+
+        switch (behavior) {
+            case BehaviorType::TOGGLE:
+            case BehaviorType::MOMENTARY:
+                cfg.type = BehavioralOutput::BehaviorType::STEADY;
+                break;
+            case BehaviorType::FLASH:
+            case BehaviorType::FLASH_TIMED: {
+                cfg.type = BehavioralOutput::BehaviorType::FLASH;
+                cfg.onTime_ms = m_flash_config.on_time_ms;
+                cfg.offTime_ms = m_flash_config.off_time_ms;
+                cfg.period_ms = m_flash_config.on_time_ms + m_flash_config.off_time_ms;
+                cfg.dutyCycle = (cfg.period_ms > 0) ? (cfg.onTime_ms * 100) / cfg.period_ms : 50;
+                if (behavior == BehaviorType::FLASH_TIMED && m_flash_config.duration_ms > 0) {
+                    cfg.duration_ms = m_flash_config.duration_ms;
+                    cfg.autoOff = true;
+                }
+                break;
+            }
+            case BehaviorType::TIMED:
+            case BehaviorType::ONE_SHOT:
+                cfg.type = BehavioralOutput::BehaviorType::HOLD_TIMED;
+                cfg.duration_ms = (m_timed_config.duration_ms == 0) ? 500 : m_timed_config.duration_ms;
+                cfg.autoOff = true;
+                break;
+            case BehaviorType::SCENE:
+                // Scene bindings handled earlier
+                break;
+            default:
+                Serial.printf("[IBOX] Behavior %s not supported via behavior engine for %s\n",
+                              behaviorToString(behavior), func.name.c_str());
+                return false;
+        }
+
+        success &= m_behavior_engine->setBehavior(outputId, cfg);
+    }
+
+    return success;
+}
+
+bool InfinityboxController::applyFlashBehavior(Function& func, uint16_t on_ms, uint16_t off_ms, uint32_t duration_ms) {
+    if (!usesBehaviorEngine(func)) {
+        return false;
+    }
+
+    if (!func.behavior_scene_id.empty()) {
+        if (duration_ms > 0) {
+            Serial.println("[IBOX] Scene-based flash durations are fixed; ignoring custom duration");
+        }
+        m_behavior_engine->activateScene(func.behavior_scene_id.c_str());
+        return true;
+    }
+
+    bool success = true;
+    uint16_t period = on_ms + off_ms;
+    uint16_t clampedDuration = duration_ms > 0xFFFF ? 0xFFFF : static_cast<uint16_t>(duration_ms);
+
+    for (const auto& binding : func.behavior_output_ids) {
+        String outputId = binding.c_str();
+        BehavioralOutput::BehaviorConfig cfg;
+        cfg.type = BehavioralOutput::BehaviorType::FLASH;
+        cfg.targetValue = 255;
+        cfg.onTime_ms = on_ms;
+        cfg.offTime_ms = off_ms;
+        cfg.period_ms = period;
+        cfg.dutyCycle = (period > 0) ? (on_ms * 100) / period : 50;
+        if (duration_ms > 0) {
+            cfg.duration_ms = clampedDuration;
+            cfg.autoOff = true;
+        }
+        success &= m_behavior_engine->setBehavior(outputId, cfg);
+    }
+
+    return success;
+}
+
+bool InfinityboxController::applyFadeBehavior(Function& func, uint8_t level, uint16_t duration_ms) {
+    if (!usesBehaviorEngine(func)) {
+        return false;
+    }
+
+    bool success = true;
+    uint8_t target = clampPercentToByte(level);
+    for (const auto& binding : func.behavior_output_ids) {
+        String outputId = binding.c_str();
+        BehavioralOutput::BehaviorConfig cfg;
+        cfg.type = BehavioralOutput::BehaviorType::RAMP;
+        cfg.targetValue = target;
+        cfg.fadeTime_ms = duration_ms;
+        cfg.softStart = true;
+        cfg.autoOff = (target == 0);
+        success &= m_behavior_engine->setBehavior(outputId, cfg);
+    }
+
+    return success;
+}
+
+bool InfinityboxController::deactivateBehaviorOutputs(const Function& func) {
+    if (!usesBehaviorEngine(func)) {
+        return false;
+    }
+
+    bool success = true;
+    if (!func.behavior_scene_id.empty()) {
+        success &= m_behavior_engine->deactivateScene(func.behavior_scene_id.c_str());
+    }
+
+    for (const auto& binding : func.behavior_output_ids) {
+        success &= m_behavior_engine->deactivateOutput(binding.c_str());
+    }
+
+    return success;
 }
 
 void InfinityboxController::printStatus() const {

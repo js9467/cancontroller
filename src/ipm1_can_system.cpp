@@ -92,6 +92,7 @@ Ipm1CanSystem& Ipm1CanSystem::instance() {
 
 bool Ipm1CanSystem::begin() {
     String error;
+    // Try to load persisted system JSON from LittleFS first
     if (LittleFS.exists(kSystemPath)) {
         File file = LittleFS.open(kSystemPath, "r");
         if (file) {
@@ -100,8 +101,20 @@ bool Ipm1CanSystem::begin() {
         }
     }
 
+    // If no file exists or it couldn't be read, fall back to the
+    // built-in default JSON and persist it so future boots are clean.
     if (system_json_.isEmpty()) {
+        Serial.println("[IPM1] No system JSON found on LittleFS, writing defaults to /ipm1_can_system_full.json");
         system_json_ = kDefaultSystemJson;
+
+        File file = LittleFS.open(kSystemPath, "w");
+        if (file) {
+            file.print(system_json_);
+            file.close();
+            Serial.println("[IPM1] Default system JSON written successfully");
+        } else {
+            Serial.println("[IPM1] WARNING: Failed to open /ipm1_can_system_full.json for write");
+        }
     }
 
     if (!loadFromJson(system_json_, error)) {

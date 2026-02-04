@@ -45,11 +45,37 @@ struct ButtonConfig {
     std::string border_color = "#FFFFFF";  // Button border color
     CanFrameConfig can;
     CanFrameConfig can_off;  // Optional OFF/release frame (used by some modules that require release frames)
-    std::string infinitybox_function = "";  // Infinitybox function name (e.g. "left_turn", "horn") - used as template
-    // Behavior timing parameters (milliseconds)
-    std::uint16_t flash_frequency = 500;  // Flash on/off interval in ms
-    std::uint16_t fade_time = 1000;       // Fade in/out duration in ms
-    std::uint16_t on_time = 2000;         // Timed behavior duration in ms
+    
+    // ═══════════════════════════════════════════════════════════════════════
+    // BEHAVIORAL OUTPUT SYSTEM - User-Friendly Approach
+    // ═══════════════════════════════════════════════════════════════════════
+    
+    // Mode Selection: "can" (traditional CAN frames), "output" (single output with behavior), or "scene" (complex multi-output scene)
+    std::string mode = "can";  // "can", "output", or "scene"
+    
+    // SIMPLE OUTPUT MODE: Control a single output with a behavior
+    struct OutputBehaviorConfig {
+        std::string output_id = "";           // Which output to control (user-defined from output manager)
+        std::string behavior_type = "steady"; // steady, flash, pulse, fade_in, fade_out, strobe, hold_timed, ramp
+        std::uint8_t target_value = 100;     // 0-100%
+        std::uint16_t period_ms = 500;        // For flash, pulse, strobe
+        std::uint8_t duty_cycle = 50;         // For flash (0-100%)
+        std::uint16_t fade_time_ms = 1000;    // For fade_in, fade_out, ramp
+        std::uint16_t hold_duration_ms = 0;   // For hold_timed (0 = infinite)
+        std::uint16_t on_time_ms = 100;       // For strobe
+        std::uint16_t off_time_ms = 100;      // For strobe
+        bool auto_off = false;                 // Release automatically when done
+    } output_behavior;
+    
+    // SCENE MODE: Activate a predefined scene (created in scene builder)
+    std::string scene_id = "";  // ID of scene to activate
+    
+    // Legacy/Deprecated (kept for backward compatibility)
+    std::string infinitybox_function = "";  // DEPRECATED - use mode="output" instead
+    std::string behavioral_scene = "";      // DEPRECATED - use mode="scene" and scene_id instead
+    std::uint16_t flash_frequency = 500;    // DEPRECATED - use output_behavior.period_ms
+    std::uint16_t fade_time = 1000;         // DEPRECATED - use output_behavior.fade_time_ms
+    std::uint16_t on_time = 2000;           // DEPRECATED - use output_behavior.hold_duration_ms
 };
 
 struct PageConfig {

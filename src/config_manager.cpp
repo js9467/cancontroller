@@ -517,6 +517,23 @@ void ConfigManager::encodeConfig(const DeviceConfig& source, DynamicJsonDocument
                 off_data_arr.add(button.can_off.data[i]);
             }
             
+            // Behavioral output system fields
+            btn_obj["mode"] = button.mode.c_str();
+            btn_obj["scene_id"] = button.scene_id.c_str();
+            
+            JsonObject output_behavior = btn_obj["output_behavior"].to<JsonObject>();
+            output_behavior["output_id"] = button.output_behavior.output_id.c_str();
+            output_behavior["behavior_type"] = button.output_behavior.behavior_type.c_str();
+            output_behavior["target_value"] = button.output_behavior.target_value;
+            output_behavior["period_ms"] = button.output_behavior.period_ms;
+            output_behavior["duty_cycle"] = button.output_behavior.duty_cycle;
+            output_behavior["fade_time_ms"] = button.output_behavior.fade_time_ms;
+            output_behavior["hold_duration_ms"] = button.output_behavior.hold_duration_ms;
+            output_behavior["on_time_ms"] = button.output_behavior.on_time_ms;
+            output_behavior["off_time_ms"] = button.output_behavior.off_time_ms;
+            output_behavior["auto_off"] = button.output_behavior.auto_off;
+            
+            // Legacy fields (backward compatibility)
             btn_obj["infinitybox_function"] = button.infinitybox_function.c_str();
             btn_obj["flash_frequency"] = button.flash_frequency;
             btn_obj["fade_time"] = button.fade_time;
@@ -748,6 +765,25 @@ bool ConfigManager::decodeConfig(JsonVariantConst json, DeviceConfig& target, st
                         }
                     }
                     
+                    // Behavioral output system fields
+                    button.mode = safeString(btn_obj["mode"], "can");
+                    button.scene_id = safeString(btn_obj["scene_id"], "");
+                    
+                    JsonObjectConst output_behavior = btn_obj["output_behavior"];
+                    if (!output_behavior.isNull()) {
+                        button.output_behavior.output_id = safeString(output_behavior["output_id"], "");
+                        button.output_behavior.behavior_type = safeString(output_behavior["behavior_type"], "steady");
+                        button.output_behavior.target_value = clampValue<std::uint8_t>(output_behavior["target_value"] | 100, 0u, 100u);
+                        button.output_behavior.period_ms = clampValue<std::uint16_t>(output_behavior["period_ms"] | 500, 1u, 10000u);
+                        button.output_behavior.duty_cycle = clampValue<std::uint8_t>(output_behavior["duty_cycle"] | 50, 0u, 100u);
+                        button.output_behavior.fade_time_ms = clampValue<std::uint16_t>(output_behavior["fade_time_ms"] | 1000, 0u, 10000u);
+                        button.output_behavior.hold_duration_ms = clampValue<std::uint16_t>(output_behavior["hold_duration_ms"] | 0, 0u, 60000u);
+                        button.output_behavior.on_time_ms = clampValue<std::uint16_t>(output_behavior["on_time_ms"] | 100, 1u, 10000u);
+                        button.output_behavior.off_time_ms = clampValue<std::uint16_t>(output_behavior["off_time_ms"] | 100, 1u, 10000u);
+                        button.output_behavior.auto_off = output_behavior["auto_off"] | false;
+                    }
+                    
+                    // Legacy fields (backward compatibility)
                     button.infinitybox_function = btn_obj["infinitybox_function"] | "";
                     button.flash_frequency = btn_obj["flash_frequency"] | 500;
                     button.fade_time = btn_obj["fade_time"] | 1000;

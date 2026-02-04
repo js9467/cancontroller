@@ -531,18 +531,51 @@ function switchTab(tabName){
 			<div><label>Corner Radius</label><input id="btn-corner-radius" type="number" min="0" max="50" /></div>
 			<div class="row"><label><input id="btn-momentary" type="checkbox" /> Momentary</label></div>
 		</div>
-		<h4>Infinitybox IPM1 Function</h4>
+		<h4>Button Action Mode</h4>
 		<div class="grid two-col">
-			<div style="grid-column:1/-1;"><label>Function</label><select id="btn-infinitybox-function" onchange="applyInfinityboxTemplate()"><option value="">None (use CAN below)</option><option value="left_turn">Left Turn</option><option value="right_turn">Right Turn</option><option value="four_way">4-Way Flashers</option><option value="horn">Horn</option><option value="high_beams">High Beams</option><option value="headlights">Headlights</option><option value="parking_lights">Parking Lights</option><option value="backup_lights">Backup Lights</option><option value="brake_lights">Brake Lights</option><option value="interior_lights">Interior Lights</option><option value="gauge_illumination">Gauge Illumination</option><option value="door_lock">Door Lock</option><option value="door_unlock">Door Unlock</option><option value="window_up_driver">Window Up (Driver)</option><option value="window_down_driver">Window Down (Driver)</option><option value="window_up_passenger">Window Up (Passenger)</option><option value="window_down_passenger">Window Down (Passenger)</option><option value="ignition">Ignition</option><option value="starter">Starter</option><option value="fuel_pump">Fuel Pump</option><option value="cooling_fan">Cooling Fan</option><option value="aux_1">AUX 1</option><option value="aux_2">AUX 2</option><option value="security_arm">Security Arm</option><option value="security_disarm">Security Disarm</option></select></div>
-			<div class="muted" style="grid-column:1/-1; font-size:0.85rem;">Select an Infinitybox function to auto-populate CAN fields below</div>
+			<div style="grid-column:1/-1;">
+				<label>Mode</label>
+				<select id="btn-mode" onchange="toggleBehavioralFields()">
+					<option value="can">CAN Frames (Advanced)</option>
+					<option value="output">Behavioral Output</option>
+					<option value="scene">Scene (Multiple Outputs)</option>
+				</select>
+			</div>
+			<div class="muted" style="grid-column:1/-1; font-size:0.85rem;">Choose CAN for manual control, Output for single light/function, or Scene for choreographed sequences</div>
 		</div>
-		<h4>Behavior Timing</h4>
-		<div class="grid two-col">
-			<div><label>Flash Frequency (ms)</label><input id="btn-flash-frequency" type="number" min="50" max="5000" step="50" value="500" /></div>
-			<div><label>Fade Time (ms)</label><input id="btn-fade-time" type="number" min="100" max="10000" step="100" value="1000" /></div>
-			<div><label>On Time (ms)</label><input id="btn-on-time" type="number" min="100" max="30000" step="100" value="2000" /></div>
-			<div class="muted" style="grid-column:1/-1; font-size:0.85rem;">Flash frequency controls blink rate. Fade time controls smooth transitions. On time is for timed behaviors.</div>
+		
+		<div id="behavioral-output-config" style="display:none;">
+			<h4>Output Configuration</h4>
+			<div class="grid two-col">
+				<div style="grid-column:1/-1;"><label>Output</label><select id="btn-output-id"><option value="">Select output...</option></select></div>
+				<div style="grid-column:1/-1;"><label>Behavior</label><select id="btn-behavior-type">
+					<option value="steady">Steady</option>
+					<option value="flash">Flash</option>
+					<option value="pulse">Pulse</option>
+					<option value="fade_in">Fade In</option>
+					<option value="fade_out">Fade Out</option>
+					<option value="strobe">Strobe</option>
+					<option value="hold_timed">Hold Timed</option>
+					<option value="ramp">Ramp</option>
+				</select></div>
+				<div><label>Target Value (0-255)</label><input id="btn-target-value" type="number" min="0" max="255" value="255" /></div>
+				<div><label>Period (ms)</label><input id="btn-period-ms" type="number" min="50" max="10000" value="1000" /></div>
+				<div><label>Duty Cycle (%)</label><input id="btn-duty-cycle" type="number" min="0" max="100" value="50" /></div>
+				<div><label>Fade Time (ms)</label><input id="btn-fade-time-ms" type="number" min="0" max="5000" value="500" /></div>
+				<div><label>Hold Duration (ms)</label><input id="btn-hold-duration-ms" type="number" min="0" max="30000" value="2000" /></div>
+				<div class="row"><label><input id="btn-auto-off" type="checkbox" /> Auto-off when released</label></div>
+			</div>
 		</div>
+		
+		<div id="behavioral-scene-config" style="display:none;">
+			<h4>Scene Selection</h4>
+			<div class="grid two-col">
+				<div style="grid-column:1/-1;"><label>Scene</label><select id="btn-scene-id"><option value="">Select scene...</option></select></div>
+				<div class="muted" style="grid-column:1/-1; font-size:0.85rem;">Scenes control multiple outputs with coordinated behaviors. Configure scenes in the Behavioral Output tab.</div>
+			</div>
+		</div>
+		
+		<div id="can-config-section" style="display:none;">
 		<h4>CAN Frame</h4>
 		<div class="row" style="margin-bottom:10px;"><label><input id="btn-can-enabled" type="checkbox" onchange="toggleCanFields()" /> Send CAN on press</label></div>
 		<div id="can-config-wrapper" class="grid two-col" style="display:none;">
@@ -575,6 +608,8 @@ function switchTab(tabName){
 				<select id="btn-can-off-library-select" onchange="loadCanOffFromLibrary()"></select>
 			</div>
 		</div>
+		</div><!-- end can-config-section -->
+		
 		<div class="row" style="margin-top:12px; justify-content:flex-end; gap:8px;">
 			<button class="btn danger" onclick="deleteButtonFromModal()">Delete</button>
 			<button class="btn primary" onclick="saveButtonFromModal()">Save</button>
@@ -1135,14 +1170,26 @@ function openButtonModal(row,col){
 		font_family: firstDefined(theme.button_font_family, 'montserrat'),
 		text_align: 'center',
 		momentary: false,
-		infinitybox_function: '',
-		flash_frequency: 500,
-		fade_time: 1000,
-		on_time: 2000,
+		mode: 'can',
+		output_behavior: {
+			output_id: '',
+			behavior_type: 'steady',
+			target_value: 255,
+			period_ms: 1000,
+			duty_cycle: 50,
+			fade_time_ms: 500,
+			hold_duration_ms: 2000,
+			on_time_ms: 0,
+			off_time_ms: 0,
+			auto_off: true
+		},
+		scene_id: '',
 		can:{enabled:false,pgn:0,priority:6,source_address:0xF9,destination_address:0xFF,data:[0,0,0,0,0,0,0,0]},
 		can_off:{enabled:false,pgn:0,priority:6,source_address:0xF9,destination_address:0xFF,data:[0,0,0,0,0,0,0,0]}
 	};
 	const data = btn || defaults;
+	
+	// Load basic fields first
 	document.getElementById('btn-label').value = data.label || '';
 	document.getElementById('btn-color').value = data.color;
 	document.getElementById('btn-pressed-color').value = firstDefined(data.pressed_color, defaults.pressed_color);
@@ -1154,10 +1201,29 @@ function openButtonModal(row,col){
 	document.getElementById('btn-font-family').value = data.font_family || 'montserrat';
 	document.getElementById('btn-text-align').value = data.text_align || 'center';
 	document.getElementById('btn-momentary').checked = data.momentary || false;
-	document.getElementById('btn-infinitybox-function').value = data.infinitybox_function || '';
-	document.getElementById('btn-flash-frequency').value = firstDefined(data.flash_frequency, 500);
-	document.getElementById('btn-fade-time').value = firstDefined(data.fade_time, 1000);
-	document.getElementById('btn-on-time').value = firstDefined(data.on_time, 2000);
+	
+	// Mode and behavioral fields (set non-dropdown fields first)
+	document.getElementById('btn-mode').value = data.mode || 'can';
+	const ob = data.output_behavior || defaults.output_behavior;
+	document.getElementById('btn-behavior-type').value = ob.behavior_type || 'steady';
+	document.getElementById('btn-target-value').value = ob.target_value || 255;
+	document.getElementById('btn-period-ms').value = ob.period_ms || 1000;
+	document.getElementById('btn-duty-cycle').value = ob.duty_cycle || 50;
+	document.getElementById('btn-fade-time-ms').value = ob.fade_time_ms || 500;
+	document.getElementById('btn-hold-duration-ms').value = ob.hold_duration_ms || 2000;
+	document.getElementById('btn-auto-off').checked = ob.auto_off !== undefined ? ob.auto_off : true;
+	
+	// Load behavioral options from server, then set dropdown values
+	loadBehavioralOptions().then(() => {
+		// Set dropdown values AFTER options are loaded
+		document.getElementById('btn-output-id').value = ob.output_id || '';
+		document.getElementById('btn-scene-id').value = data.scene_id || '';
+	}).catch(err => {
+		console.error('Failed to load behavioral options:', err);
+		// Set values anyway even if loading failed
+		document.getElementById('btn-output-id').value = ob.output_id || '';
+		document.getElementById('btn-scene-id').value = data.scene_id || '';
+	});
 	const canCfg = data.can || {};
 	document.getElementById('btn-can-enabled').checked = canCfg.enabled || false;
 	document.getElementById('btn-can-pgn').value = (canCfg.pgn || 0).toString(16).toUpperCase();
@@ -1175,7 +1241,7 @@ function openButtonModal(row,col){
 	const canOffData = (canOffCfg.data && canOffCfg.data.length) ? canOffCfg.data : defaults.can_off.data;
 	document.getElementById('btn-can-off-data').value = canOffData.map(b=>b.toString(16).toUpperCase().padStart(2,'0')).join(' ');
 	populateCanLibraryDropdown();
-	toggleCanFields();
+	toggleBehavioralFields();
 	document.getElementById('button-modal').classList.add('open');
 }
 
@@ -1211,10 +1277,20 @@ function saveButtonFromModal(){
 		font_name: document.getElementById('btn-font-family').value+'_16',
 		text_align: document.getElementById('btn-text-align').value,
 		momentary: document.getElementById('btn-momentary').checked,
-		infinitybox_function: document.getElementById('btn-infinitybox-function').value || '',
-		flash_frequency: parseInt(document.getElementById('btn-flash-frequency').value) || 500,
-		fade_time: parseInt(document.getElementById('btn-fade-time').value) || 1000,
-		on_time: parseInt(document.getElementById('btn-on-time').value) || 2000,
+		mode: document.getElementById('btn-mode').value,
+		output_behavior: {
+			output_id: document.getElementById('btn-output-id').value || '',
+			behavior_type: document.getElementById('btn-behavior-type').value,
+			target_value: parseInt(document.getElementById('btn-target-value').value) || 255,
+			period_ms: parseInt(document.getElementById('btn-period-ms').value) || 1000,
+			duty_cycle: parseInt(document.getElementById('btn-duty-cycle').value) || 50,
+			fade_time_ms: parseInt(document.getElementById('btn-fade-time-ms').value) || 500,
+			hold_duration_ms: parseInt(document.getElementById('btn-hold-duration-ms').value) || 2000,
+			on_time_ms: 0,
+			off_time_ms: 0,
+			auto_off: document.getElementById('btn-auto-off').checked
+		},
+		scene_id: document.getElementById('btn-scene-id').value || '',
 		can: {
 			enabled: canEnabled,
 			pgn: canEnabled ? parseInt(document.getElementById('btn-can-pgn').value,16)||0 : 0,
@@ -1245,6 +1321,38 @@ function deleteButtonFromModal(){
 	closeModal();
 	renderGrid();
 	renderPreview();
+}
+
+function toggleBehavioralFields(){
+	const mode = document.getElementById('btn-mode').value;
+	document.getElementById('behavioral-output-config').style.display = mode === 'output' ? 'block' : 'none';
+	document.getElementById('behavioral-scene-config').style.display = mode === 'scene' ? 'block' : 'none';
+	document.getElementById('can-config-section').style.display = mode === 'can' ? 'block' : 'none';
+	if(mode === 'can') toggleCanFields(); // Update CAN sub-sections
+}
+
+function loadBehavioralOptions(){
+	return fetch('/api/behavioral/options')
+		.then(r => r.json())
+		.then(data => {
+			const outputSel = document.getElementById('btn-output-id');
+			outputSel.innerHTML = '<option value="">Select output...</option>';
+			(data.outputs || []).forEach(out => {
+				const opt = document.createElement('option');
+				opt.value = out.id;
+				opt.textContent = out.name;
+				outputSel.appendChild(opt);
+			});
+			
+			const sceneSel = document.getElementById('btn-scene-id');
+			sceneSel.innerHTML = '<option value="">Select scene...</option>';
+			(data.scenes || []).forEach(scene => {
+				const opt = document.createElement('option');
+				opt.value = scene.id;
+				opt.textContent = scene.name;
+				sceneSel.appendChild(opt);
+			});
+		});
 }
 
 function toggleCanFields(){

@@ -19,6 +19,7 @@
 #include "assets/images.h"
 #include "version_auto.h"
 #include "infinitybox_control.h"
+#include "behavioral_output_integration.h"
 
 extern ESP_Panel* panel;
 
@@ -647,10 +648,106 @@ void UIBuilder::actionButtonEvent(lv_event_t* e) {
     const lv_event_code_t code = lv_event_get_code(e);
     auto* config = static_cast<const ButtonConfig*>(lv_event_get_user_data(e));
     if (!config) {
+        Serial.println("[UI] ✗ Button event with null config!");
         return;
     }
 
-    // Use CAN message handling (Infinitybox functions populate CAN fields via web interface)
+    // DEBUG: Always log ALL button events
+    Serial.printf("[UI] ⚡ BUTTON EVENT: mode='%s', code=%d, label='%s'\n", 
+        config->mode.c_str(), code, config->label.c_str());
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // NEW MODE-BASED BUTTON HANDLING
+    // ═══════════════════════════════════════════════════════════════════════
+    
+    if (config->mode == "scene") {
+        // SCENE MODE: Activate a complex multi-output scene
+        if (code == LV_EVENT_CLICKED && !config->scene_id.empty()) {
+            Serial.printf("[UI] Activating scene: %s\n", config->scene_id.c_str());
+            behaviorEngine.activateScene(config->scene_id.c_str());
+        }
+        return;
+    }
+    
+    if (config->mode == "output") {
+        // OUTPUT MODE: Control a single output with specific behavior
+        if (!config->output_behavior.output_id.empty()) {
+            if (code == LV_EVENT_PRESSED || code == LV_EVENT_CLICKED) {
+                Serial.printf("[UI] Output %s → %s behavior\n", 
+                    config->output_behavior.output_id.c_str(),
+                    config->output_behavior.behavior_type.c_str());
+                
+                // Build behavior configuration
+                BehavioralOutput::BehaviorConfig behavior;
+                
+                // Map behavior type string to enum
+                if (config->output_behavior.behavior_type == "steady") {
+                    behavior.type = BehavioralOutput::BehaviorType::STEADY;
+                    behavior.targetValue = (config->output_behavior.target_value * 255) / 100;
+                } else if (config->output_behavior.behavior_type == "flash") {
+                    behavior.type = BehavioralOutput::BehaviorType::FLASH;
+                    behavior.targetValue = (config->output_behavior.target_value * 255) / 100;
+                    behavior.period_ms = config->output_behavior.period_ms;
+                    behavior.dutyCycle = config->output_behavior.duty_cycle;
+                } else if (config->output_behavior.behavior_type == "pulse") {
+                    behavior.type = BehavioralOutput::BehaviorType::PULSE;
+                    behavior.targetValue = (config->output_behavior.target_value * 255) / 100;
+                    behavior.period_ms = config->output_behavior.period_ms;
+                } else if (config->output_behavior.behavior_type == "fade_in") {
+                    behavior.type = BehavioralOutput::BehaviorType::FADE_IN;
+                    behavior.targetValue = (config->output_behavior.target_value * 255) / 100;
+                    behavior.fadeTime_ms = config->output_behavior.fade_time_ms;
+                    behavior.softStart = true;
+                } else if (config->output_behavior.behavior_type == "fade_out") {
+                    behavior.type = BehavioralOutput::BehaviorType::FADE_OUT;
+                    behavior.targetValue = (config->output_behavior.target_value * 255) / 100;
+                    behavior.fadeTime_ms = config->output_behavior.fade_time_ms;
+                } else if (config->output_behavior.behavior_type == "strobe") {
+                    behavior.type = BehavioralOutput::BehaviorType::STROBE;
+                    behavior.targetValue = (config->output_behavior.target_value * 255) / 100;
+                    behavior.onTime_ms = config->output_behavior.on_time_ms;
+                    behavior.offTime_ms = config->output_behavior.off_time_ms;
+                } else if (config->output_behavior.behavior_type == "hold_timed") {
+                    behavior.type = BehavioralOutput::BehaviorType::HOLD_TIMED;
+                    behavior.targetValue = (config->output_behavior.target_value * 255) / 100;
+                    behavior.duration_ms = config->output_behavior.hold_duration_ms;
+                    behavior.autoOff = true;
+                } else if (config->output_behavior.behavior_type == "ramp") {
+                    behavior.type = BehavioralOutput::BehaviorType::RAMP;
+                    behavior.targetValue = (config->output_behavior.target_value * 255) / 100;
+                    behavior.fadeTime_ms = config->output_behavior.fade_time_ms;
+                }
+                
+                // Activate the behavior on the output
+                behaviorEngine.setBehavior(config->output_behavior.output_id.c_str(), behavior);
+            }
+            
+            // Handle release - check auto_off regardless of momentary mode
+            if (code == LV_EVENT_RELEASED) {
+                if (config->output_behavior.auto_off) {
+                    Serial.printf("[UI] Auto-off triggered for output: %s\n", 
+                        config->output_behavior.output_id.c_str());
+                    behaviorEngine.deactivateOutput(config->output_behavior.output_id.c_str());
+                }
+            }
+        }
+        return;
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════
+    // LEGACY CAN MODE (backward compatibility)
+    // ═══════════════════════════════════════════════════════════════════════
+    
+    // Check for legacy behavioral_scene field (backward compatibility)
+    if (!config->behavioral_scene.empty()) {
+        if (code == LV_EVENT_CLICKED) {
+            Serial.printf("[UI] [LEGACY] Activating behavioral scene: %s\n", config->behavioral_scene.c_str());
+            behaviorEngine.activateScene(config->behavioral_scene.c_str());
+        }
+        return;
+    }
+
+    // Traditional CAN frame transmission
     if (config->momentary) {
         if (code == LV_EVENT_PRESSED) {
             CanManager::instance().sendButtonAction(*config);
@@ -2290,7 +2387,7 @@ void UIBuilder::buildInfinityboxDrivingPage() {
     createFunctionFlash(page_container_, "Right Front Turn", "Right Turn Signal Front");
     createFunctionFlash(page_container_, "Left Rear Turn", "Left Turn Signal Rear");
     createFunctionFlash(page_container_, "Right Rear Turn", "Right Turn Signal Rear");
-    createFunctionFlash(page_container_, "4-Way Flashers", "4-Way Flashers");
+    createFunctionFlash(page_container_, "4-Way Flashers", "4-Ways");
     
     // Horn and Lights
     createFunctionMomentary(page_container_, "Horn", "Horn");
@@ -2315,7 +2412,8 @@ void UIBuilder::buildInfinityboxExteriorPage() {
     lv_obj_set_style_pad_gap(page_container_, UITheme::SPACE_SM, 0);
 
     createFunctionToggle(page_container_, "Headlights", "Headlights");
-    createFunctionToggle(page_container_, "Parking Lights", "Parking Lights");
+    createFunctionToggle(page_container_, "Parking Lights Front", "Parking Lights Front");
+    createFunctionToggle(page_container_, "Parking Lights Rear", "Parking Lights Rear");
     createFunctionToggle(page_container_, "Backup Lights", "Backup Lights");
     createFunctionToggle(page_container_, "Brake Lights", "Brake Lights");
 }
@@ -2338,7 +2436,6 @@ void UIBuilder::buildInfinityboxInteriorPage() {
     lv_obj_set_style_pad_gap(page_container_, UITheme::SPACE_SM, 0);
 
     createFunctionToggle(page_container_, "Interior Lights", "Interior Lights");
-    createFunctionToggle(page_container_, "Gauge Illumination", "Gauge Illumination");
 }
 
 void UIBuilder::buildInfinityboxBodyPage() {
@@ -2359,8 +2456,8 @@ void UIBuilder::buildInfinityboxBodyPage() {
     lv_obj_set_style_pad_gap(page_container_, UITheme::SPACE_SM, 0);
 
     // Door locks with timed behavior
-    createFunctionMomentary(page_container_, "Lock Doors", "Door Locks");
-    createFunctionMomentary(page_container_, "Unlock Doors", "Door Unlocks");
+    createFunctionMomentary(page_container_, "Driver Door Lock", "Driver Door Lock");
+    createFunctionMomentary(page_container_, "Driver Door Unlock", "Driver Door Unlock");
     
     // Windows
     createFunctionMomentary(page_container_, "Driver Window Up", "Driver Window Up");

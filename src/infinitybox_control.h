@@ -24,6 +24,8 @@
 #include <map>
 #include <functional>
 
+#include "output_behavior_engine.h"
+
 // Forward declaration
 class Ipm1CanSystem;
 
@@ -87,6 +89,8 @@ struct Function {
     std::vector<std::string> requires;        // e.g., ["ignition"]
     std::vector<std::string> blocked_when;    // e.g., ["security"]
     bool renameable;
+    std::vector<std::string> behavior_output_ids; // BehavioralOutput bindings
+    std::string behavior_scene_id;                 // Optional scene binding
     
     // Runtime state
     BehaviorType active_behavior;
@@ -155,7 +159,7 @@ public:
     }
     
     // Initialization
-    bool begin(Ipm1CanSystem* can_system);
+    bool begin(Ipm1CanSystem* can_system, BehavioralOutput::BehaviorEngine* behavior_engine);
     void loop();  // Call from main loop for behavior engines
     
     // Device management
@@ -214,6 +218,11 @@ private:
     bool isBlocked(const Function& func) const;
     bool sendCanCommand(const Function& func, bool state);
     bool sendCanCommandMultiOutput(const Function& func, bool state);
+    bool usesBehaviorEngine(const Function& func) const;
+    bool applyBehaviorOutputs(Function& func, BehaviorType behavior, bool state);
+    bool applyFlashBehavior(Function& func, uint16_t on_ms, uint16_t off_ms, uint32_t duration_ms);
+    bool applyFadeBehavior(Function& func, uint8_t level, uint16_t duration_ms);
+    bool deactivateBehaviorOutputs(const Function& func);
     void updateFlashEngines();
     void updateFadeEngines();
     void updateTimedEngines();
@@ -224,10 +233,12 @@ private:
     std::map<std::string, Scene> m_scenes;
     
     Ipm1CanSystem* m_can_system;
+    BehavioralOutput::BehaviorEngine* m_behavior_engine;
     bool m_security_active;
     bool m_ignition_on;
     
     FlashConfig m_flash_config;
+    TimedConfig m_timed_config;
     
     // Behavior engine tracking
     struct FlashState {

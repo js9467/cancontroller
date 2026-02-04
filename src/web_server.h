@@ -23,6 +23,9 @@ public:
     void notifyConfigChanged();
     void disableAP();
     WifiStatusSnapshot getStatusSnapshot() const;
+    
+    // Access to web server for plugin registration
+    AsyncWebServer& getServer() { return server_; }
 
 private:
     WebServerManager();

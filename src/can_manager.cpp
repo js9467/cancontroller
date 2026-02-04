@@ -78,42 +78,41 @@ bool CanManager::begin(gpio_num_t tx_pin, gpio_num_t rx_pin, std::uint32_t bitra
     }
     
     Serial.printf("[CanManager] Received %lu frames in 1 second\\n", rx_count);
-    
-    if (rx_count >= 3) {
-        bus_alive_ = true;
-        Serial.println("[CanManager] Bus traffic detected - switching to NORMAL mode");
-        
-        // Switch to NORMAL mode for TX/RX
-        twai_stop();
-        twai_driver_uninstall();
-        
-        // CRITICAL: Re-assert CAN mux before reinstalling TWAI
-        Serial.println("[CanManager] Re-asserting CAN mux before NORMAL mode...");
-        forceCanMux();
-        
-        g_config.mode = TWAI_MODE_NORMAL;
-        g_config.alerts_enabled = TWAI_ALERT_TX_SUCCESS | TWAI_ALERT_TX_FAILED | TWAI_ALERT_BUS_ERROR | TWAI_ALERT_BUS_OFF | TWAI_ALERT_ERR_PASS;
-        
-        if (twai_driver_install(&g_config, &t_config, &f_config) != ESP_OK) {
-            Serial.println("[CanManager] Failed to reinstall TWAI in NORMAL mode");
-            ready_ = false;
-            return false;
-        }
-        
-        if (twai_start() != ESP_OK) {
-            Serial.println("[CanManager] Failed to restart TWAI in NORMAL mode");
-            twai_driver_uninstall();  // Clean up on failure
-            ready_ = false;
-            return false;
-        }
+
+    // Record whether we saw traffic, but ALWAYS switch to NORMAL so we can transmit
+    bus_alive_ = (rx_count >= 3);
+    if (bus_alive_) {
+        Serial.println("[CanManager] Bus traffic detected - enabling NORMAL TX/RX mode");
     } else {
-        Serial.println("[CanManager] WARNING: No bus traffic detected - staying in LISTEN_ONLY (RX only)");
-        Serial.println("[CanManager]   TX will be blocked until bus traffic is seen");
-        bus_alive_ = false;
+        Serial.println("[CanManager] WARNING: No bus traffic detected - enabling NORMAL mode anyway so this node can transmit");
+    }
+
+    // Switch to NORMAL mode for TX/RX
+    twai_stop();
+    twai_driver_uninstall();
+
+    // CRITICAL: Re-assert CAN mux before reinstalling TWAI
+    Serial.println("[CanManager] Re-asserting CAN mux before NORMAL mode...");
+    forceCanMux();
+    
+    g_config.mode = TWAI_MODE_NORMAL;
+    g_config.alerts_enabled = TWAI_ALERT_TX_SUCCESS | TWAI_ALERT_TX_FAILED | TWAI_ALERT_BUS_ERROR | TWAI_ALERT_BUS_OFF | TWAI_ALERT_ERR_PASS;
+    
+    if (twai_driver_install(&g_config, &t_config, &f_config) != ESP_OK) {
+        Serial.println("[CanManager] Failed to reinstall TWAI in NORMAL mode");
+        ready_ = false;
+        return false;
+    }
+    
+    if (twai_start() != ESP_OK) {
+        Serial.println("[CanManager] Failed to restart TWAI in NORMAL mode");
+        twai_driver_uninstall();  // Clean up on failure
+        ready_ = false;
+        return false;
     }
 
     ready_ = true;
-    Serial.println("[CanManager] TWAI bus ready at 250 kbps");
+    Serial.println("[CanManager] TWAI bus ready in NORMAL mode at 250 kbps");
     return true;
 }
 
@@ -149,10 +148,10 @@ bool CanManager::sendFrame(const CanFrameConfig& frame) {
         return false;
     }
 
-    // Block TX if bus is not alive (prevents timeout hell)
+    // If we haven't seen any traffic yet, warn but allow TX so this node
+    // can be the first talker on the bus.
     if (!bus_alive_) {
-        Serial.println("[CanManager] TX blocked - no bus traffic detected (use LISTEN_ONLY or check wiring)");
-        return false;
+        Serial.println("[CanManager] WARNING: TX while bus_alive_ == false (no startup traffic seen); attempting anyway");
     }
 
     // Re-assert CAN mux before TX (belt and suspenders)
