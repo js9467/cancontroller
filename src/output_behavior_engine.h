@@ -308,6 +308,11 @@ public:
     const std::map<String, Scene>& getScenes() const {
         return _scenes;
     }
+
+    Scene* getScene(const String& id) {
+        auto it = _scenes.find(id);
+        return (it != _scenes.end()) ? &it->second : nullptr;
+    }
     
     // Helper methods for checking if outputs/scenes exist
     std::vector<String> getAllOutputs() const {

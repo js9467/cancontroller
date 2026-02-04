@@ -70,6 +70,9 @@ struct ButtonConfig {
     
     // SCENE MODE: Activate a predefined scene (created in scene builder)
     std::string scene_id = "";  // ID of scene to activate
+    std::string scene_action = "on";  // on, off, toggle
+    std::uint16_t scene_duration_ms = 0;  // 0 = indefinite
+    bool scene_release_off = false;  // Release to OFF for scenes
     
     // Legacy/Deprecated (kept for backward compatibility)
     std::string infinitybox_function = "";  // DEPRECATED - use mode="output" instead

@@ -576,6 +576,13 @@ function switchTab(tabName){
 			<h4>Scene Selection</h4>
 			<div class="grid two-col">
 				<div style="grid-column:1/-1;"><label>Scene</label><select id="btn-scene-id"><option value="">Select scene...</option></select></div>
+				<div style="grid-column:1/-1;"><label>Action</label><select id="btn-scene-action">
+					<option value="on">On</option>
+					<option value="off">Off</option>
+					<option value="toggle">Toggle</option>
+				</select></div>
+				<div><label>Duration (ms)</label><input id="btn-scene-duration-ms" type="number" min="0" max="60000" value="0" /></div>
+				<div class="row"><label><input id="btn-scene-release-off" type="checkbox" /> Release to OFF</label></div>
 				<div class="muted" style="grid-column:1/-1; font-size:0.85rem;">Scenes control multiple outputs with coordinated behaviors. Configure scenes in the Behavioral Output tab.</div>
 			</div>
 		</div>
@@ -1190,6 +1197,9 @@ function openButtonModal(row,col){
 			auto_off: true
 		},
 		scene_id: '',
+		scene_action: 'on',
+		scene_duration_ms: 0,
+		scene_release_off: false,
 		can:{enabled:false,pgn:0,priority:6,source_address:0xF9,destination_address:0xFF,data:[0,0,0,0,0,0,0,0]},
 		can_off:{enabled:false,pgn:0,priority:6,source_address:0xF9,destination_address:0xFF,data:[0,0,0,0,0,0,0,0]}
 	};
@@ -1231,6 +1241,9 @@ function openButtonModal(row,col){
 		document.getElementById('btn-output-id').value = ob.output_id || '';
 		document.getElementById('btn-scene-id').value = data.scene_id || '';
 	});
+	document.getElementById('btn-scene-action').value = data.scene_action || 'on';
+	document.getElementById('btn-scene-duration-ms').value = data.scene_duration_ms || 0;
+	document.getElementById('btn-scene-release-off').checked = data.scene_release_off || false;
 	const canCfg = data.can || {};
 	document.getElementById('btn-can-enabled').checked = canCfg.enabled || false;
 	document.getElementById('btn-can-pgn').value = (canCfg.pgn || 0).toString(16).toUpperCase();
@@ -1299,6 +1312,9 @@ function saveButtonFromModal(){
 			auto_off: document.getElementById('btn-auto-off').checked
 		},
 		scene_id: document.getElementById('btn-scene-id').value || '',
+		scene_action: document.getElementById('btn-scene-action').value || 'on',
+		scene_duration_ms: parseInt(document.getElementById('btn-scene-duration-ms').value) || 0,
+		scene_release_off: document.getElementById('btn-scene-release-off').checked,
 		can: {
 			enabled: canEnabled,
 			pgn: canEnabled ? parseInt(document.getElementById('btn-can-pgn').value,16)||0 : 0,

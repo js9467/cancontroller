@@ -520,6 +520,9 @@ void ConfigManager::encodeConfig(const DeviceConfig& source, DynamicJsonDocument
             // Behavioral output system fields
             btn_obj["mode"] = button.mode.c_str();
             btn_obj["scene_id"] = button.scene_id.c_str();
+            btn_obj["scene_action"] = button.scene_action.c_str();
+            btn_obj["scene_duration_ms"] = button.scene_duration_ms;
+            btn_obj["scene_release_off"] = button.scene_release_off;
             
             JsonObject output_behavior = btn_obj["output_behavior"].to<JsonObject>();
             output_behavior["output_id"] = button.output_behavior.output_id.c_str();
@@ -769,6 +772,9 @@ bool ConfigManager::decodeConfig(JsonVariantConst json, DeviceConfig& target, st
                     // Behavioral output system fields
                     button.mode = safeString(btn_obj["mode"], "can");
                     button.scene_id = safeString(btn_obj["scene_id"], "");
+                    button.scene_action = safeString(btn_obj["scene_action"], "on");
+                    button.scene_duration_ms = clampValue<std::uint16_t>(btn_obj["scene_duration_ms"] | 0, 0u, 60000u);
+                    button.scene_release_off = btn_obj["scene_release_off"] | false;
                     
                     JsonObjectConst output_behavior = btn_obj["output_behavior"];
                     if (!output_behavior.isNull()) {

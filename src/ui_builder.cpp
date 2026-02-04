@@ -543,6 +543,8 @@ void UIBuilder::buildPage(std::size_t index) {
                      LV_GRID_ALIGN_STRETCH, button.row, button.row_span);
         lv_obj_add_event_cb(btn, actionButtonEvent, LV_EVENT_PRESSED, (void*)&button);
         lv_obj_add_event_cb(btn, actionButtonEvent, LV_EVENT_RELEASED, (void*)&button);
+        lv_obj_add_event_cb(btn, actionButtonEvent, LV_EVENT_PRESS_LOST, (void*)&button);
+        lv_obj_add_event_cb(btn, actionButtonEvent, LV_EVENT_CANCEL, (void*)&button);
         lv_obj_add_event_cb(btn, actionButtonEvent, LV_EVENT_CLICKED, (void*)&button);
 
         // Create icon if specified
@@ -662,9 +664,42 @@ void UIBuilder::actionButtonEvent(lv_event_t* e) {
     
     if (config->mode == "scene") {
         // SCENE MODE: Activate a complex multi-output scene
-        if (code == LV_EVENT_CLICKED && !config->scene_id.empty()) {
-            Serial.printf("[UI] Activating scene: %s\n", config->scene_id.c_str());
-            behaviorEngine.activateScene(config->scene_id.c_str());
+        if (!config->scene_id.empty()) {
+            const std::string& action = config->scene_action;
+            const bool trigger_on_press = (action != "toggle");
+            const bool trigger_on_click = (action == "toggle");
+
+            if ((trigger_on_press && code == LV_EVENT_PRESSED) ||
+                (trigger_on_click && code == LV_EVENT_CLICKED)) {
+                if (action == "off") {
+                    Serial.printf("[UI] Scene %s → OFF\n", config->scene_id.c_str());
+                    behaviorEngine.deactivateScene(config->scene_id.c_str());
+                    return;
+                }
+
+                if (action == "toggle") {
+                    auto* scene = behaviorEngine.getScene(config->scene_id.c_str());
+                    if (scene && scene->isActive) {
+                        Serial.printf("[UI] Scene %s → TOGGLE OFF\n", config->scene_id.c_str());
+                        behaviorEngine.deactivateScene(config->scene_id.c_str());
+                        return;
+                    }
+                }
+
+                if (auto* scene = behaviorEngine.getScene(config->scene_id.c_str())) {
+                    scene->duration_ms = config->scene_duration_ms;
+                }
+
+                Serial.printf("[UI] Scene %s → ON\n", config->scene_id.c_str());
+                behaviorEngine.activateScene(config->scene_id.c_str());
+            }
+
+            if (code == LV_EVENT_RELEASED || code == LV_EVENT_PRESS_LOST || code == LV_EVENT_CANCEL) {
+                if (action == "on" && config->scene_release_off) {
+                    Serial.printf("[UI] Release OFF for scene: %s\n", config->scene_id.c_str());
+                    behaviorEngine.deactivateScene(config->scene_id.c_str());
+                }
+            }
         }
         return;
     }
@@ -672,10 +707,14 @@ void UIBuilder::actionButtonEvent(lv_event_t* e) {
     if (config->mode == "output") {
         // OUTPUT MODE: Control a single output with specific behavior
         if (!config->output_behavior.output_id.empty()) {
-            if (code == LV_EVENT_PRESSED || code == LV_EVENT_CLICKED) {
-                const std::string& action = config->output_behavior.action;
-                const std::string& output_id = config->output_behavior.output_id;
-                
+            const std::string& action = config->output_behavior.action;
+            const std::string& output_id = config->output_behavior.output_id;
+
+            const bool trigger_on_press = (action != "toggle");
+            const bool trigger_on_click = (action == "toggle");
+
+            if ((trigger_on_press && code == LV_EVENT_PRESSED) ||
+                (trigger_on_click && code == LV_EVENT_CLICKED)) {
                 if (action == "off") {
                     Serial.printf("[UI] Output %s → OFF\n", output_id.c_str());
                     behaviorEngine.deactivateOutput(output_id.c_str());
@@ -741,9 +780,10 @@ void UIBuilder::actionButtonEvent(lv_event_t* e) {
             }
             
             // Handle release - check auto_off regardless of momentary mode
-            if (code == LV_EVENT_RELEASED) {
-                const std::string& action = config->output_behavior.action;
-                if (action == "on" && (config->momentary || config->output_behavior.auto_off)) {
+            if (code == LV_EVENT_RELEASED || code == LV_EVENT_PRESS_LOST || code == LV_EVENT_CANCEL) {
+                const bool release_to_off = config->momentary ||
+                    config->output_behavior.auto_off;
+                if (action == "on" && release_to_off) {
                     Serial.printf("[UI] Release OFF for output: %s\n", 
                         config->output_behavior.output_id.c_str());
                     behaviorEngine.deactivateOutput(config->output_behavior.output_id.c_str());
@@ -770,7 +810,7 @@ void UIBuilder::actionButtonEvent(lv_event_t* e) {
     if (config->momentary) {
         if (code == LV_EVENT_PRESSED) {
             CanManager::instance().sendButtonAction(*config);
-        } else if (code == LV_EVENT_RELEASED) {
+        } else if (code == LV_EVENT_RELEASED || code == LV_EVENT_PRESS_LOST || code == LV_EVENT_CANCEL) {
             if (config->can_off.enabled) {
                 CanManager::instance().sendButtonReleaseAction(*config);
             }
