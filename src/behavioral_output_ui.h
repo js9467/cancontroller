@@ -64,6 +64,18 @@ body {
 	z-index: 100;
 }
 
+.top-nav {
+	margin-top: 12px;
+	display: flex;
+	gap: 10px;
+	flex-wrap: wrap;
+}
+
+.top-nav .btn.active {
+	background: var(--accent-2);
+	color: #0b0c10;
+}
+
 .header h1 {
 	font-size: 1.8rem;
 	letter-spacing: 0.05em;
@@ -572,6 +584,11 @@ input[type="range"]::-webkit-slider-thumb {
 <div class="header">
 	<h1>🎛️ Behavioral Output Designer</h1>
 	<p>Intent-based output control with behaviors, patterns, and scenes</p>
+	<div class="top-nav">
+		<button class="btn" onclick="location.href='/'">🏠 Configurator</button>
+		<button class="btn" onclick="location.href='/can-monitor'">📡 CAN Monitor</button>
+		<button class="btn active" onclick="location.href='/behavioral'">🎛️ Behavioral Outputs</button>
+	</div>
 </div>
 
 <div class="main-layout">

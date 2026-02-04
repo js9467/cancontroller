@@ -228,7 +228,7 @@ function switchTab(tabName){
 	<div class="tabs">
 		<button class="tab-btn active" data-tab="wifi" onclick="switchTab('wifi')">WiFi</button>
 		<button class="tab-btn" data-tab="builder" onclick="switchTab('builder')">Interface Builder</button>
-		<button class="tab-btn" data-tab="can" onclick="switchTab('can')">CAN Library</button>
+		<button class="tab-btn" data-tab="settings" onclick="switchTab('settings')">Settings</button>
 	</div>
 	<div id="status-banner" class="status-banner"></div>
 
@@ -480,24 +480,14 @@ function switchTab(tabName){
 		</div>
 	</section>
 
-	<section id="tab-can" class="tab">
+	<section id="tab-settings" class="tab">
 		<div class="layout">
 			<div class="card">
-				<h3>CAN Message Library</h3>
-				<div class="row" style="margin-bottom:10px;">
-					<button class="btn primary" onclick="addCanMessage()">Add Message</button>
-				</div>
-				<div id="can-library-list" class="grid"></div>
-			</div>
-			<div class="card">
-				<h3>Quick Import</h3>
-				<div class="row">
-					<button class="btn" onclick="importCanMessage('windows')">Windows</button>
-					<button class="btn" onclick="importCanMessage('locks')">Locks</button>
-					<button class="btn" onclick="importCanMessage('boards')">Running Boards</button>
-				</div>
+				<h3>Diagnostics & Monitoring</h3>
+				<div class="muted">Quick access to diagnostic and monitoring tools.</div>
 				<div class="row" style="margin-top:10px;">
-					<button class="btn primary" onclick="addSuspensionPageTemplate()">Add Suspension Page (TCU S15)</button>
+					<button class="btn primary" onclick="location.href='/can-monitor'">CAN Monitor</button>
+					<button class="btn" onclick="location.href='/behavioral'">Behavioral Outputs</button>
 				</div>
 			</div>
 		</div>
@@ -1939,6 +1929,7 @@ function populateFontSelects(){
 
 function renderCanLibrary(){
 	const list = document.getElementById('can-library-list');
+	if (!list) return;
 	const items = config.can_library || [];
 	if(items.length===0){ list.innerHTML = '<div class="muted">No messages yet.</div>'; return; }
 	list.innerHTML = '';

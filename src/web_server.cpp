@@ -801,6 +801,20 @@ void WebServerManager::setupRoutes() {
             margin-bottom: 20px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.3);
         }
+        .top-nav {
+            display: flex;
+            gap: 10px;
+            margin: 14px 0 0 0;
+            flex-wrap: wrap;
+        }
+        .top-nav button {
+            background: rgba(255,255,255,0.15);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .top-nav button.active {
+            background: rgba(255,255,255,0.35);
+            border-color: rgba(255,255,255,0.5);
+        }
         h1 { font-size: 28px; font-weight: 600; }
         .status {
             display: flex;
@@ -926,6 +940,11 @@ void WebServerManager::setupRoutes() {
     <div class="header">
         <h1>🚗 CAN Bus Monitor</h1>
         <p style="margin-top:8px; opacity:0.9;">Real-time POWERCELL NGX Frame Analysis</p>
+        <div class="top-nav">
+            <button onclick="location.href='/'">🏠 Configurator</button>
+            <button class="active" onclick="location.href='/can-monitor'">📡 CAN Monitor</button>
+            <button onclick="location.href='/behavioral'">🎛️ Behavioral Outputs</button>
+        </div>
     </div>
     
     <div class="status">
