@@ -968,8 +968,9 @@ function showOutputEditor(outputId = null) {
 	const name = prompt('Output Name (e.g., "Left Turn Signal"):');
 	if (!name) return;
 	
-	const cellAddr = parseInt(prompt('Cell Address (1-254):', '1'));
-	const outputNum = parseInt(prompt('Output Number (1-10):', '1'));
+	const cellAddr = parseInt(prompt('Cell Address (0-254, 0=Mastercell):', '1'));
+	const outputRange = (cellAddr === 0) ? '1-8' : '1-10';
+	const outputNum = parseInt(prompt(`Output Number (${outputRange}):`, '1'));
 	
 	const output = {
 		id: outputId || `out_${Date.now()}`,
@@ -993,8 +994,9 @@ function editOutput(id) {
 	const name = prompt('Output Name:', output.name);
 	if (!name) return;
 	
-	const cellAddr = parseInt(prompt('Cell Address (1-254):', output.cellAddress));
-	const outputNum = parseInt(prompt('Output Number (1-10):', output.outputNumber));
+	const cellAddr = parseInt(prompt('Cell Address (0-254, 0=Mastercell):', output.cellAddress));
+	const outputRange = (cellAddr === 0) ? '1-8' : '1-10';
+	const outputNum = parseInt(prompt(`Output Number (${outputRange}):`, output.outputNumber));
 	
 	const updated = {
 		...output,

@@ -14,6 +14,7 @@
 #include "version_auto.h"
 #include "web_interface.h"
 #include "behavioral_output_integration.h"
+#include "output_frame_synthesizer.h"
 
 namespace {
 const IPAddress kApIp(192, 168, 4, 250);
@@ -318,6 +319,8 @@ void WebServerManager::setupRoutes() {
                 obj["id"] = output->id;
                 obj["name"] = output->name;
                 obj["description"] = output->description;
+                obj["cellAddress"] = output->cellAddress;
+                obj["outputNumber"] = output->outputNumber;
             }
         }
         
@@ -346,6 +349,145 @@ void WebServerManager::setupRoutes() {
         behaviors.add("hold_timed");
         behaviors.add("ramp");
         
+        String payload;
+        serializeJson(doc, payload);
+        request->send(200, "application/json", payload);
+    });
+
+    server_.on("/api/debug/mastercell", HTTP_GET, [](AsyncWebServerRequest* request) {
+        if (request->url() != "/api/debug/mastercell") {
+            request->send(404, "application/json", "{\"error\":\"Not Found\"}");
+            return;
+        }
+        DynamicJsonDocument doc(256);
+        doc["endpoint"] = "mastercell";
+        doc["valid"] = BehavioralOutput::g_lastMastercellValid;
+        doc["bitmap"] = BehavioralOutput::g_lastMastercellBitmap;
+        doc["data0"] = BehavioralOutput::g_lastMastercellData0;
+        String payload;
+        serializeJson(doc, payload);
+        request->send(200, "application/json", payload);
+    });
+
+    server_.on("/api/debug/mastercell/activate", HTTP_GET, [](AsyncWebServerRequest* request) {
+        uint8_t outNum = 0;
+        if (request->hasParam("out")) {
+            outNum = static_cast<uint8_t>(request->getParam("out")->value().toInt());
+        }
+
+        String matchedId;
+        for (const auto& [id, output] : behaviorEngine.getOutputs()) {
+            if (output.cellAddress == 0 && output.outputNumber == outNum) {
+                matchedId = id;
+                break;
+            }
+        }
+
+        DynamicJsonDocument doc(256);
+        if (matchedId.length() > 0) {
+            BehavioralOutput::BehaviorConfig cfg;
+            cfg.type = BehavioralOutput::BehaviorType::STEADY;
+            cfg.targetValue = 255;
+            behaviorEngine.setBehavior(matchedId, cfg);
+            doc["success"] = true;
+            doc["outputId"] = matchedId;
+            doc["cell"] = 0;
+            doc["out"] = outNum;
+        } else {
+            doc["success"] = false;
+            doc["error"] = "mastercell output not found";
+            doc["cell"] = 0;
+            doc["out"] = outNum;
+        }
+
+        String payload;
+        serializeJson(doc, payload);
+        request->send(200, "application/json", payload);
+    });
+
+    server_.on("/api/debug/mastercell/deactivate", HTTP_GET, [](AsyncWebServerRequest* request) {
+        uint8_t outNum = 0;
+        if (request->hasParam("out")) {
+            outNum = static_cast<uint8_t>(request->getParam("out")->value().toInt());
+        }
+
+        String matchedId;
+        for (const auto& [id, output] : behaviorEngine.getOutputs()) {
+            if (output.cellAddress == 0 && output.outputNumber == outNum) {
+                matchedId = id;
+                break;
+            }
+        }
+
+        DynamicJsonDocument doc(256);
+        if (matchedId.length() > 0) {
+            behaviorEngine.deactivateOutput(matchedId);
+            doc["success"] = true;
+            doc["outputId"] = matchedId;
+            doc["cell"] = 0;
+            doc["out"] = outNum;
+        } else {
+            doc["success"] = false;
+            doc["error"] = "mastercell output not found";
+            doc["cell"] = 0;
+            doc["out"] = outNum;
+        }
+
+        String payload;
+        serializeJson(doc, payload);
+        request->send(200, "application/json", payload);
+    });
+
+    server_.on("/api/debug/mastercell/outputs", HTTP_GET, [](AsyncWebServerRequest* request) {
+        DynamicJsonDocument doc(1024);
+        doc["endpoint"] = "outputs";
+        JsonArray outputs = doc.createNestedArray("outputs");
+        for (const auto& [id, output] : behaviorEngine.getOutputs()) {
+            if (output.cellAddress != 0) continue;
+            JsonObject obj = outputs.createNestedObject();
+            obj["id"] = output.id;
+            obj["name"] = output.name;
+            obj["out"] = output.outputNumber;
+        }
+        String payload;
+        serializeJson(doc, payload);
+        request->send(200, "application/json", payload);
+    });
+
+    server_.on("/api/debug/mastercell/force", HTTP_GET, [](AsyncWebServerRequest* request) {
+        uint8_t outNum = 0;
+        if (request->hasParam("out")) {
+            outNum = static_cast<uint8_t>(request->getParam("out")->value().toInt());
+        }
+
+        String matchedId;
+        for (const auto& [id, output] : behaviorEngine.getOutputs()) {
+            if (output.cellAddress == 0 && output.outputNumber == outNum) {
+                matchedId = id;
+                break;
+            }
+        }
+
+        DynamicJsonDocument doc(256);
+        if (matchedId.length() > 0) {
+            BehavioralOutput::BehaviorConfig cfg;
+            cfg.type = BehavioralOutput::BehaviorType::STEADY;
+            cfg.targetValue = 255;
+            behaviorEngine.setBehavior(matchedId, cfg);
+            if (powercellSynthesizer) {
+                powercellSynthesizer->transmitImmediate();
+            }
+            doc["success"] = true;
+            doc["outputId"] = matchedId;
+        } else {
+            doc["success"] = false;
+            doc["error"] = "mastercell output not found";
+        }
+
+        doc["valid"] = BehavioralOutput::g_lastMastercellValid;
+        doc["bitmap"] = BehavioralOutput::g_lastMastercellBitmap;
+        doc["data0"] = BehavioralOutput::g_lastMastercellData0;
+
         String payload;
         serializeJson(doc, payload);
         request->send(200, "application/json", payload);
@@ -505,7 +647,18 @@ void WebServerManager::setupRoutes() {
     server_.addHandler(image_handler);
 
     server_.on("/api/wifi/scan", HTTP_GET, [](AsyncWebServerRequest* request) {
-        const int16_t count = WiFi.scanNetworks(/*async=*/false, /*show_hidden=*/true);
+        int16_t count = WiFi.scanComplete();
+        if (count == WIFI_SCAN_FAILED) {
+            WiFi.scanNetworks(/*async=*/true, /*show_hidden=*/true);
+            request->send(202, "application/json", "{\"status\":\"started\",\"message\":\"Scan started\",\"networks\":[]}");
+            return;
+        }
+
+        if (count == WIFI_SCAN_RUNNING) {
+            request->send(202, "application/json", "{\"status\":\"busy\",\"message\":\"Scan in progress\",\"networks\":[]}");
+            return;
+        }
+
         if (count < 0) {
             request->send(500, "application/json", "{\"status\":\"error\",\"message\":\"Scan failed\"}");
             return;

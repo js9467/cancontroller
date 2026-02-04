@@ -486,9 +486,10 @@ function switchTab(tabName){
 				<h3>Diagnostics & Monitoring</h3>
 				<div class="muted">Quick access to diagnostic and monitoring tools.</div>
 				<div class="row" style="margin-top:10px;">
-					<button class="btn primary" onclick="location.href='/can-monitor'">CAN Monitor</button>
-					<button class="btn" onclick="location.href='/behavioral'">Behavioral Outputs</button>
+					<a class="btn primary" href="http://192.168.7.116/can-monitor" target="_blank" rel="noopener">CAN Monitor</a>
+					<a class="btn" href="http://192.168.7.116/behavioral" target="_blank" rel="noopener">Behavioral Outputs</a>
 				</div>
+				<div class="muted" style="margin-top:8px; font-size:0.85rem;">IP shown is placeholder and will be dynamic.</div>
 			</div>
 		</div>
 	</section>
@@ -1929,7 +1930,6 @@ function populateFontSelects(){
 
 function renderCanLibrary(){
 	const list = document.getElementById('can-library-list');
-	if (!list) return;
 	const items = config.can_library || [];
 	if(items.length===0){ list.innerHTML = '<div class="muted">No messages yet.</div>'; return; }
 	list.innerHTML = '';

@@ -356,6 +356,17 @@ private:
         output.description = doc.containsKey("description") ? doc["description"].as<String>() : String("");
         output.cellAddress = doc.containsKey("cellAddress") ? doc["cellAddress"].as<uint8_t>() : 1;
         output.outputNumber = doc.containsKey("outputNumber") ? doc["outputNumber"].as<uint8_t>() : 1;
+
+        if (output.cellAddress > 254) {
+            output.cellAddress = 254;
+        }
+        if (output.cellAddress == 0) {
+            if (output.outputNumber < 1) output.outputNumber = 1;
+            if (output.outputNumber > 8) output.outputNumber = 8;
+        } else {
+            if (output.outputNumber < 1) output.outputNumber = 1;
+            if (output.outputNumber > 10) output.outputNumber = 10;
+        }
         
         _engine->addOutput(output);
         saveBehavioralConfig(*_engine); // Auto-save

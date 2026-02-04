@@ -277,8 +277,75 @@ inline void loadInfinityBoxDefaults() {
     fuelPump.cellAddress = 2;
     fuelPump.outputNumber = 10;
     behaviorEngine.addOutput(fuelPump);
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // MASTERCELL OUTPUTS (Cell 0)
+    // ═══════════════════════════════════════════════════════════════════════
+    OutputChannel leftTurnIndicator;
+    leftTurnIndicator.id = "left_turn_indicator";
+    leftTurnIndicator.name = "Left Turn Indicator";
+    leftTurnIndicator.description = "Gauge cluster left turn indicator";
+    leftTurnIndicator.cellAddress = 0;
+    leftTurnIndicator.outputNumber = 1;
+    behaviorEngine.addOutput(leftTurnIndicator);
+
+    OutputChannel rightTurnIndicator;
+    rightTurnIndicator.id = "right_turn_indicator";
+    rightTurnIndicator.name = "Right Turn Indicator";
+    rightTurnIndicator.description = "Gauge cluster right turn indicator";
+    rightTurnIndicator.cellAddress = 0;
+    rightTurnIndicator.outputNumber = 2;
+    behaviorEngine.addOutput(rightTurnIndicator);
+
+    OutputChannel highBeamIndicator;
+    highBeamIndicator.id = "high_beam_indicator";
+    highBeamIndicator.name = "High Beam Indicator";
+    highBeamIndicator.description = "Gauge cluster high beam indicator";
+    highBeamIndicator.cellAddress = 0;
+    highBeamIndicator.outputNumber = 3;
+    behaviorEngine.addOutput(highBeamIndicator);
+
+    OutputChannel gaugeIllumination;
+    gaugeIllumination.id = "gauge_illumination";
+    gaugeIllumination.name = "Gauge Illumination";
+    gaugeIllumination.description = "Gauge cluster backlight";
+    gaugeIllumination.cellAddress = 0;
+    gaugeIllumination.outputNumber = 4;
+    behaviorEngine.addOutput(gaugeIllumination);
+
+    OutputChannel masterAux1;
+    masterAux1.id = "master_aux_1";
+    masterAux1.name = "Mastercell Aux 1";
+    masterAux1.description = "Mastercell open output 5";
+    masterAux1.cellAddress = 0;
+    masterAux1.outputNumber = 5;
+    behaviorEngine.addOutput(masterAux1);
+
+    OutputChannel masterAux2;
+    masterAux2.id = "master_aux_2";
+    masterAux2.name = "Mastercell Aux 2";
+    masterAux2.description = "Mastercell open output 6";
+    masterAux2.cellAddress = 0;
+    masterAux2.outputNumber = 6;
+    behaviorEngine.addOutput(masterAux2);
+
+    OutputChannel masterAux3;
+    masterAux3.id = "master_aux_3";
+    masterAux3.name = "Mastercell Aux 3";
+    masterAux3.description = "Mastercell open output 7";
+    masterAux3.cellAddress = 0;
+    masterAux3.outputNumber = 7;
+    behaviorEngine.addOutput(masterAux3);
+
+    OutputChannel masterAux4;
+    masterAux4.id = "master_aux_4";
+    masterAux4.name = "Mastercell Aux 4";
+    masterAux4.description = "Mastercell open output 8";
+    masterAux4.cellAddress = 0;
+    masterAux4.outputNumber = 8;
+    behaviorEngine.addOutput(masterAux4);
     
-    Serial.printf("[Behavioral Output] Loaded %d InfinityBox IPM1 standard outputs\n", 17);
+    Serial.printf("[Behavioral Output] Loaded %d InfinityBox IPM1 standard outputs\n", 25);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -312,6 +379,13 @@ inline void loadDefaultScenes() {
     leftRear.behavior.period_ms = 1000;
     leftRear.behavior.dutyCycle = 50;
     leftTurnScene.outputs.push_back(leftRear);
+    SceneOutput leftIndicator;
+    leftIndicator.outputId = "left_turn_indicator";
+    leftIndicator.behavior.type = BehaviorType::FLASH;
+    leftIndicator.behavior.targetValue = 255;
+    leftIndicator.behavior.period_ms = 1000;
+    leftIndicator.behavior.dutyCycle = 50;
+    leftTurnScene.outputs.push_back(leftIndicator);
     behaviorEngine.addScene(leftTurnScene);
     
     // ───────────────────────────────────────────────────────────────────────
@@ -338,6 +412,13 @@ inline void loadDefaultScenes() {
     rightRear.behavior.period_ms = 1000;
     rightRear.behavior.dutyCycle = 50;
     rightTurnScene.outputs.push_back(rightRear);
+    SceneOutput rightIndicator;
+    rightIndicator.outputId = "right_turn_indicator";
+    rightIndicator.behavior.type = BehaviorType::FLASH;
+    rightIndicator.behavior.targetValue = 255;
+    rightIndicator.behavior.period_ms = 1000;
+    rightIndicator.behavior.dutyCycle = 50;
+    rightTurnScene.outputs.push_back(rightIndicator);
     behaviorEngine.addScene(rightTurnScene);
     
     // ───────────────────────────────────────────────────────────────────────
@@ -353,6 +434,8 @@ inline void loadDefaultScenes() {
     hazardScene.outputs.push_back(rightFront);
     hazardScene.outputs.push_back(leftRear);
     hazardScene.outputs.push_back(rightRear);
+    hazardScene.outputs.push_back(leftIndicator);
+    hazardScene.outputs.push_back(rightIndicator);
     behaviorEngine.addScene(hazardScene);
     
     // ───────────────────────────────────────────────────────────────────────

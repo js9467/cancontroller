@@ -26,6 +26,10 @@
 
 namespace BehavioralOutput {
 
+inline uint16_t g_lastMastercellBitmap = 0;
+inline uint8_t g_lastMastercellData0 = 0;
+inline bool g_lastMastercellValid = false;
+
 // ═══════════════════════════════════════════════════════════════════════════
 // CELL STATE ACCUMULATOR
 // ═══════════════════════════════════════════════════════════════════════════
