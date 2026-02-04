@@ -782,7 +782,11 @@ bool ConfigManager::decodeConfig(JsonVariantConst json, DeviceConfig& target, st
                         button.output_behavior.hold_duration_ms = clampValue<std::uint16_t>(output_behavior["hold_duration_ms"] | 0, 0u, 60000u);
                         button.output_behavior.on_time_ms = clampValue<std::uint16_t>(output_behavior["on_time_ms"] | 100, 1u, 10000u);
                         button.output_behavior.off_time_ms = clampValue<std::uint16_t>(output_behavior["off_time_ms"] | 100, 1u, 10000u);
-                        button.output_behavior.auto_off = output_behavior["auto_off"] | false;
+                        if (output_behavior.containsKey("auto_off")) {
+                            button.output_behavior.auto_off = output_behavior["auto_off"] | false;
+                        } else {
+                            button.output_behavior.auto_off = (button.mode == "output");
+                        }
                     }
                     
                     // Legacy fields (backward compatibility)
