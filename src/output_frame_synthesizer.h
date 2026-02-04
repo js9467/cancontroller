@@ -32,10 +32,9 @@ namespace BehavioralOutput {
 
 struct CellState {
     uint8_t address = 1;
-    uint16_t outputBitmap = 0;         // Bits 0-9 for outputs 1-10 (ON/OFF)
-    uint16_t softStartBitmap = 0;      // Bits 0-9 for soft-start enable
-    uint16_t pwmEnableBitmap = 0;      // Bits 0-9 for PWM enable
+    uint16_t outputBitmap = 0;         // Bits 0-9 for outputs 1-10 (ON/OFF) - Track mode
     bool hasChanges = false;
+    // Note: softStart and PWM not implemented yet (Track-only mode)
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -70,70 +69,53 @@ public:
         if (!_engine) return;
         
         unsigned long now = millis();
-        
-        // Check if it's time to transmit
         if (!_forceTransmit && (now - _lastTransmit < _transmitInterval)) {
             return;
         }
-        
         _lastTransmit = now;
         
-        // Get all outputs and update cell state cache
         const auto& outputs = _engine->getOutputs();
-        std::set<uint8_t> activeCells;
+        std::map<uint8_t, uint16_t> nextBitmaps;
+        std::map<uint8_t, bool> cellHasActive;
         
+        // Build complete desired state per cell
         for (const auto& [id, output] : outputs) {
             uint8_t cellAddr = output.cellAddress;
             uint8_t outNum = output.outputNumber;
             
-            // Validate output number (1-10 for POWERCELL NGX)
+            // Validate cell address and output number
+            if (cellAddr < 1 || cellAddr > 16) continue;
             if (outNum < 1 || outNum > 10) continue;
             
-            // Initialize cell state if needed
-            if (_cellStateCache.find(cellAddr) == _cellStateCache.end()) {
-                CellState state;
-                state.address = cellAddr;
-                _cellStateCache[cellAddr] = state;
+            // Ensure cell entry exists
+            uint16_t& bitmap = nextBitmaps[cellAddr];
+            if (output.isActive) {
+                cellHasActive[cellAddr] = true;
             }
-            
-            // Update this output's bit in the cache
-            CellState& state = _cellStateCache[cellAddr];
-            
-            // Set/clear output bit (output numbers are 1-based, bits are 0-based)
-            uint16_t bitMask = (1 << (outNum - 1));
+
             if (output.currentState) {
-                state.outputBitmap |= bitMask;   // Set bit = ON
-            } else {
-                state.outputBitmap &= ~bitMask;  // Clear bit = OFF
+                bitmap |= static_cast<uint16_t>(1u << (outNum - 1));
             }
-            
-            // Handle soft-start bit
-            if (output.softStart) {
-                state.softStartBitmap |= bitMask;
-            } else {
-                state.softStartBitmap &= ~bitMask;
-            }
-            
-            // Handle PWM enable bit
-            if (output.pwmEnable) {
-                state.pwmEnableBitmap |= bitMask;
-            } else {
-                state.pwmEnableBitmap &= ~bitMask;
-            }
-            
-            state.hasChanges = true;
-            activeCells.insert(cellAddr);
         }
         
-        // Transmit frames for all cells that have had any changes
-        for (uint8_t addr : activeCells) {
-            if (_cellStateCache.find(addr) != _cellStateCache.end()) {
-                CellState& state = _cellStateCache[addr];
-                if (state.hasChanges || _forceTransmit) {
-                    _transmitCellState(state);
-                    state.hasChanges = false; // Clear change flag after transmit
-                }
+        // Transmit for cells with active outputs (continuous) or just-deactivated outputs (one final OFF)
+        for (const auto& [addr, bitmap] : nextBitmaps) {
+            CellState& state = _cellStateCache[addr];
+            state.address = addr;
+
+            const uint16_t previous = state.outputBitmap;
+            state.outputBitmap = bitmap;
+            state.hasChanges = (state.outputBitmap != previous);
+
+            const bool hasActive = (cellHasActive.find(addr) != cellHasActive.end());
+            const bool hadActive = (_cellActiveCache.find(addr) != _cellActiveCache.end()) && _cellActiveCache[addr];
+            const bool shouldTransmit = _forceTransmit || hasActive || hadActive;
+
+            if (shouldTransmit) {
+                _transmitCellState(state);
             }
+
+            _cellActiveCache[addr] = hasActive;
         }
     }
     
@@ -157,47 +139,39 @@ private:
     
     // Cell state cache - preserves output values across updates
     std::map<uint8_t, CellState> _cellStateCache;
+    std::map<uint8_t, bool> _cellActiveCache;
     
     // ───────────────────────────────────────────────────────────────────────
     // POWERCELL FRAME CONSTRUCTION
     // ───────────────────────────────────────────────────────────────────────
     
     void _transmitCellState(const CellState& state) {
-        // Build POWERCELL NGX bitmap frame
-        // PGN: 0xFF50 base normalized per cell address
-        uint32_t pgn = Ipm1Can::NormalizePowercellPgn(state.address, 0xFF50);
+        // Guard against invalid address (prevents accidental FF00 PGN)
+        if (state.address < 1 || state.address > 16) return;
         
-        // Data format per POWERCELL NGX specification (8 bytes):
-        // Byte 0: Output ON/OFF bitmap (Outputs 1-8)
-        // Byte 1: Output ON/OFF bitmap (Outputs 9-10)
-        // Byte 2: Soft-Start enable bitmap (Outputs 1-10)
-        // Byte 3: PWM enable bitmap (Outputs 1-10)
-        // Bytes 4-7: Reserved (0x00)
+        // POWERCELL NGX Track control PGN: 0xFF00 + cellAddress
+        // Cell 1 → 0xFF01, Cell 2 → 0xFF02, etc.
+        uint32_t pgn = 0xFF00 + state.address;
+        
+        // Track personality frame format:
+        // - First 10 bits control outputs 1-10 in order
+        // - Byte 0 uses MSB-first mapping: OUT1=bit7 ... OUT8=bit0
+        // - Byte 1 uses bits 7-6 for OUT9/OUT10
+        // - Bytes 2-7 must be 0x00 (Track supersedes Soft-Start and PWM)
         uint8_t data[8] = {0};
+        for (uint8_t out = 1; out <= 8; ++out) {
+            if (state.outputBitmap & (1u << (out - 1))) {
+                data[0] |= static_cast<uint8_t>(1u << (8 - out));
+            }
+        }
+        if (state.outputBitmap & (1u << 8)) {
+            data[1] |= 0x80;  // OUT9
+        }
+        if (state.outputBitmap & (1u << 9)) {
+            data[1] |= 0x40;  // OUT10
+        }
+        // data[2..7] remain 0x00 for Track-only mode
         
-        // Byte 0: Outputs 1-8 ON/OFF (bit 0 = output 1, bit 7 = output 8)
-        data[0] = (uint8_t)(state.outputBitmap & 0xFF);
-        
-        // Byte 1: Outputs 9-10 ON/OFF (bit 0 = output 9, bit 1 = output 10)
-        data[1] = (uint8_t)((state.outputBitmap >> 8) & 0x03);
-        
-        // Byte 2: Soft-start enable bitmap
-        // Outputs 1-8 in bits 0-7, outputs 9-10 packed into upper bits
-        data[2] = (uint8_t)(state.softStartBitmap & 0xFF);           // Outputs 1-8
-        data[2] |= (uint8_t)(((state.softStartBitmap >> 8) & 0x03) << 6);  // Outputs 9-10 in bits 6-7
-        
-        // Byte 3: PWM enable bitmap
-        // Outputs 1-8 in bits 0-7, outputs 9-10 packed into upper bits
-        data[3] = (uint8_t)(state.pwmEnableBitmap & 0xFF);           // Outputs 1-8
-        data[3] |= (uint8_t)(((state.pwmEnableBitmap >> 8) & 0x03) << 6);  // Outputs 9-10 in bits 6-7
-        
-        // Bytes 4-7: Reserved (already zeroed)
-        
-        // Debug: Log frame transmission
-        Serial.printf("[POWERCELL] Cell %d → PGN 0x%04X | Byte0=0x%02X Byte1=0x%02X Byte2=0x%02X Byte3=0x%02X\n",
-            state.address, pgn, data[0], data[1], data[2], data[3]);
-        
-        // Send the frame
         if (_sendFrame) {
             _sendFrame(pgn, data);
         }

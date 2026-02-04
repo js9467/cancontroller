@@ -523,6 +523,7 @@ void ConfigManager::encodeConfig(const DeviceConfig& source, DynamicJsonDocument
             
             JsonObject output_behavior = btn_obj["output_behavior"].to<JsonObject>();
             output_behavior["output_id"] = button.output_behavior.output_id.c_str();
+            output_behavior["action"] = button.output_behavior.action.c_str();
             output_behavior["behavior_type"] = button.output_behavior.behavior_type.c_str();
             output_behavior["target_value"] = button.output_behavior.target_value;
             output_behavior["period_ms"] = button.output_behavior.period_ms;
@@ -772,6 +773,7 @@ bool ConfigManager::decodeConfig(JsonVariantConst json, DeviceConfig& target, st
                     JsonObjectConst output_behavior = btn_obj["output_behavior"];
                     if (!output_behavior.isNull()) {
                         button.output_behavior.output_id = safeString(output_behavior["output_id"], "");
+                        button.output_behavior.action = safeString(output_behavior["action"], "on");
                         button.output_behavior.behavior_type = safeString(output_behavior["behavior_type"], "steady");
                         button.output_behavior.target_value = clampValue<std::uint8_t>(output_behavior["target_value"] | 100, 0u, 100u);
                         button.output_behavior.period_ms = clampValue<std::uint16_t>(output_behavior["period_ms"] | 500, 1u, 10000u);

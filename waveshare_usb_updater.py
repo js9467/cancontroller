@@ -30,10 +30,26 @@ try:
 except ImportError as e:  # pragma: no cover
     raise SystemExit("The 'pyserial' package is required. Install with: pip install pyserial") from e
 
+try:
+    import esptool  # type: ignore
+except ImportError as e:  # pragma: no cover
+    raise SystemExit("The 'esptool' package is required. Install with: pip install esptool") from e
+
 
 GITHUB_REPO = "js9467/cancontroller"
 GITHUB_BRANCH = "master"
 GITHUB_VERSIONS_PATH = "versions"
+
+# OPTIONAL: GitHub personal access token for private repos.
+#
+# WARNING: If you embed a real token here and build an EXE, anyone with the
+# EXE can potentially extract that token and gain the same GitHub access.
+# Use a token with minimal permissions (read-only on this repo) and accept
+# the risk before distributing.
+#
+# Example (do NOT commit real tokens to public repos):
+#   GITHUB_TOKEN = "ghp_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+GITHUB_TOKEN = None
 
 
 def parse_version_from_name(name: str):
@@ -87,14 +103,22 @@ def get_latest_firmware():
     """Determine latest bronco_vX.Y.Z.bin from GitHub, with local fallback.
 
     Returns (version_str, local_path_or_tempfile_path).
-    Raises RuntimeError on failure.
+    Raises RuntimeError on failure with a human-friendly reason.
     """
     versions = []
+    github_status = None
+    github_error = None
+
+    # Build headers for GitHub (optionally with PAT for private repo)
+    headers = {"Accept": "application/vnd.github.v3+json"}
+    if GITHUB_TOKEN:
+        headers["Authorization"] = f"token {GITHUB_TOKEN}"
 
     # 1) Try GitHub contents API
     try:
         api_url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{GITHUB_VERSIONS_PATH}?ref={GITHUB_BRANCH}"
-        resp = requests.get(api_url, timeout=15)
+        resp = requests.get(api_url, headers=headers, timeout=15)
+        github_status = resp.status_code
         if resp.status_code == 200:
             for item in resp.json():
                 name = item.get("name", "")
@@ -107,27 +131,49 @@ def get_latest_firmware():
                         "download_url": item.get("download_url"),
                         "source": "github",
                     })
-    except Exception:
-        # We'll fall back to local below
-        pass
+        else:
+            github_error = f"GitHub API returned HTTP {resp.status_code} for {api_url}"
+    except Exception as e:
+        github_error = f"GitHub request failed: {e}"
 
-    # 2) Local fallback: ./versions folder next to this script
+    # 2) Local fallback: ./versions folder next to this script (or EXE)
     script_dir = Path(__file__).parent.resolve()
-    local_versions_dir = script_dir / "versions"
-    if local_versions_dir.exists():
-        for entry in local_versions_dir.glob("bronco_v*.bin"):
-            ver_tuple = parse_version_from_name(entry.name)
-            if ver_tuple:
-                versions.append({
-                    "version_tuple": ver_tuple,
-                    "version_str": ".".join(str(p) for p in ver_tuple),
-                    "name": entry.name,
-                    "local_path": entry,
-                    "source": "local",
-                })
+    candidate_dirs = [
+        script_dir / "versions",
+        script_dir.parent / "versions",  # helpful when running from dist/ next to project root
+    ]
+
+    local_found = False
+    for local_versions_dir in candidate_dirs:
+        if local_versions_dir.exists():
+            local_found = True
+            for entry in local_versions_dir.glob("bronco_v*.bin"):
+                ver_tuple = parse_version_from_name(entry.name)
+                if ver_tuple:
+                    versions.append({
+                        "version_tuple": ver_tuple,
+                        "version_str": ".".join(str(p) for p in ver_tuple),
+                        "name": entry.name,
+                        "local_path": entry,
+                        "source": "local",
+                    })
 
     if not versions:
-        raise RuntimeError("No bronco_vX.Y.Z.bin firmware files found on GitHub or in local versions/ folder")
+        parts = []
+        if github_status is not None:
+            if github_status == 404:
+                parts.append("GitHub: repo or versions/ path not accessible (HTTP 404)")
+            elif github_status == 401:
+                parts.append("GitHub: unauthorized (private repo or bad credentials)")
+            else:
+                parts.append(f"GitHub: HTTP {github_status}")
+        if github_error:
+            parts.append(github_error)
+        if not local_found:
+            parts.append("Local: no versions/ folder with bronco_vX.Y.Z.bin found next to the app")
+
+        detail = "; ".join(parts) if parts else "No firmware sources available"
+        raise RuntimeError(detail)
 
     # Pick highest semantic version
     versions.sort(key=lambda v: v["version_tuple"], reverse=True)
@@ -145,7 +191,8 @@ def get_latest_firmware():
     tmp_dir = Path(tempfile.gettempdir())
     tmp_path = tmp_dir / latest["name"]
 
-    with requests.get(download_url, stream=True, timeout=60) as r:
+    # Use raw download URL with same auth headers if needed
+    with requests.get(download_url, headers=headers, stream=True, timeout=60) as r:
         if r.status_code != 200:
             raise RuntimeError(f"Download failed with HTTP {r.status_code}")
         with open(tmp_path, "wb") as f:
@@ -297,7 +344,7 @@ class USBUpdaterGUI:
             self.root.after(0, lambda: self.version_var.set(f"v{version}"))
             self.log(f"Using firmware v{version} ({firmware_path})")
 
-            # 2) Flash via esptool
+            # 2) Flash via esptool (library call, no new process)
             self.log("")
             self.log("Flashing firmware with esptool...")
             self.log("If upload fails, you may need to:\n"
@@ -305,9 +352,7 @@ class USBUpdaterGUI:
                      "  2) Press RESET button\n"
                      "  3) Release BOOT, then retry")
 
-            cmd = [
-                sys.executable,
-                "-m",
+            args = [
                 "esptool",
                 "--chip",
                 "esp32s3",
@@ -320,31 +365,22 @@ class USBUpdaterGUI:
                 str(firmware_path),
             ]
 
-            self.log("Running: " + " ".join(cmd))
+            self.log("Running (embedded esptool): " + " ".join(args))
 
+            exit_code = 0
             try:
-                proc = subprocess.Popen(
-                    cmd,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                )
-            except FileNotFoundError:
-                self.log("ERROR: esptool not found. Install with: pip install esptool")
-                messagebox.showerror("esptool Missing", "esptool is not installed. Install with:\n\npython -m pip install esptool")
-                return
+                # esptool.main() calls sys.exit(), so catch SystemExit
+                esptool.main(args)
+            except SystemExit as ex:  # pragma: no cover - behavior from esptool
+                try:
+                    exit_code = int(ex.code)
+                except (TypeError, ValueError):
+                    exit_code = 1
 
-            # Stream output to log
-            assert proc.stdout is not None
-            for line in proc.stdout:
-                line = line.rstrip("\n")
-                self.root.after(0, lambda l=line: self.log(l))
-
-            proc.wait()
-            if proc.returncode != 0:
+            if exit_code != 0:
                 self.log("")
-                self.log(f"Upload FAILED with exit code {proc.returncode}")
-                messagebox.showerror("Upload Failed", "Firmware upload failed. Check the log and try again.")
+                self.log(f"Upload FAILED with exit code {exit_code}")
+                messagebox.showerror("Upload Failed", "Firmware upload failed. Check USB connection and try again.")
                 return
 
             self.log("")

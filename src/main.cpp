@@ -612,7 +612,7 @@ void loop() {
                 Serial.printf("[CAN] Sending poll to address %d (check with canmon for response)\n", address);
                 
                 // Build polling CAN ID: FF4X with source address 0x63
-                uint32_t pgn = 0xFF40 + (address == 16 ? 0 : address);
+                uint32_t pgn = 0xFF40 + address;
                 CanFrameConfig frame;
                 frame.enabled = true;
                 frame.pgn = pgn;
@@ -874,6 +874,14 @@ void loop() {
     CanFrame frame;
     while (xQueueReceive(g_can_queue, &frame, 0) == pdTRUE) {
         can_frames_processed++;
+        
+        // Broadcast to WebSocket clients for CAN monitor
+        CanRxMessage ws_msg;
+        ws_msg.identifier = frame.id;
+        ws_msg.length = frame.dlc;
+        memcpy(ws_msg.data, frame.data, 8);
+        ws_msg.timestamp = frame.timestamp_ms;
+        WebServerManager::instance().broadcastCanFrame(ws_msg);
         
         // Only print if actively monitoring (not every frame!)
         if (canmon_active) {

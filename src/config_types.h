@@ -56,6 +56,7 @@ struct ButtonConfig {
     // SIMPLE OUTPUT MODE: Control a single output with a behavior
     struct OutputBehaviorConfig {
         std::string output_id = "";           // Which output to control (user-defined from output manager)
+        std::string action = "on";           // on, off, toggle
         std::string behavior_type = "steady"; // steady, flash, pulse, fade_in, fade_out, strobe, hold_timed, ramp
         std::uint8_t target_value = 100;     // 0-100%
         std::uint16_t period_ms = 500;        // For flash, pulse, strobe

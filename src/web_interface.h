@@ -548,6 +548,11 @@ function switchTab(tabName){
 			<h4>Output Configuration</h4>
 			<div class="grid two-col">
 				<div style="grid-column:1/-1;"><label>Output</label><select id="btn-output-id"><option value="">Select output...</option></select></div>
+				<div style="grid-column:1/-1;"><label>Action</label><select id="btn-output-action">
+					<option value="on">On (apply behavior)</option>
+					<option value="off">Off</option>
+					<option value="toggle">Toggle</option>
+				</select></div>
 				<div style="grid-column:1/-1;"><label>Behavior</label><select id="btn-behavior-type">
 					<option value="steady">Steady</option>
 					<option value="flash">Flash</option>
@@ -563,7 +568,7 @@ function switchTab(tabName){
 				<div><label>Duty Cycle (%)</label><input id="btn-duty-cycle" type="number" min="0" max="100" value="50" /></div>
 				<div><label>Fade Time (ms)</label><input id="btn-fade-time-ms" type="number" min="0" max="5000" value="500" /></div>
 				<div><label>Hold Duration (ms)</label><input id="btn-hold-duration-ms" type="number" min="0" max="30000" value="2000" /></div>
-				<div class="row"><label><input id="btn-auto-off" type="checkbox" /> Auto-off when released</label></div>
+				<div class="row"><label><input id="btn-auto-off" type="checkbox" /> Release to OFF</label></div>
 			</div>
 		</div>
 		
@@ -1173,6 +1178,7 @@ function openButtonModal(row,col){
 		mode: 'can',
 		output_behavior: {
 			output_id: '',
+			action: 'on',
 			behavior_type: 'steady',
 			target_value: 255,
 			period_ms: 1000,
@@ -1205,6 +1211,7 @@ function openButtonModal(row,col){
 	// Mode and behavioral fields (set non-dropdown fields first)
 	document.getElementById('btn-mode').value = data.mode || 'can';
 	const ob = data.output_behavior || defaults.output_behavior;
+	document.getElementById('btn-output-action').value = ob.action || 'on';
 	document.getElementById('btn-behavior-type').value = ob.behavior_type || 'steady';
 	document.getElementById('btn-target-value').value = ob.target_value || 255;
 	document.getElementById('btn-period-ms').value = ob.period_ms || 1000;
@@ -1280,6 +1287,7 @@ function saveButtonFromModal(){
 		mode: document.getElementById('btn-mode').value,
 		output_behavior: {
 			output_id: document.getElementById('btn-output-id').value || '',
+			action: document.getElementById('btn-output-action').value || 'on',
 			behavior_type: document.getElementById('btn-behavior-type').value,
 			target_value: parseInt(document.getElementById('btn-target-value').value) || 255,
 			period_ms: parseInt(document.getElementById('btn-period-ms').value) || 1000,
@@ -1328,6 +1336,13 @@ function toggleBehavioralFields(){
 	document.getElementById('behavioral-output-config').style.display = mode === 'output' ? 'block' : 'none';
 	document.getElementById('behavioral-scene-config').style.display = mode === 'scene' ? 'block' : 'none';
 	document.getElementById('can-config-section').style.display = mode === 'can' ? 'block' : 'none';
+	const momentary = document.getElementById('btn-momentary');
+	if (momentary) {
+		momentary.disabled = mode !== 'can';
+		if (mode !== 'can') {
+			momentary.checked = false;
+		}
+	}
 	if(mode === 'can') toggleCanFields(); // Update CAN sub-sections
 }
 

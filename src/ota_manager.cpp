@@ -668,7 +668,8 @@ bool OTAUpdateManager::checkGitHubVersions(std::vector<std::string>& versions) {
     
     http.setUserAgent(kUserAgent);
     http.addHeader("Accept", "application/vnd.github.v3+json");
-    http.addHeader("Authorization", String("token ") + kGitHubToken);
+    // Don't send Authorization header for public repos - causes issues
+    // http.addHeader("Authorization", String("token ") + kGitHubToken);
     
     Serial.println("[OTA] Sending GET request...");
     int httpCode = http.GET();
@@ -769,7 +770,8 @@ bool OTAUpdateManager::installVersionFromGitHub(const std::string& version) {
     }
     
     http.setUserAgent(kUserAgent);
-    http.addHeader(kAuthHeader, kAuthValue);  // Add GitHub token for private repo access
+    // Don't send auth header for public repos
+    // http.addHeader(kAuthHeader, kAuthValue);
     http.setTimeout(30000);  // 30 second timeout for download
     
     Serial.println("[OTA] Sending GET request...");

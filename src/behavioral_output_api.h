@@ -24,6 +24,66 @@ public:
     
     void registerEndpoints() {
         // ═══════════════════════════════════════════════════════════════════
+        // DEBUG TEST ENDPOINT - Direct behavioral engine activation
+        // ═══════════════════════════════════════════════════════════════════
+        
+        // GET /api/test/flash?output=left_turn_front - Test flash behavior directly
+        _server->on("/api/test/flash", HTTP_GET, [this](AsyncWebServerRequest* request) {
+            String outputId = "left_turn_front";
+            if (request->hasParam("output")) {
+                outputId = request->getParam("output")->value();
+            }
+            
+            BehaviorConfig behavior;
+            behavior.type = BehaviorType::FLASH;
+            behavior.targetValue = 255;
+            behavior.onTime_ms = 500;
+            behavior.offTime_ms = 500;
+            behavior.period_ms = 1000;
+            behavior.dutyCycle = 50;
+            
+            bool success = _engine->setBehavior(outputId, behavior);
+            
+            String response = "{\"success\":" + String(success ? "true" : "false") + 
+                            ",\"output\":\"" + outputId + "\"" +
+                            ",\"message\":\"Direct flash activation test\"}";
+            request->send(200, "application/json", response);
+        });
+        
+        // GET /api/test/steady?output=left_turn_front - Test steady ON directly
+        _server->on("/api/test/steady", HTTP_GET, [this](AsyncWebServerRequest* request) {
+            String outputId = "left_turn_front";
+            if (request->hasParam("output")) {
+                outputId = request->getParam("output")->value();
+            }
+            
+            BehaviorConfig behavior;
+            behavior.type = BehaviorType::STEADY;
+            behavior.targetValue = 255;
+            
+            bool success = _engine->setBehavior(outputId, behavior);
+            
+            String response = "{\"success\":" + String(success ? "true" : "false") + 
+                            ",\"output\":\"" + outputId + "\"" +
+                            ",\"message\":\"Direct steady ON test\"}";
+            request->send(200, "application/json", response);
+        });
+        
+        // GET /api/test/off?output=left_turn_front - Deactivate output
+        _server->on("/api/test/off", HTTP_GET, [this](AsyncWebServerRequest* request) {
+            String outputId = "left_turn_front";
+            if (request->hasParam("output")) {
+                outputId = request->getParam("output")->value();
+            }
+            
+            bool success = _engine->deactivateOutput(outputId);
+            
+            String response = "{\"success\":" + String(success ? "true" : "false") + 
+                            ",\"output\":\"" + outputId + "\"}";
+            request->send(200, "application/json", response);
+        });
+        
+        // ═══════════════════════════════════════════════════════════════════
         // OUTPUT ENDPOINTS
         // ═══════════════════════════════════════════════════════════════════
         

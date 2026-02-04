@@ -673,8 +673,26 @@ void UIBuilder::actionButtonEvent(lv_event_t* e) {
         // OUTPUT MODE: Control a single output with specific behavior
         if (!config->output_behavior.output_id.empty()) {
             if (code == LV_EVENT_PRESSED || code == LV_EVENT_CLICKED) {
+                const std::string& action = config->output_behavior.action;
+                const std::string& output_id = config->output_behavior.output_id;
+                
+                if (action == "off") {
+                    Serial.printf("[UI] Output %s → OFF\n", output_id.c_str());
+                    behaviorEngine.deactivateOutput(output_id.c_str());
+                    return;
+                }
+
+                if (action == "toggle") {
+                    auto* out = behaviorEngine.getOutput(output_id.c_str());
+                    if (out && out->isActive) {
+                        Serial.printf("[UI] Output %s → TOGGLE OFF\n", output_id.c_str());
+                        behaviorEngine.deactivateOutput(output_id.c_str());
+                        return;
+                    }
+                }
+
                 Serial.printf("[UI] Output %s → %s behavior\n", 
-                    config->output_behavior.output_id.c_str(),
+                    output_id.c_str(),
                     config->output_behavior.behavior_type.c_str());
                 
                 // Build behavior configuration
@@ -719,13 +737,14 @@ void UIBuilder::actionButtonEvent(lv_event_t* e) {
                 }
                 
                 // Activate the behavior on the output
-                behaviorEngine.setBehavior(config->output_behavior.output_id.c_str(), behavior);
+                behaviorEngine.setBehavior(output_id.c_str(), behavior);
             }
             
             // Handle release - check auto_off regardless of momentary mode
             if (code == LV_EVENT_RELEASED) {
-                if (config->output_behavior.auto_off) {
-                    Serial.printf("[UI] Auto-off triggered for output: %s\n", 
+                const std::string& action = config->output_behavior.action;
+                if (action == "on" && (config->momentary || config->output_behavior.auto_off)) {
+                    Serial.printf("[UI] Release OFF for output: %s\n", 
                         config->output_behavior.output_id.c_str());
                     behaviorEngine.deactivateOutput(config->output_behavior.output_id.c_str());
                 }

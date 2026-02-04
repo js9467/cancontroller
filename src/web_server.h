@@ -26,6 +26,10 @@ public:
     
     // Access to web server for plugin registration
     AsyncWebServer& getServer() { return server_; }
+    
+    // CAN monitoring WebSocket broadcast
+    void broadcastCanFrame(const struct CanRxMessage& msg);
+    AsyncWebSocket& getCanMonitorSocket() { return can_monitor_ws_; }
 
 private:
     WebServerManager();
@@ -34,6 +38,7 @@ private:
     void configureWifi();
 
     AsyncWebServer server_;
+    AsyncWebSocket can_monitor_ws_;
     DNSServer dns_server_;
     bool sta_connected_ = false;
     bool events_registered_ = false;

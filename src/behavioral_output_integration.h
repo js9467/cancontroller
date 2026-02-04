@@ -77,14 +77,30 @@ inline void initBehavioralOutputSystem(AsyncWebServer* webServer) {
     
     // Try to load from persistent storage first
     bool loaded = loadBehavioralConfig(behaviorEngine);
+    size_t outputCount = behaviorEngine.getOutputs().size();
+    size_t sceneCount = behaviorEngine.getScenes().size();
     
     if (!loaded) {
         // No saved config - load InfinityBox standard outputs
         Serial.println("[Behavioral Output] No saved config, loading InfinityBox defaults...");
         loadInfinityBoxDefaults();
         loadDefaultScenes();
+        outputCount = behaviorEngine.getOutputs().size();
+        sceneCount = behaviorEngine.getScenes().size();
     } else {
-        Serial.println("[Behavioral Output] User configuration loaded from persistent storage");
+        if (outputCount == 0) {
+            Serial.println("[Behavioral Output] Saved config contained zero outputs. Restoring InfinityBox defaults...");
+            loadInfinityBoxDefaults();
+            outputCount = behaviorEngine.getOutputs().size();
+        }
+        if (sceneCount == 0) {
+            Serial.println("[Behavioral Output] Saved config had no scenes. Restoring default scenes...");
+            loadDefaultScenes();
+            sceneCount = behaviorEngine.getScenes().size();
+        }
+        Serial.printf("[Behavioral Output] Configuration ready (%u outputs, %u scenes)\n", 
+                     static_cast<unsigned>(outputCount), 
+                     static_cast<unsigned>(sceneCount));
     }
     
     Serial.println("[Behavioral Output] System initialized");
