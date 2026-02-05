@@ -85,6 +85,8 @@ struct ButtonConfig {
 struct PageConfig {
     std::string id = "page_0";
     std::string name = "Home";
+    std::string type = "";                  // Page type: "" (normal), "custom_html"
+    std::string custom_content = "";        // Custom content identifier
     std::string nav_text = "";          // Optional nav label override
     std::string nav_color = "";             // Active nav button color
     std::string nav_inactive_color = "";    // Inactive nav button color

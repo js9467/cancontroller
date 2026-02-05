@@ -101,6 +101,12 @@ constexpr uint32_t LVGL_TASK_MIN_DELAY_MS = 1;
 void lvgl_port_lock(int timeout_ms);
 void lvgl_port_unlock();
 
+// Forward declarations for FreeRTOS tasks
+void mux_watchdog_task(void*);
+void suspension_tx_task(void*);
+void can_rx_task(void*);
+void health_monitor_task(void*);
+
 // NOTE: Expander initialization moved to AFTER panel init
 // No early hardware init needed - panel handles everything
 
@@ -148,6 +154,20 @@ void mux_watchdog_task(void*) {
     }
 }
 
+// Suspension TX task - sends 0x737 command every 300ms (separate from Infinitybox)
+void suspension_tx_task(void*) {
+    Serial.println("[Suspension] TX task started - 300ms cadence");
+    
+    for (;;) {
+        vTaskDelay(pdMS_TO_TICKS(300));  // 300ms interval per spec
+        
+        // Only send if CAN is ready
+        if (CanManager::instance().isReady()) {
+            CanManager::instance().sendSuspensionCommand();
+        }
+    }
+}
+
 // CAN receive task - runs on core 1, never blocks UI
 // Pulls messages from TWAI and pushes to queue for processing
 void can_rx_task(void* param) {
@@ -157,6 +177,14 @@ void can_rx_task(void* param) {
     for (;;) {
         // Non-blocking receive with short timeout
         if (CanManager::instance().receiveMessage(msg, 50)) {
+            // Check for suspension status frame (0x738)
+            // Standard IDs are 11-bit (0-0x7FF), extended are 29-bit
+            bool is_standard = (msg.identifier <= 0x7FF);
+            if (is_standard && msg.identifier == 0x738 && msg.length == 8) {
+                CanManager::instance().parseSuspensionStatus(msg.data);
+            }
+            
+            // Queue frame for general processing (Infinitybox, diagnostics, etc.)
             CanFrame frame;
             frame.id = msg.identifier;
             frame.ext = (msg.identifier & 0x80000000) != 0;  // Infer from ID
@@ -431,6 +459,10 @@ void setup() {
     // Start mux watchdog to keep USB_SEL HIGH
     xTaskCreatePinnedToCore(mux_watchdog_task, "mux_wd", 4096, nullptr, 1, nullptr, 1);
     Serial.println("[WATCHDOG] ✓ Mux watchdog started");
+    
+    // Start suspension TX task on core 1 (300ms cadence)
+    xTaskCreatePinnedToCore(suspension_tx_task, "susp_tx", 4096, nullptr, 2, nullptr, 1);
+    Serial.println("[SUSPENSION] ✓ Suspension TX task started (300ms)");
     
     // Start CAN RX task on core 1 (separate from UI)
     xTaskCreatePinnedToCore(can_rx_task, "can_rx", 4096, nullptr, 3, nullptr, 1);
@@ -881,7 +913,7 @@ void loop() {
         ws_msg.length = frame.dlc;
         memcpy(ws_msg.data, frame.data, 8);
         ws_msg.timestamp = frame.timestamp_ms;
-        WebServerManager::instance().broadcastCanFrame(ws_msg);
+        WebServerManager::instance().broadcastCanFrame(ws_msg, false);
         
         // Only print if actively monitoring (not every frame!)
         if (canmon_active) {

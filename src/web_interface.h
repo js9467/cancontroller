@@ -376,6 +376,7 @@ function switchTab(tabName){
 					<div class="field"><label>Window</label><select id="quick-page-select" onchange="quickPageSelectChanged()"></select></div>
 					<button class="btn small" onclick="addPage()">Add</button>
 					<button class="btn small" onclick="deletePage()">Delete</button>
+					<button class="btn small ghost" onclick="addSuspensionPageTemplate()" title="Add pre-configured suspension control window">+ Suspension</button>
 					<div class="field" style="min-width:140px;"><label>Grid</label>
 						<select id="page-rows" onchange="updateGrid()"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select>
 						<span style="color:var(--muted);">x</span>
@@ -779,68 +780,25 @@ function addPage(){
 function addSuspensionPageTemplate(){
 	ensurePages();
 	const id = 'page_suspension_'+Date.now();
-	const buttonSpecs = [
-		{ label:'Power On', pgn:0x737, data:[0,0,0,0,0,0,0,0x30] },
-		{ label:'Power Off', pgn:0x737, data:[0,0,0,0,0,0,0,0x00] },
-		{ label:'Calibrate', pgn:0x738, data:[0,0,0,0,0,0,0,0x01] },
-		{ label:'Info', pgn:0x737, data:[0,0,0,0,0,0,0,0] },
-		{ label:'Mode 1', pgn:0x737, data:[0,0,0,0x01,0x01,0x01,0x01,0] },
-		{ label:'Mode 2', pgn:0x737, data:[0,0,0,0x02,0x02,0x02,0x02,0] },
-		{ label:'Mode 3', pgn:0x737, data:[0,0,0,0x03,0x03,0x03,0x03,0] },
-		{ label:'Mode 4', pgn:0x737, data:[0,0,0,0x04,0x04,0x04,0x04,0] },
-		{ label:'Mode 5', pgn:0x737, data:[0,0,0,0x05,0x05,0x05,0x05,0] },
-		{ label:'Front Soft', pgn:0x737, data:[0,0,0,0,0,0,0x01,0] },
-		{ label:'Front Medium', pgn:0x737, data:[0,0,0,0,0,0,0x03,0] },
-		{ label:'Front Firm', pgn:0x737, data:[0,0,0,0,0,0,0x05,0] },
-		{ label:'Rear Soft', pgn:0x737, data:[0,0,0,0,0,0x01,0,0] },
-		{ label:'Rear Medium', pgn:0x737, data:[0,0,0,0,0,0x03,0,0] },
-		{ label:'Rear Firm', pgn:0x737, data:[0,0,0,0,0,0x05,0,0] },
-		{ label:'Pitch Soft', pgn:0x737, data:[0,0,0,0x01,0,0,0,0] },
-		{ label:'Pitch Medium', pgn:0x737, data:[0,0,0,0x03,0,0,0,0] },
-		{ label:'Pitch Firm', pgn:0x737, data:[0,0,0,0x05,0,0,0,0] },
-		{ label:'Roll Soft', pgn:0x737, data:[0,0,0,0,0x01,0,0,0] },
-		{ label:'Roll Medium', pgn:0x737, data:[0,0,0,0,0x03,0,0,0] },
-		{ label:'Roll Firm', pgn:0x737, data:[0,0,0,0,0x05,0,0,0] }
-	];
-
-	const buttons = buttonSpecs.map((spec, i) => {
-		const row = Math.floor(i / 4);
-		const col = i % 4;
-		return {
-			id: `${spec.label.toLowerCase().replace(/[^a-z0-9]+/g,'_')}_${i}`,
-			label: spec.label,
-			row,
-			col,
-			row_span: 1,
-			col_span: 1,
-			momentary: false,
-			font_size: 20,
-			corner_radius: 12,
-			can: {
-				enabled: true,
-				pgn: spec.pgn,
-				priority: 6,
-				source_address: 0xF9,
-				destination_address: 0xFF,
-				data: spec.data
-			}
-		};
-	});
-
+	
+	// Create a page with custom suspension interface content
 	const page = {
 		id,
 		name: 'Suspension',
-		rows: 6,
-		cols: 4,
-		buttons
+		type: 'custom_html',
+		custom_content: 'suspension_interface',
+		rows: 1,
+		cols: 1,
+		buttons: []
 	};
+	
 	config.pages.push(page);
 	activePageIndex = config.pages.length - 1;
 	renderPageList();
 	hydratePageFields();
 	renderGrid();
 	renderPreview();
-	showBanner('Suspension page added', 'success');
+	showBanner('Suspension interface added', 'success');
 }
 
 function deletePage(){
@@ -1097,6 +1055,13 @@ function renderGrid(){
 	const grid = document.getElementById('layout-grid');
 	if(!grid) return;
 	const page = config.pages[activePageIndex];
+	
+	// Check if this is a custom suspension page
+	if(page.type === 'custom_html' && page.custom_content === 'suspension_interface'){
+		grid.innerHTML = '<div style="padding: 20px; text-align: center; color: #8d92a3;"><p>Suspension Interface (Preview not available in editor)</p><p style="font-size: 0.85rem; margin-top: 8px;">This page will display the interactive suspension control interface on the device</p></div>';
+		return;
+	}
+	
 	const theme = config.theme || {};
 	const fallbackText = page.text_color || theme.text_primary || '#f2f4f8';
 	const fallbackFill = page.button_color || theme.accent_color || '#ff9d2e';
@@ -1506,6 +1471,14 @@ function applyInfinityboxTemplate(){
 function renderPreview(){
 	ensurePages();
 	const page = config.pages[activePageIndex];
+	
+	// Handle suspension interface preview
+	if(page.type === 'custom_html' && page.custom_content === 'suspension_interface'){
+		renderNav();  // Update navigation colors before rendering suspension preview
+		renderSuspensionPreview();
+		return;
+	}
+	
 	const theme = config.theme || {};
 	const headerCfg = config.header || {};
 	const header = document.getElementById('preview-header');
@@ -1652,6 +1625,88 @@ function renderPreview(){
 		}
 	}
 	body.appendChild(grid);
+}
+
+function renderSuspensionPreview(){
+	const body = document.getElementById('preview-body');
+	if(!body) return;
+	
+	const page = config.pages[activePageIndex];
+	const bgColor = page.bg_color || config.theme?.page_bg_color || '#0F0F0F';
+	
+	body.innerHTML = `
+		<div style="width:100%;height:100%;background:${bgColor};padding:12px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;">
+			<div style="display:flex;justify-content:space-between;align-items:center;width:100%;margin-bottom:4px;">
+				<div style="font-size:18px;font-weight:700;color:#ff9d2e;">Suspension Controls</div>
+				<button style="padding:6px 16px;border-radius:8px;border:none;background:#7ad7f0;color:#0a0f0a;font-size:11px;font-weight:700;cursor:pointer;" onmouseover="this.style.background='#5ac0d0';" onmouseout="this.style.background='#7ad7f0';">Calibrate</button>
+			</div>
+			
+			<div style="text-align:center;font-size:10px;color:#8d92a3;text-transform:uppercase;letter-spacing:1px;">FRONT DAMPER SETTINGS</div>
+			<div style="display:flex;gap:4px;justify-content:center;margin-bottom:4px;">
+				${createPresetButtonsHTML()}
+			</div>
+			<div style="display:flex;gap:8px;justify-content:center;">
+				${createDamperCardHTML('Front Left')}
+				${createDamperCardHTML('Front Right')}
+			</div>
+			
+			<div style="text-align:center;font-size:10px;color:#8d92a3;text-transform:uppercase;letter-spacing:1px;margin-top:8px;">REAR DAMPER SETTINGS</div>
+			<div style="display:flex;gap:4px;justify-content:center;margin-bottom:4px;">
+				${createPresetButtonsHTML()}
+			</div>
+			<div style="display:flex;gap:8px;justify-content:center;">
+				${createDamperCardHTML('Rear Left')}
+				${createDamperCardHTML('Rear Right')}
+			</div>
+			
+			<div style="text-align:center;font-size:10px;color:#8d92a3;text-transform:uppercase;letter-spacing:1px;margin-top:8px;">ANTI-ROLL & PITCH</div>
+			<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+				${createControlCardHTML('Anti-Roll')}
+				${createControlCardHTML('Anti-Pitch')}
+			</div>
+		</div>
+	`;
+}
+
+function createPresetButtonsHTML(){
+	let html = '';
+	for(let i = 1; i <= 5; i++) {
+		html += `<button style="width:45px;height:26px;border-radius:6px;border:1px solid #3a3a4a;background:#2a2a3a;color:#f2f4f8;font-size:13px;font-weight:700;cursor:pointer;" onmouseover="this.style.background='#ff9d2e';this.style.color='#16110a';" onmouseout="this.style.background='#2a2a3a';this.style.color='#f2f4f8';">${i}</button>`;
+	}
+	return html;
+}
+
+function createDamperCardHTML(label){
+	return `
+		<div style="background:#12141c;border:1px solid #20232f;border-radius:14px;padding:12px;width:160px;display:flex;flex-direction:column;align-items:center;gap:8px;">
+			<div style="font-size:11px;font-weight:700;color:#7ad7f0;text-transform:uppercase;letter-spacing:0.5px;">${label}</div>
+			<div style="display:flex;align-items:center;gap:8px;width:100%;justify-content:center;">
+				<button style="width:32px;height:32px;border-radius:8px;border:1px solid #3a3a4a;background:#1a1d28;color:#f2f4f8;font-size:16px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;" onmouseover="this.style.background='#ff6b6b';this.style.borderColor='#ff6b6b';" onmouseout="this.style.background='#1a1d28';this.style.borderColor='#3a3a4a';">−</button>
+				<div style="display:flex;flex-direction:column;align-items:center;min-width:40px;">
+					<span style="font-size:18px;font-weight:700;color:#ff9d2e;">0</span>
+					<span style="font-size:9px;color:#8d92a3;">%</span>
+				</div>
+				<button style="width:32px;height:32px;border-radius:8px;border:1px solid #3a3a4a;background:#1a1d28;color:#f2f4f8;font-size:16px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;" onmouseover="this.style.background='#3dd598';this.style.borderColor='#3dd598';" onmouseout="this.style.background='#1a1d28';this.style.borderColor='#3a3a4a';">+</button>
+			</div>
+			<div style="display:flex;align-items:center;gap:6px;font-size:10px;color:#8d92a3;">
+				<span style="color:#3dd598;font-size:11px;">●</span>
+				<span>Ready</span>
+			</div>
+		</div>
+	`;
+}
+
+function createControlCardHTML(label){
+	return `
+		<div style="background:#12141c;border:1px solid #20232f;border-radius:14px;padding:12px;width:200px;display:flex;flex-direction:column;align-items:center;gap:10px;">
+			<div style="font-size:12px;font-weight:700;color:#7ad7f0;text-transform:uppercase;letter-spacing:0.5px;">${label}</div>
+			<div style="display:flex;gap:4px;width:100%;justify-content:space-evenly;">
+				<button style="padding:8px 6px;border-radius:8px;border:1px solid #3a3a4a;background:#1a1d28;color:#f2f4f8;font-size:9px;font-weight:700;cursor:pointer;text-transform:uppercase;letter-spacing:0.5px;flex:1;" onmouseover="this.style.background='#ff9d2e';this.style.color='#16110a';" onmouseout="this.style.background='#1a1d28';this.style.color='#f2f4f8';">Decrease</button>
+				<button style="padding:8px 6px;border-radius:8px;border:1px solid #3dd598;background:#3dd598;color:#0a0f0a;font-size:9px;font-weight:700;cursor:pointer;text-transform:uppercase;letter-spacing:0.5px;flex:1;" onmouseover="this.style.background='#2eb882';" onmouseout="this.style.background='#3dd598';">Neutral</button>
+				<button style="padding:8px 6px;border-radius:8px;border:1px solid #3a3a4a;background:#1a1d28;color:#f2f4f8;font-size:9px;font-weight:700;cursor:pointer;text-transform:uppercase;letter-spacing:0.5px;flex:1;" onmouseover="this.style.background='#ff9d2e';this.style.color='#16110a';" onmouseout="this.style.background='#1a1d28';this.style.color='#f2f4f8';">Increase</button>
+			</div>
+		</div>
+	`;
 }
 
 function renderNav(){

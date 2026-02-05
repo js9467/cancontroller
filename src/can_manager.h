@@ -17,6 +17,35 @@ struct CanRxMessage {
     uint32_t timestamp;
 };
 
+// Suspension state management (single source of truth)
+struct SuspensionState {
+    bool power_on = false;
+    uint8_t front_left_percent = 0;    // 0-100%
+    uint8_t front_right_percent = 0;   // 0-100%
+    uint8_t rear_left_percent = 0;     // 0-100%
+    uint8_t rear_right_percent = 0;    // 0-100%
+    bool calibration_active = false;
+    
+    // Actual state from 0x738 feedback
+    uint8_t actual_fl_percent = 0;
+    uint8_t actual_fr_percent = 0;
+    uint8_t actual_rl_percent = 0;
+    uint8_t actual_rr_percent = 0;
+    uint8_t fault_flags = 0;
+    uint32_t last_feedback_ms = 0;
+};
+
+// Suspension CAN diagnostics
+struct SuspensionCANStats {
+    uint32_t tx_count = 0;
+    uint32_t tx_fail_count = 0;
+    uint32_t rx_count = 0;
+    uint32_t last_tx_ms = 0;
+    uint32_t last_rx_ms = 0;
+    uint8_t last_tx_data[8] = {0};
+    uint8_t last_rx_data[8] = {0};
+};
+
 class CanManager {
 public:
     static CanManager& instance();
@@ -40,6 +69,13 @@ public:
     // Helper for sending J1939 PGN (used by background tasks)
     bool sendJ1939Pgn(uint8_t priority, uint32_t pgn, uint8_t source_addr, const uint8_t data[8]);
 
+    // Suspension control (separate from Infinitybox pipeline)
+    void updateSuspensionState(const SuspensionState& state);
+    SuspensionState getSuspensionState() const;
+    SuspensionCANStats getSuspensionStats() const;
+    bool sendSuspensionCommand();  // Sends current state to 0x737
+    void parseSuspensionStatus(const uint8_t data[8]);  // Parse 0x738 response
+
     bool isReady() const { return ready_; }
     bool isBusAlive() const { return bus_alive_; }
     gpio_num_t txPin() const { return tx_pin_; }
@@ -57,6 +93,11 @@ private:
     gpio_num_t tx_pin_ = DEFAULT_TX_PIN;
     gpio_num_t rx_pin_ = DEFAULT_RX_PIN;
     std::uint32_t bitrate_ = 250000;
+
+    // Suspension state (separate from Infinitybox)
+    SuspensionState suspension_state_;
+    SuspensionCANStats suspension_stats_;
+    mutable SemaphoreHandle_t suspension_mutex_ = nullptr;
 
     std::uint32_t buildIdentifier(const CanFrameConfig& frame) const;
 };

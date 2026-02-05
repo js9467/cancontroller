@@ -1,5 +1,6 @@
 #include "can_manager.h"
 #include "hardware_config.h"
+#include "web_server.h"
 
 #include <driver/twai.h>
 #include <freertos/FreeRTOS.h>
@@ -21,6 +22,10 @@ static void force_can_mux_direct() {
 
 CanManager& CanManager::instance() {
     static CanManager manager;
+    // Initialize suspension mutex on first access
+    if (!manager.suspension_mutex_) {
+        manager.suspension_mutex_ = xSemaphoreCreateMutex();
+    }
     return manager;
 }
 
@@ -50,6 +55,9 @@ bool CanManager::begin(gpio_num_t tx_pin, gpio_num_t rx_pin, std::uint32_t bitra
     }
 
     const twai_timing_config_t t_config = TWAI_TIMING_CONFIG_250KBITS();
+    
+    // Filter config: accept both EXT (Infinitybox J1939) and STD (Suspension 0x737/0x738)
+    // ACCEPT_ALL allows both frame types - this is critical for dual-format bus operation
     const twai_filter_config_t f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL();
 
     if (twai_driver_install(&g_config, &t_config, &f_config) != ESP_OK) {
@@ -290,3 +298,139 @@ bool CanManager::sendJ1939Pgn(uint8_t priority, uint32_t pgn, uint8_t source_add
                   data[4], data[5], data[6], data[7]);
     return true;
 }
+
+// ============================================================================
+// SUSPENSION CONTROL (Separate from Infinitybox pipeline)
+// ============================================================================
+
+void CanManager::updateSuspensionState(const SuspensionState& state) {
+    if (suspension_mutex_) {
+        xSemaphoreTake(suspension_mutex_, portMAX_DELAY);
+        suspension_state_ = state;
+        xSemaphoreGive(suspension_mutex_);
+    }
+}
+
+SuspensionState CanManager::getSuspensionState() const {
+    SuspensionState state;
+    if (suspension_mutex_) {
+        xSemaphoreTake(suspension_mutex_, portMAX_DELAY);
+        state = suspension_state_;
+        xSemaphoreGive(suspension_mutex_);
+    }
+    return state;
+}
+
+SuspensionCANStats CanManager::getSuspensionStats() const {
+    SuspensionCANStats stats;
+    if (suspension_mutex_) {
+        xSemaphoreTake(suspension_mutex_, portMAX_DELAY);
+        stats = suspension_stats_;
+        xSemaphoreGive(suspension_mutex_);
+    }
+    return stats;
+}
+
+bool CanManager::sendSuspensionCommand() {
+    if (!ready_) {
+        Serial.println("[Suspension] CAN not ready");
+        return false;
+    }
+
+    // Get current state
+    SuspensionState state = getSuspensionState();
+
+    // Build 8-byte payload for 0x737
+    // Byte layout based on spec (adjust as needed):
+    // Byte 0: Power/Mode flags
+    // Byte 1: Front Left damping %
+    // Byte 2: Front Right damping %
+    // Byte 3: Rear Left damping %
+    // Byte 4: Rear Right damping %
+    // Byte 5: Calibration flags
+    // Byte 6-7: Reserved
+    uint8_t data[8] = {0};
+    data[0] = state.power_on ? 0x01 : 0x00;
+    if (state.calibration_active) data[0] |= 0x80;  // Calibration bit
+    data[1] = state.front_left_percent;
+    data[2] = state.front_right_percent;
+    data[3] = state.rear_left_percent;
+    data[4] = state.rear_right_percent;
+    data[5] = 0x00;  // Reserved for calibration status
+    data[6] = 0x00;
+    data[7] = 0x00;
+
+    // Build standard 11-bit CAN frame (0x737)
+    twai_message_t msg = {};
+    msg.identifier = 0x737;
+    msg.extd = 0;  // Standard 11-bit ID
+    msg.data_length_code = 8;
+    memcpy(msg.data, data, 8);
+
+    // Non-blocking transmit
+    esp_err_t result = twai_transmit(&msg, pdMS_TO_TICKS(50));
+    
+    // Update stats
+    if (suspension_mutex_) {
+        xSemaphoreTake(suspension_mutex_, portMAX_DELAY);
+        if (result == ESP_OK) {
+            suspension_stats_.tx_count++;
+            suspension_stats_.last_tx_ms = millis();
+            memcpy(suspension_stats_.last_tx_data, data, 8);
+        } else {
+            suspension_stats_.tx_fail_count++;
+        }
+        xSemaphoreGive(suspension_mutex_);
+    }
+
+    if (result != ESP_OK) {
+        Serial.printf("[Suspension] TX fail: %s\n", esp_err_to_name(result));
+        return false;
+    }
+
+    // Broadcast TX frame to CAN monitor clients so suspension traffic is visible
+    CanRxMessage ws_msg;
+    ws_msg.identifier = msg.identifier;
+    ws_msg.length = msg.data_length_code;
+    memcpy(ws_msg.data, msg.data, 8);
+    ws_msg.timestamp = millis();
+    WebServerManager::instance().broadcastCanFrame(ws_msg, true);
+
+    Serial.printf("[Suspension] TX 0x737: %02X %02X %02X %02X %02X %02X %02X %02X\n",
+                  data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7]);
+    return true;
+}
+
+void CanManager::parseSuspensionStatus(const uint8_t data[8]) {
+    // Parse 0x738 status frame
+    // Byte layout based on spec (adjust as needed):
+    // Byte 0: Status flags
+    // Byte 1: Actual Front Left %
+    // Byte 2: Actual Front Right %
+    // Byte 3: Actual Rear Left %
+    // Byte 4: Actual Rear Right %
+    // Byte 5: Fault flags
+    // Byte 6-7: Reserved
+    
+    if (suspension_mutex_) {
+        xSemaphoreTake(suspension_mutex_, portMAX_DELAY);
+        
+        suspension_state_.actual_fl_percent = data[1];
+        suspension_state_.actual_fr_percent = data[2];
+        suspension_state_.actual_rl_percent = data[3];
+        suspension_state_.actual_rr_percent = data[4];
+        suspension_state_.fault_flags = data[5];
+        suspension_state_.last_feedback_ms = millis();
+        
+        suspension_stats_.rx_count++;
+        suspension_stats_.last_rx_ms = millis();
+        memcpy(suspension_stats_.last_rx_data, data, 8);
+        
+        xSemaphoreGive(suspension_mutex_);
+    }
+
+    Serial.printf("[Suspension] RX 0x738: %02X %02X %02X %02X %02X %02X %02X %02X (FL=%d%%, FR=%d%%, RL=%d%%, RR=%d%%)\n",
+                  data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7],
+                  data[1], data[2], data[3], data[4]);
+}
+

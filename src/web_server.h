@@ -28,7 +28,7 @@ public:
     AsyncWebServer& getServer() { return server_; }
     
     // CAN monitoring WebSocket broadcast
-    void broadcastCanFrame(const struct CanRxMessage& msg);
+    void broadcastCanFrame(const struct CanRxMessage& msg, bool is_tx);
     AsyncWebSocket& getCanMonitorSocket() { return can_monitor_ws_; }
 
 private:

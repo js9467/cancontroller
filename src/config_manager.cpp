@@ -469,6 +469,8 @@ void ConfigManager::encodeConfig(const DeviceConfig& source, DynamicJsonDocument
         page_obj["button_radius"] = page.button_radius;
         page_obj["rows"] = page.rows;
         page_obj["cols"] = page.cols;
+        page_obj["type"] = page.type.c_str();
+        page_obj["custom_content"] = page.custom_content.c_str();
 
         JsonArray buttons = page_obj["buttons"].to<JsonArray>();
         for (const auto& button : page.buttons) {
@@ -695,6 +697,8 @@ bool ConfigManager::decodeConfig(JsonVariantConst json, DeviceConfig& target, st
             page.button_radius = clampValue<std::uint8_t>(page_obj["button_radius"] | page.button_radius, 0u, 50u);
             page.rows = clampValue<std::uint8_t>(page_obj["rows"] | 2, 1, 4);
             page.cols = clampValue<std::uint8_t>(page_obj["cols"] | 2, 1, 4);
+            page.type = safeString(page_obj["type"], "");
+            page.custom_content = safeString(page_obj["custom_content"], "");
 
             JsonArrayConst buttons = page_obj["buttons"].as<JsonArrayConst>();
             if (!buttons.isNull()) {

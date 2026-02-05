@@ -39,6 +39,17 @@ private:
     void buildPage(std::size_t index);
     void updateNavSelection();
     
+    // Suspension interface UI
+    void buildSuspensionInterfacePage(const PageConfig& page);
+    lv_obj_t* createDamperCard(lv_obj_t* parent, const char* label, const char* id);
+    lv_obj_t* createControlCard(lv_obj_t* parent, const char* label);
+    void updateSuspensionUI();  // Refresh UI from CAN feedback
+    static void suspensionDamperEvent(lv_event_t* e);  // +/- button handler
+    static void suspensionPresetEvent(lv_event_t* e);  // Preset 1-5 handler
+    static void suspensionCalibrateEvent(lv_event_t* e);  // Calibrate handler
+    static void suspensionControlEvent(lv_event_t* e);  // Anti-roll/pitch buttons
+    static void suspensionBackEvent(lv_event_t* e);  // Back button handler
+    
     // Infinitybox UI methods
     void buildInfinityboxPage(std::size_t category_index);
     void buildInfinityboxDrivingPage();
@@ -148,6 +159,7 @@ private:
     std::vector<lv_coord_t> grid_cols_;
     std::vector<lv_coord_t> grid_rows_;
     std::size_t active_page_ = 0;
+    std::size_t last_page_before_suspension_ = 0;  // Track page before entering suspension
     bool dirty_ = false;
     lv_coord_t nav_base_pad_top_ = UITheme::SPACE_XS;
     std::string last_ap_ip_ = "";
@@ -185,4 +197,27 @@ private:
     OtaAction ota_primary_action_ = OtaAction::INSTALL;
     DiagnosticsPriority diag_priority_ = DiagnosticsPriority::NORMAL;
     bool info_modal_visible_ = false;
+    
+    // Suspension UI element tracking
+    struct {
+        lv_obj_t* fl_value_label = nullptr;
+        lv_obj_t* fr_value_label = nullptr;
+        lv_obj_t* rl_value_label = nullptr;
+        lv_obj_t* rr_value_label = nullptr;
+        lv_obj_t* fl_status_label = nullptr;
+        lv_obj_t* fr_status_label = nullptr;
+        lv_obj_t* rl_status_label = nullptr;
+        lv_obj_t* rr_status_label = nullptr;
+        lv_obj_t* calibrate_btn = nullptr;
+        lv_obj_t* calibrate_label = nullptr;
+        lv_obj_t* front_preset_btns[5] = {nullptr, nullptr, nullptr, nullptr, nullptr};
+        lv_obj_t* rear_preset_btns[5] = {nullptr, nullptr, nullptr, nullptr, nullptr};
+        lv_obj_t* roll_btns[3] = {nullptr, nullptr, nullptr};
+        lv_obj_t* pitch_btns[3] = {nullptr, nullptr, nullptr};
+    } suspension_ui_;
+
+    int8_t suspension_front_preset_active_ = -1;
+    int8_t suspension_rear_preset_active_ = -1;
+    int8_t suspension_roll_active_ = 1;
+    int8_t suspension_pitch_active_ = 1;
 };

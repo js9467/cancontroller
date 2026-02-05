@@ -457,6 +457,23 @@ void UIBuilder::buildPage(std::size_t index) {
 
     active_page_ = index;
     const PageConfig& page = config_->pages[index];
+    
+    // Check if this is a custom suspension interface page
+    if (page.type == "custom_html" && page.custom_content == "suspension_interface") {
+        // Save the current page as the last page before suspension (unless already on suspension)
+        if (active_page_ > 0 && active_page_ < config_->pages.size()) {
+            // Find a non-suspension page to go back to
+            for (std::size_t i = 0; i < config_->pages.size(); ++i) {
+                if (i != index && (config_->pages[i].type != "custom_html" || config_->pages[i].custom_content != "suspension_interface")) {
+                    last_page_before_suspension_ = i;
+                    break;
+                }
+            }
+        }
+        buildSuspensionInterfacePage(page);
+        updateNavSelection();
+        return;
+    }
 
     const std::string page_bg_hex = !page.bg_color.empty()
         ? page.bg_color
@@ -2409,6 +2426,356 @@ uint32_t UIBuilder::nextUtf8Codepoint(const std::string& text, std::size_t& inde
 }
 
 // ============================================================================
+// Suspension Interface UI Implementation
+// ============================================================================
+
+void UIBuilder::buildSuspensionInterfacePage(const PageConfig& page) {
+    if (!base_screen_) return;
+
+    suspension_ui_ = {};
+
+    const std::string page_bg_hex = !page.bg_color.empty()
+        ? page.bg_color
+        : (config_ ? config_->theme.page_bg_color : "#0F0F0F");
+
+    // Hide the header and nav for full-screen experience
+    if (header_bar_) lv_obj_add_flag(header_bar_, LV_OBJ_FLAG_HIDDEN);
+    if (nav_bar_) lv_obj_add_flag(nav_bar_, LV_OBJ_FLAG_HIDDEN);
+    if (header_overlay_) lv_obj_add_flag(header_overlay_, LV_OBJ_FLAG_HIDDEN);
+    
+    // Use content_root_ for the full-screen suspension interface
+    lv_obj_clean(content_root_);
+    lv_obj_remove_style_all(content_root_);
+    lv_obj_set_width(content_root_, lv_pct(100));
+    lv_obj_set_height(content_root_, lv_pct(100));
+    lv_obj_set_style_bg_color(content_root_, colorFromHex(page_bg_hex, UITheme::COLOR_SURFACE), 0);
+    lv_obj_set_style_bg_opa(content_root_, LV_OPA_COVER, 0);
+    lv_obj_set_style_radius(content_root_, 0, 0);
+    lv_obj_set_style_pad_all(content_root_, 8, 0);
+    lv_obj_set_style_border_width(content_root_, 0, 0);
+    lv_obj_set_layout(content_root_, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(content_root_, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(content_root_, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_gap(content_root_, 8, 0);
+    lv_obj_clear_flag(content_root_, LV_OBJ_FLAG_SCROLLABLE);
+
+    // Create compact title row with back button, title, and calibrate button
+    lv_obj_t* title_row = lv_obj_create(content_root_);
+    lv_obj_remove_style_all(title_row);
+    lv_obj_set_size(title_row, lv_pct(100), LV_SIZE_CONTENT);
+    lv_obj_set_layout(title_row, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(title_row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(title_row, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_bottom(title_row, 4, 0);
+    
+    // Back button (small arrow)
+    lv_obj_t* back_btn = lv_btn_create(title_row);
+    lv_obj_set_size(back_btn, 36, 30);
+    lv_obj_set_style_bg_color(back_btn, lv_color_hex(0x1a1d28), 0);
+    lv_obj_set_style_bg_color(back_btn, lv_color_hex(0x2a2f3d), LV_STATE_PRESSED);
+    lv_obj_set_style_radius(back_btn, 8, 0);
+    lv_obj_t* back_lbl = lv_label_create(back_btn);
+    lv_label_set_text(back_lbl, LV_SYMBOL_LEFT);
+    lv_obj_set_style_text_font(back_lbl, &lv_font_montserrat_14, 0);
+    lv_obj_center(back_lbl);
+    lv_obj_add_event_cb(back_btn, suspensionBackEvent, LV_EVENT_CLICKED, nullptr);
+    
+    lv_obj_t* title = lv_label_create(title_row);
+    lv_label_set_text(title, "Suspension Controls");
+    lv_obj_set_style_text_font(title, &lv_font_montserrat_18, 0);
+    lv_obj_set_style_text_color(title, lv_color_hex(0xff9d2e), 0);
+    
+    // Calibrate button
+    lv_obj_t* cal_btn = lv_btn_create(title_row);
+    lv_obj_set_size(cal_btn, 96, 28);
+    lv_obj_set_style_bg_color(cal_btn, lv_color_hex(0x7ad7f0), 0);
+    lv_obj_set_style_bg_color(cal_btn, lv_color_hex(0x5ac0d0), LV_STATE_PRESSED);
+    lv_obj_set_style_radius(cal_btn, 10, 0);
+    lv_obj_t* cal_lbl = lv_label_create(cal_btn);
+    lv_label_set_text(cal_lbl, "Calibrate");
+    lv_obj_set_style_text_font(cal_lbl, &lv_font_montserrat_12, 0);
+    lv_obj_set_style_text_color(cal_lbl, lv_color_hex(0x0a0f0a), 0);
+    lv_obj_center(cal_lbl);
+    lv_obj_add_event_cb(cal_btn, suspensionCalibrateEvent, LV_EVENT_CLICKED, nullptr);
+    suspension_ui_.calibrate_btn = cal_btn;
+    suspension_ui_.calibrate_label = cal_lbl;
+
+    // Front Dampers Section
+    lv_obj_t* front_label = lv_label_create(content_root_);
+    lv_label_set_text(front_label, "FRONT DAMPER SETTINGS");
+    lv_obj_set_style_text_font(front_label, &lv_font_montserrat_12, 0);
+    lv_obj_set_style_text_color(front_label, lv_color_hex(0x8d92a3), 0);
+    lv_obj_set_width(front_label, lv_pct(100));
+    lv_obj_set_style_text_align(front_label, LV_TEXT_ALIGN_CENTER, 0);
+    
+    // Front preset buttons
+    lv_obj_t* front_presets = lv_obj_create(content_root_);
+    lv_obj_remove_style_all(front_presets);
+    lv_obj_set_size(front_presets, lv_pct(100), LV_SIZE_CONTENT);
+    lv_obj_set_layout(front_presets, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(front_presets, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(front_presets, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_gap(front_presets, 6, 0);
+    
+    for(int i = 1; i <= 5; i++) {
+        lv_obj_t* preset_btn = lv_btn_create(front_presets);
+        lv_obj_set_size(preset_btn, 40, 22);
+        lv_obj_set_style_bg_color(preset_btn, lv_color_hex(0x2a2a3a), 0);
+        lv_obj_set_style_bg_color(preset_btn, lv_color_hex(0xff9d2e), LV_STATE_PRESSED);
+        lv_obj_set_style_bg_color(preset_btn, lv_color_hex(0xff9d2e), LV_STATE_CHECKED);
+        lv_obj_set_style_radius(preset_btn, 8, 0);
+        lv_obj_t* preset_lbl = lv_label_create(preset_btn);
+        char label[4];
+        snprintf(label, sizeof(label), "%d", i);
+        lv_label_set_text(preset_lbl, label);
+        lv_obj_set_style_text_font(preset_lbl, &lv_font_montserrat_12, 0);
+        lv_obj_center(preset_lbl);
+        lv_obj_add_flag(preset_btn, LV_OBJ_FLAG_CHECKABLE);
+        lv_obj_set_user_data(preset_btn, (void*)"front");
+        lv_obj_add_event_cb(preset_btn, suspensionPresetEvent, LV_EVENT_CLICKED, (void*)(intptr_t)i);
+        suspension_ui_.front_preset_btns[i - 1] = preset_btn;
+    }
+
+    // Front dampers container
+    lv_obj_t* front_cont = lv_obj_create(content_root_);
+    lv_obj_remove_style_all(front_cont);
+    lv_obj_set_size(front_cont, lv_pct(100), LV_SIZE_CONTENT);
+    lv_obj_set_layout(front_cont, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(front_cont, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(front_cont, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_gap(front_cont, 8, 0);
+    lv_obj_set_flex_grow(front_cont, 1);
+
+    // Front Left + Front Right damper cards (slightly smaller)
+    createDamperCard(front_cont, "Front Left", "FL");
+    createDamperCard(front_cont, "Front Right", "FR");
+
+    // Rear Dampers Section
+    lv_obj_t* rear_label = lv_label_create(content_root_);
+    lv_label_set_text(rear_label, "REAR DAMPER SETTINGS");
+    lv_obj_set_style_text_font(rear_label, &lv_font_montserrat_12, 0);
+    lv_obj_set_style_text_color(rear_label, lv_color_hex(0x8d92a3), 0);
+    lv_obj_set_width(rear_label, lv_pct(100));
+    lv_obj_set_style_text_align(rear_label, LV_TEXT_ALIGN_CENTER, 0);
+    
+    // Rear preset buttons
+    lv_obj_t* rear_presets = lv_obj_create(content_root_);
+    lv_obj_remove_style_all(rear_presets);
+    lv_obj_set_size(rear_presets, lv_pct(100), LV_SIZE_CONTENT);
+    lv_obj_set_layout(rear_presets, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(rear_presets, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(rear_presets, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_gap(rear_presets, 6, 0);
+    
+    for(int i = 1; i <= 5; i++) {
+        lv_obj_t* preset_btn = lv_btn_create(rear_presets);
+        lv_obj_set_size(preset_btn, 40, 22);
+        lv_obj_set_style_bg_color(preset_btn, lv_color_hex(0x2a2a3a), 0);
+        lv_obj_set_style_bg_color(preset_btn, lv_color_hex(0xff9d2e), LV_STATE_PRESSED);
+        lv_obj_set_style_bg_color(preset_btn, lv_color_hex(0xff9d2e), LV_STATE_CHECKED);
+        lv_obj_set_style_radius(preset_btn, 8, 0);
+        lv_obj_t* preset_lbl = lv_label_create(preset_btn);
+        char label[4];
+        snprintf(label, sizeof(label), "%d", i);
+        lv_label_set_text(preset_lbl, label);
+        lv_obj_set_style_text_font(preset_lbl, &lv_font_montserrat_12, 0);
+        lv_obj_center(preset_lbl);
+        lv_obj_add_flag(preset_btn, LV_OBJ_FLAG_CHECKABLE);
+        lv_obj_set_user_data(preset_btn, (void*)"rear");
+        lv_obj_add_event_cb(preset_btn, suspensionPresetEvent, LV_EVENT_CLICKED, (void*)(intptr_t)i);
+        suspension_ui_.rear_preset_btns[i - 1] = preset_btn;
+    }
+
+    // Rear dampers container
+    lv_obj_t* rear_cont = lv_obj_create(content_root_);
+    lv_obj_remove_style_all(rear_cont);
+    lv_obj_set_size(rear_cont, lv_pct(100), LV_SIZE_CONTENT);
+    lv_obj_set_layout(rear_cont, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(rear_cont, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(rear_cont, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_gap(rear_cont, 8, 0);
+    lv_obj_set_flex_grow(rear_cont, 1);
+
+    // Rear Left + Rear Right damper cards
+    createDamperCard(rear_cont, "Rear Left", "RL");
+    createDamperCard(rear_cont, "Rear Right", "RR");
+
+    // Anti-Roll & Anti-Pitch Section
+    lv_obj_t* control_label = lv_label_create(content_root_);
+    lv_label_set_text(control_label, "ANTI-ROLL & PITCH");
+    lv_obj_set_style_text_font(control_label, &lv_font_montserrat_12, 0);
+    lv_obj_set_style_text_color(control_label, lv_color_hex(0x8d92a3), 0);
+    lv_obj_set_width(control_label, lv_pct(100));
+    lv_obj_set_style_text_align(control_label, LV_TEXT_ALIGN_CENTER, 0);
+
+    // Control buttons container
+    lv_obj_t* control_cont = lv_obj_create(content_root_);
+    lv_obj_remove_style_all(control_cont);
+    lv_obj_set_size(control_cont, lv_pct(100), LV_SIZE_CONTENT);
+    lv_obj_set_layout(control_cont, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(control_cont, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(control_cont, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_gap(control_cont, 8, 0);
+    lv_obj_set_flex_grow(control_cont, 1);
+
+    // Anti-Roll + Anti-Pitch controls (carded like the web UI)
+    createControlCard(control_cont, "ANTI-ROLL");
+    createControlCard(control_cont, "ANTI-PITCH");
+
+    updateNavSelection();
+    updateSuspensionUI();
+}
+
+lv_obj_t* UIBuilder::createDamperCard(lv_obj_t* parent, const char* label, const char* id) {
+    lv_obj_t* card = lv_obj_create(parent);
+    lv_obj_set_size(card, lv_pct(48), LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_color(card, lv_color_hex(0x10131b), 0);
+    lv_obj_set_style_border_color(card, lv_color_hex(0x242938), 0);
+    lv_obj_set_style_border_width(card, 1, 0);
+    lv_obj_set_style_radius(card, 10, 0);
+    lv_obj_set_style_pad_all(card, 8, 0);
+    lv_obj_set_style_shadow_width(card, 8, 0);
+    lv_obj_set_style_shadow_color(card, lv_color_hex(0x0a0d14), 0);
+    lv_obj_set_style_shadow_opa(card, LV_OPA_30, 0);
+    lv_obj_set_layout(card, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(card, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(card, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_gap(card, 6, 0);
+
+    // Header label
+    lv_obj_t* header = lv_label_create(card);
+    lv_label_set_text(header, label);
+    lv_obj_set_style_text_font(header, &lv_font_montserrat_12, 0);
+    lv_obj_set_style_text_color(header, lv_color_hex(0x7ad7f0), 0);
+
+    // Controls container (- value +)
+    lv_obj_t* controls = lv_obj_create(card);
+    lv_obj_remove_style_all(controls);
+    lv_obj_set_width(controls, lv_pct(100));
+    lv_obj_set_layout(controls, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(controls, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(controls, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_gap(controls, 6, 0);
+
+    // Decrease button
+    lv_obj_t* btn_dec = lv_btn_create(controls);
+    lv_obj_set_size(btn_dec, 32, 32);
+    lv_obj_set_style_bg_color(btn_dec, lv_color_hex(0x1a1d28), 0);
+    lv_obj_set_style_bg_color(btn_dec, lv_color_hex(0xff6b6b), LV_STATE_PRESSED);
+    lv_obj_set_style_radius(btn_dec, 8, 0);
+    lv_obj_t* label_dec = lv_label_create(btn_dec);
+    lv_label_set_text(label_dec, "-");
+    lv_obj_set_style_text_font(label_dec, &lv_font_montserrat_16, 0);
+    lv_obj_center(label_dec);
+    lv_obj_set_user_data(btn_dec, (void*)id);  // Store damper ID
+    lv_obj_add_event_cb(btn_dec, suspensionDamperEvent, LV_EVENT_CLICKED, (void*)-5);  // -5%
+
+    // Value display
+    lv_obj_t* value = lv_label_create(controls);
+    lv_label_set_text(value, "0%");
+    lv_obj_set_style_text_font(value, &lv_font_montserrat_18, 0);
+    lv_obj_set_style_text_color(value, lv_color_hex(0xff9d2e), 0);
+
+    // Increase button
+    lv_obj_t* btn_inc = lv_btn_create(controls);
+    lv_obj_set_size(btn_inc, 32, 32);
+    lv_obj_set_style_bg_color(btn_inc, lv_color_hex(0x1a1d28), 0);
+    lv_obj_set_style_bg_color(btn_inc, lv_color_hex(0x3dd598), LV_STATE_PRESSED);
+    lv_obj_set_style_radius(btn_inc, 8, 0);
+    lv_obj_t* label_inc = lv_label_create(btn_inc);
+    lv_label_set_text(label_inc, "+");
+    lv_obj_set_style_text_font(label_inc, &lv_font_montserrat_16, 0);
+    lv_obj_center(label_inc);
+    lv_obj_set_user_data(btn_inc, (void*)id);  // Store damper ID
+    lv_obj_add_event_cb(btn_inc, suspensionDamperEvent, LV_EVENT_CLICKED, (void*)5);  // +5%
+
+    // Status
+    lv_obj_t* status = lv_label_create(card);
+    lv_label_set_text(status, "\u25cf Ready");
+    lv_obj_set_style_text_font(status, &lv_font_montserrat_12, 0);
+    lv_obj_set_style_text_color(status, lv_color_hex(0x3dd598), 0);
+
+    // Track UI elements for feedback updates
+    if (strcmp(id, "FL") == 0) {
+        suspension_ui_.fl_value_label = value;
+        suspension_ui_.fl_status_label = status;
+    } else if (strcmp(id, "FR") == 0) {
+        suspension_ui_.fr_value_label = value;
+        suspension_ui_.fr_status_label = status;
+    } else if (strcmp(id, "RL") == 0) {
+        suspension_ui_.rl_value_label = value;
+        suspension_ui_.rl_status_label = status;
+    } else if (strcmp(id, "RR") == 0) {
+        suspension_ui_.rr_value_label = value;
+        suspension_ui_.rr_status_label = status;
+    }
+
+    return card;
+}
+
+lv_obj_t* UIBuilder::createControlCard(lv_obj_t* parent, const char* label) {
+    lv_obj_t* card = lv_obj_create(parent);
+    lv_obj_set_size(card, lv_pct(48), LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_color(card, lv_color_hex(0x10131b), 0);
+    lv_obj_set_style_border_color(card, lv_color_hex(0x242938), 0);
+    lv_obj_set_style_border_width(card, 1, 0);
+    lv_obj_set_style_radius(card, 10, 0);
+    lv_obj_set_style_pad_all(card, 8, 0);
+    lv_obj_set_style_shadow_width(card, 8, 0);
+    lv_obj_set_style_shadow_color(card, lv_color_hex(0x0a0d14), 0);
+    lv_obj_set_style_shadow_opa(card, LV_OPA_30, 0);
+    lv_obj_set_layout(card, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(card, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_style_pad_gap(card, 6, 0);
+    lv_obj_set_flex_align(card, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+
+    // Header
+    lv_obj_t* header = lv_label_create(card);
+    lv_label_set_text(header, label);
+    lv_obj_set_style_text_font(header, &lv_font_montserrat_12, 0);
+    lv_obj_set_style_text_color(header, lv_color_hex(0x7ad7f0), 0);
+
+    // Buttons container
+    lv_obj_t* btns = lv_obj_create(card);
+    lv_obj_remove_style_all(btns);
+    lv_obj_set_width(btns, lv_pct(100));
+    lv_obj_set_layout(btns, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(btns, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(btns, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_gap(btns, 6, 0);
+
+    const char* labels[] = {"Decrease", "Neutral", "Increase"};
+    uint32_t active_colors[] = {0xff6b6b, 0x3dd598, 0xff9d2e};
+    const bool is_roll = (strcmp(label, "ANTI-ROLL") == 0);
+    const bool is_pitch = (strcmp(label, "ANTI-PITCH") == 0);
+    
+    for(int i = 0; i < 3; i++) {
+        lv_obj_t* btn = lv_btn_create(btns);
+        lv_obj_set_size(btn, 68, 32);
+        lv_obj_set_style_bg_color(btn, lv_color_hex(0x1a1d28), 0);
+        lv_obj_set_style_bg_color(btn, lv_color_hex(active_colors[i]), LV_STATE_PRESSED);
+        lv_obj_set_style_bg_color(btn, lv_color_hex(active_colors[i]), LV_STATE_CHECKED);
+        lv_obj_set_style_radius(btn, 8, 0);
+        lv_obj_t* lbl = lv_label_create(btn);
+        lv_label_set_text(lbl, labels[i]);
+        lv_obj_set_style_text_font(lbl, &lv_font_montserrat_12, 0);
+        lv_obj_center(lbl);
+        lv_obj_add_flag(btn, LV_OBJ_FLAG_CHECKABLE);
+        if (is_roll) {
+            suspension_ui_.roll_btns[i] = btn;
+            lv_obj_set_user_data(btn, (void*)"roll");
+            lv_obj_add_event_cb(btn, suspensionControlEvent, LV_EVENT_CLICKED, (void*)(intptr_t)i);
+        } else if (is_pitch) {
+            suspension_ui_.pitch_btns[i] = btn;
+            lv_obj_set_user_data(btn, (void*)"pitch");
+            lv_obj_add_event_cb(btn, suspensionControlEvent, LV_EVENT_CLICKED, (void*)(intptr_t)i);
+        }
+    }
+
+    return card;
+}
+
+// ============================================================================
 // Infinitybox UI Implementation
 // ============================================================================
 
@@ -2678,6 +3045,216 @@ void UIBuilder::infinityboxMomentaryEvent(lv_event_t* e) {
         Serial.println(function_name);
         InfinityboxControl::InfinityboxController::instance().activateFunction(function_name, false);
     }
+}
+
+// ============================================================================
+// SUSPENSION EVENT HANDLERS
+// ============================================================================
+
+void UIBuilder::suspensionDamperEvent(lv_event_t* e) {
+    lv_obj_t* btn = lv_event_get_target(e);
+    const char* damper_id = (const char*)lv_obj_get_user_data(btn);
+    int delta = (int)(intptr_t)lv_event_get_user_data(e);  // +5 or -5
+    
+    if (!damper_id) return;
+    
+    // Get current suspension state
+    SuspensionState state = CanManager::instance().getSuspensionState();
+    
+    // Update the appropriate damper
+    uint8_t* target = nullptr;
+    if (strcmp(damper_id, "FL") == 0) target = &state.front_left_percent;
+    else if (strcmp(damper_id, "FR") == 0) target = &state.front_right_percent;
+    else if (strcmp(damper_id, "RL") == 0) target = &state.rear_left_percent;
+    else if (strcmp(damper_id, "RR") == 0) target = &state.rear_right_percent;
+    
+    if (target) {
+        int new_val = (int)*target + delta;
+        if (new_val < 0) new_val = 0;
+        if (new_val > 100) new_val = 100;
+        *target = (uint8_t)new_val;
+        state.power_on = true;  // Enable power when adjusting
+        
+        // Update CAN manager (will be transmitted on next 300ms tick)
+        CanManager::instance().updateSuspensionState(state);
+        
+        Serial.printf("[Suspension] %s %s -> %d%%\n", damper_id, 
+                      delta > 0 ? "INC" : "DEC", new_val);
+        
+        // Update UI immediately for responsiveness
+        UIBuilder::instance().updateSuspensionUI();
+    }
+}
+
+void UIBuilder::suspensionPresetEvent(lv_event_t* e) {
+    lv_obj_t* btn = lv_event_get_target(e);
+    int preset_number = (int)(intptr_t)lv_event_get_user_data(e);  // 1-5
+    const char* axle = (const char*)lv_obj_get_user_data(btn);  // "front" or "rear"
+    
+    if (!axle) return;
+    
+    // Preset damping percentages (adjust based on your spec)
+    const uint8_t preset_values[] = {0, 25, 50, 75, 100};  // Presets 1-5
+    uint8_t value = preset_values[preset_number - 1];
+    
+    // Get current state
+    SuspensionState state = CanManager::instance().getSuspensionState();
+    
+    // Apply preset to front or rear
+    if (strcmp(axle, "front") == 0) {
+        state.front_left_percent = value;
+        state.front_right_percent = value;
+        UIBuilder::instance().suspension_front_preset_active_ = preset_number - 1;
+        Serial.printf("[Suspension] Front preset %d -> %d%%\n", preset_number, value);
+    } else if (strcmp(axle, "rear") == 0) {
+        state.rear_left_percent = value;
+        state.rear_right_percent = value;
+        UIBuilder::instance().suspension_rear_preset_active_ = preset_number - 1;
+        Serial.printf("[Suspension] Rear preset %d -> %d%%\n", preset_number, value);
+    }
+    
+    state.power_on = true;
+    CanManager::instance().updateSuspensionState(state);
+    UIBuilder::instance().updateSuspensionUI();
+}
+
+void UIBuilder::suspensionCalibrateEvent(lv_event_t* e) {
+    SuspensionState state = CanManager::instance().getSuspensionState();
+    state.calibration_active = !state.calibration_active;
+    
+    CanManager::instance().updateSuspensionState(state);
+    UIBuilder::instance().updateSuspensionUI();
+    
+    Serial.printf("[Suspension] Calibration %s\n", 
+                  state.calibration_active ? "ACTIVE" : "INACTIVE");
+}
+
+void UIBuilder::suspensionControlEvent(lv_event_t* e) {
+    lv_obj_t* btn = lv_event_get_target(e);
+    const char* group = (const char*)lv_obj_get_user_data(btn);
+    int index = (int)(intptr_t)lv_event_get_user_data(e);  // 0-2
+
+    if (!group) return;
+
+    if (strcmp(group, "roll") == 0) {
+        UIBuilder::instance().suspension_roll_active_ = index;
+    } else if (strcmp(group, "pitch") == 0) {
+        UIBuilder::instance().suspension_pitch_active_ = index;
+    }
+
+    UIBuilder::instance().updateSuspensionUI();
+}
+
+void UIBuilder::suspensionBackEvent(lv_event_t* e) {
+    UIBuilder& builder = UIBuilder::instance();
+    
+    // Restore header and nav visibility
+    if (builder.header_bar_) lv_obj_clear_flag(builder.header_bar_, LV_OBJ_FLAG_HIDDEN);
+    if (builder.nav_bar_) lv_obj_clear_flag(builder.nav_bar_, LV_OBJ_FLAG_HIDDEN);
+    if (builder.header_overlay_) lv_obj_clear_flag(builder.header_overlay_, LV_OBJ_FLAG_HIDDEN);
+    
+    // Go back to the last page before suspension
+    builder.buildPage(builder.last_page_before_suspension_);
+    
+    Serial.printf("[Suspension] Back to page %zu\n", builder.last_page_before_suspension_);
+}
+
+void UIBuilder::updateSuspensionUI() {
+    SuspensionState state = CanManager::instance().getSuspensionState();
+    
+    // Update value labels
+    char buf[8];
+    if (suspension_ui_.fl_value_label) {
+        snprintf(buf, sizeof(buf), "%d%%", state.front_left_percent);
+        lv_label_set_text(suspension_ui_.fl_value_label, buf);
+    }
+    if (suspension_ui_.fr_value_label) {
+        snprintf(buf, sizeof(buf), "%d%%", state.front_right_percent);
+        lv_label_set_text(suspension_ui_.fr_value_label, buf);
+    }
+    if (suspension_ui_.rl_value_label) {
+        snprintf(buf, sizeof(buf), "%d%%", state.rear_left_percent);
+        lv_label_set_text(suspension_ui_.rl_value_label, buf);
+    }
+    if (suspension_ui_.rr_value_label) {
+        snprintf(buf, sizeof(buf), "%d%%", state.rear_right_percent);
+        lv_label_set_text(suspension_ui_.rr_value_label, buf);
+    }
+    
+    // Update status indicators based on feedback
+    uint32_t now = millis();
+    bool feedback_fresh = (now - state.last_feedback_ms) < 1000;  // < 1s old
+    
+    auto updateStatus = [&](lv_obj_t* label, uint8_t desired, uint8_t actual) {
+        if (!label) return;
+        
+        if (!feedback_fresh) {
+            lv_label_set_text(label, "\u25cf Waiting");
+            lv_obj_set_style_text_color(label, lv_color_hex(0x8d92a3), 0);
+        } else if (state.fault_flags != 0) {
+            lv_label_set_text(label, "\u2716 Error");
+            lv_obj_set_style_text_color(label, lv_color_hex(0xff6b6b), 0);
+        } else if (abs((int)desired - (int)actual) <= 2) {
+            lv_label_set_text(label, "\u2713 OK");
+            lv_obj_set_style_text_color(label, lv_color_hex(0x3dd598), 0);
+        } else {
+            lv_label_set_text(label, "\u25cf Active");
+            lv_obj_set_style_text_color(label, lv_color_hex(0xff9d2e), 0);
+        }
+    };
+
+    const uint8_t preset_values[] = {0, 25, 50, 75, 100};
+    if (state.front_left_percent == state.front_right_percent) {
+        suspension_front_preset_active_ = -1;
+        for (int i = 0; i < 5; i++) {
+            if (state.front_left_percent == preset_values[i]) {
+                suspension_front_preset_active_ = i;
+                break;
+            }
+        }
+    } else {
+        suspension_front_preset_active_ = -1;
+    }
+
+    if (state.rear_left_percent == state.rear_right_percent) {
+        suspension_rear_preset_active_ = -1;
+        for (int i = 0; i < 5; i++) {
+            if (state.rear_left_percent == preset_values[i]) {
+                suspension_rear_preset_active_ = i;
+                break;
+            }
+        }
+    } else {
+        suspension_rear_preset_active_ = -1;
+    }
+
+    auto applyCheckedState = [](lv_obj_t** btns, int count, int active_index) {
+        for (int i = 0; i < count; i++) {
+            if (!btns[i]) continue;
+            if (i == active_index) lv_obj_add_state(btns[i], LV_STATE_CHECKED);
+            else lv_obj_clear_state(btns[i], LV_STATE_CHECKED);
+        }
+    };
+
+    applyCheckedState(suspension_ui_.front_preset_btns, 5, suspension_front_preset_active_);
+    applyCheckedState(suspension_ui_.rear_preset_btns, 5, suspension_rear_preset_active_);
+    applyCheckedState(suspension_ui_.roll_btns, 3, suspension_roll_active_);
+    applyCheckedState(suspension_ui_.pitch_btns, 3, suspension_pitch_active_);
+
+    if (suspension_ui_.calibrate_btn && suspension_ui_.calibrate_label) {
+        if (state.calibration_active) {
+            lv_obj_set_style_bg_color(suspension_ui_.calibrate_btn, lv_color_hex(0xff9d2e), 0);
+            lv_obj_set_style_text_color(suspension_ui_.calibrate_label, lv_color_hex(0x0f0f0f), 0);
+        } else {
+            lv_obj_set_style_bg_color(suspension_ui_.calibrate_btn, lv_color_hex(0x7ad7f0), 0);
+            lv_obj_set_style_text_color(suspension_ui_.calibrate_label, lv_color_hex(0x0a0f0a), 0);
+        }
+    }
+    
+    updateStatus(suspension_ui_.fl_status_label, state.front_left_percent, state.actual_fl_percent);
+    updateStatus(suspension_ui_.fr_status_label, state.front_right_percent, state.actual_fr_percent);
+    updateStatus(suspension_ui_.rl_status_label, state.rear_left_percent, state.actual_rl_percent);
+    updateStatus(suspension_ui_.rr_status_label, state.rear_right_percent, state.actual_rr_percent);
 }
 
 void UIBuilder::infinityboxFlashEvent(lv_event_t* e) {

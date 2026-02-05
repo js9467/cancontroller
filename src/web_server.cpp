@@ -1063,6 +1063,9 @@ void WebServerManager::setupRoutes() {
         }
         tr:hover { background: #333; }
         .frame-id { color: #fbbf24; }
+        .frame-dir { font-weight: 700; letter-spacing: 0.5px; }
+        .dir-tx { color: #60a5fa; }
+        .dir-rx { color: #4ade80; }
         .frame-pgn { color: #60a5fa; }
         .frame-data { 
             color: #a3e635;
@@ -1134,6 +1137,7 @@ void WebServerManager::setupRoutes() {
             <thead>
                 <tr>
                     <th style="width:80px">Time</th>
+                    <th style="width:50px">Dir</th>
                     <th style="width:120px">ID (Hex)</th>
                     <th style="width:100px">PGN</th>
                     <th style="width:50px">SA</th>
@@ -1143,7 +1147,7 @@ void WebServerManager::setupRoutes() {
                 </tr>
             </thead>
             <tbody id="frame-table">
-                <tr><td colspan="7" class="no-frames">Waiting for CAN frames...</td></tr>
+                <tr><td colspan="8" class="no-frames">Waiting for CAN frames...</td></tr>
             </tbody>
         </table>
     </div>
@@ -1211,9 +1215,12 @@ void WebServerManager::setupRoutes() {
             
             const now = new Date();
             const timeStr = now.toLocaleTimeString() + '.' + String(now.getMilliseconds()).padStart(3, '0');
+            const dir = (frame.dir || 'RX').toUpperCase();
+            const dirClass = dir === 'TX' ? 'dir-tx' : 'dir-rx';
             
             row.innerHTML = `
                 <td class="timestamp">${timeStr}</td>
+                <td class="frame-dir ${dirClass}">${dir}</td>
                 <td class="frame-id">${frame.id}</td>
                 <td class="frame-pgn">0x${pgn.toString(16).toUpperCase()}</td>
                 <td>${sa.toString(16).toUpperCase()}</td>
@@ -1272,7 +1279,7 @@ void WebServerManager::setupRoutes() {
         }
         
         function clearFrames() {
-            document.getElementById('frame-table').innerHTML = '<tr><td colspan="7" class="no-frames">Cleared - waiting for frames...</td></tr>';
+            document.getElementById('frame-table').innerHTML = '<tr><td colspan="8" class="no-frames">Cleared - waiting for frames...</td></tr>';
             frameCount = 0;
             lastSecondCount = 0;
             document.getElementById('frame-count').textContent = '0';
@@ -1316,7 +1323,7 @@ void WebServerManager::disableAP() {
     ap_ip_ = IPAddress(0, 0, 0, 0);
 }
 
-void WebServerManager::broadcastCanFrame(const CanRxMessage& msg) {
+void WebServerManager::broadcastCanFrame(const CanRxMessage& msg, bool is_tx) {
     if (can_monitor_ws_.count() == 0) return;  // No clients connected
     
     DynamicJsonDocument doc(512);
@@ -1326,6 +1333,7 @@ void WebServerManager::broadcastCanFrame(const CanRxMessage& msg) {
     snprintf(id_hex, sizeof(id_hex), "%08lX", static_cast<unsigned long>(msg.identifier));
     doc["id"] = id_hex;
     doc["timestamp"] = msg.timestamp;
+    doc["dir"] = is_tx ? "TX" : "RX";
     
     JsonArray dataArray = doc.createNestedArray("data");
     for (uint8_t i = 0; i < msg.length && i < 8; i++) {
