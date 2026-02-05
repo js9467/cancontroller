@@ -26,7 +26,35 @@ CanManager& CanManager::instance() {
     if (!manager.suspension_mutex_) {
         manager.suspension_mutex_ = xSemaphoreCreateMutex();
     }
+    if (!manager.powercell_mutex_) {
+        manager.powercell_mutex_ = xSemaphoreCreateMutex();
+    }
     return manager;
+}
+
+namespace {
+
+bool decodePowercellStatusPgn(uint32_t pgn, uint8_t& cellAddress, uint8_t& bankStart) {
+    if (pgn >= 0xFF10 && pgn <= 0xFF1F) {
+        bankStart = 1;
+    } else if (pgn >= 0xFF20 && pgn <= 0xFF2F) {
+        bankStart = 6;
+    } else if (pgn >= 0xFF50 && pgn <= 0xFF5F) {
+        bankStart = 1;
+    } else if (pgn >= 0xFF60 && pgn <= 0xFF6F) {
+        bankStart = 6;
+    } else {
+        return false;
+    }
+
+    cellAddress = static_cast<uint8_t>(pgn & 0x0F);
+    if (cellAddress == 0) {
+        cellAddress = 16;
+    }
+
+    return true;
+}
+
 }
 
 void CanManager::forceCanMux() {
@@ -212,6 +240,42 @@ bool CanManager::sendFrame(const CanFrameConfig& frame) {
     return true;
 }
 
+bool CanManager::sendStandardFrame(uint16_t identifier, const uint8_t data[8], uint8_t length) {
+    if (!ready_) {
+        Serial.println("[CanManager] TWAI bus not initialized");
+        return false;
+    }
+
+    if (length == 0) {
+        Serial.println("[CanManager] Standard TX length is 0");
+        return false;
+    }
+
+    forceCanMux();
+
+    twai_message_t msg = {};
+    msg.identifier = identifier & 0x7FF;
+    msg.extd = 0;
+    msg.data_length_code = length > 8 ? 8 : length;
+    memcpy(msg.data, data, msg.data_length_code);
+
+    esp_err_t result = twai_transmit(&msg, pdMS_TO_TICKS(50));
+    if (result != ESP_OK) {
+        Serial.printf("[CanManager] ✗ STD TX FAILED (err=%d)\n", static_cast<int>(result));
+        return false;
+    }
+
+    CanRxMessage ws_msg;
+    ws_msg.identifier = msg.identifier;
+    ws_msg.length = msg.data_length_code;
+    memcpy(ws_msg.data, msg.data, 8);
+    ws_msg.timestamp = millis();
+    WebServerManager::instance().broadcastCanFrame(ws_msg, true);
+
+    Serial.printf("[CanManager] ✓ STD TX ID=0x%03X Len=%d\n", msg.identifier, msg.data_length_code);
+    return true;
+}
+
 std::uint32_t CanManager::buildIdentifier(const CanFrameConfig& frame) const {
     const std::uint8_t priority = frame.priority & 0x7;
     const std::uint8_t data_page = (frame.pgn >> 16) & 0x01;
@@ -297,6 +361,92 @@ bool CanManager::sendJ1939Pgn(uint8_t priority, uint32_t pgn, uint8_t source_add
                   (unsigned long)pgn, data[0], data[1], data[2], data[3], 
                   data[4], data[5], data[6], data[7]);
     return true;
+}
+
+bool CanManager::updatePowercellStatusFromPgn(uint32_t pgn, const uint8_t data[8]) {
+    uint8_t cellAddress = 0;
+    uint8_t bankStart = 0;
+    if (!decodePowercellStatusPgn(pgn, cellAddress, bankStart)) {
+        return false;
+    }
+
+    if (cellAddress < 1 || cellAddress > kPowercellMaxAddress) {
+        return false;
+    }
+
+    if (powercell_mutex_) {
+        xSemaphoreTake(powercell_mutex_, portMAX_DELAY);
+    }
+
+    PowercellCellStatus& cell = powercell_status_[cellAddress - 1];
+    cell.last_seen_ms = millis();
+    cell.voltage_raw = data[6];
+    cell.temperature_c = static_cast<int8_t>(data[7]);
+
+    for (uint8_t i = 0; i < 5; ++i) {
+        const uint8_t outputNumber = static_cast<uint8_t>(bankStart + i);
+        if (outputNumber > kPowercellOutputsPerCell) {
+            continue;
+        }
+
+        PowercellOutputState& out = cell.outputs[outputNumber - 1];
+        out.valid = true;
+        const uint8_t bitIndex = static_cast<uint8_t>(7 - i);
+        out.on = ((data[0] >> bitIndex) & 0x01) != 0;
+        out.current_raw = data[1 + i];
+        out.last_seen_ms = cell.last_seen_ms;
+    }
+
+    if (powercell_mutex_) {
+        xSemaphoreGive(powercell_mutex_);
+    }
+
+    return true;
+}
+
+PowercellOutputState CanManager::getPowercellOutputState(uint8_t cell_address, uint8_t output_number) const {
+    PowercellOutputState result;
+    if (cell_address < 1 || cell_address > kPowercellMaxAddress) {
+        return result;
+    }
+    if (output_number < 1 || output_number > kPowercellOutputsPerCell) {
+        return result;
+    }
+
+    if (powercell_mutex_) {
+        xSemaphoreTake(powercell_mutex_, portMAX_DELAY);
+    }
+
+    result = powercell_status_[cell_address - 1].outputs[output_number - 1];
+
+    if (powercell_mutex_) {
+        xSemaphoreGive(powercell_mutex_);
+    }
+
+    return result;
+}
+
+PowercellCellTelemetry CanManager::getPowercellCellTelemetry(uint8_t cell_address) const {
+    PowercellCellTelemetry result;
+    if (cell_address < 1 || cell_address > kPowercellMaxAddress) {
+        return result;
+    }
+
+    if (powercell_mutex_) {
+        xSemaphoreTake(powercell_mutex_, portMAX_DELAY);
+    }
+
+    const PowercellCellStatus& cell = powercell_status_[cell_address - 1];
+    result.valid = (cell.last_seen_ms > 0);
+    result.voltage_raw = cell.voltage_raw;
+    result.temperature_c = cell.temperature_c;
+    result.last_seen_ms = cell.last_seen_ms;
+
+    if (powercell_mutex_) {
+        xSemaphoreGive(powercell_mutex_);
+    }
+
+    return result;
 }
 
 // ============================================================================

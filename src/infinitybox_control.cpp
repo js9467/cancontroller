@@ -100,218 +100,93 @@ bool InfinityboxController::begin(Ipm1CanSystem* can_system, BehavioralOutput::B
     addDevice(im_dr);
     addDevice(im_pr);
     addDevice(mastercell);
-    
-    // Function definitions from JSON
-    // Turn signals
+
+    bool loaded_from_json = false;
     {
-        Function f;
-        f.name = "Left Turn Signal Front";
-        f.outputs = {{"pc_front", 1, "output_1"}};
-        f.allowed_behaviors = {BehaviorType::FLASH, BehaviorType::FLASH_TIMED};
-        f.requires = {"ignition"};
-        f.behavior_output_ids = {"left_turn_front"};
-        addFunction(f);
+        String system_json = Ipm1CanSystem::instance().getSystemJson();
+        DynamicJsonDocument doc(32768);
+        auto result = deserializeJson(doc, system_json);
+        if (result == DeserializationError::Ok) {
+            auto applyBehaviorBindings = [](Function& func) {
+                if (func.name == "Left Turn Signal Front") func.behavior_output_ids = {"left_turn_front"};
+                else if (func.name == "Right Turn Signal Front") func.behavior_output_ids = {"right_turn_front"};
+                else if (func.name == "4-Ways") func.behavior_scene_id = "hazard";
+                else if (func.name == "Ignition") func.behavior_output_ids = {"ignition"};
+                else if (func.name == "Starter") func.behavior_output_ids = {"starter"};
+                else if (func.name == "Headlights") func.behavior_output_ids = {"headlights"};
+                else if (func.name == "Parking Lights Front") func.behavior_output_ids = {"parking_front"};
+                else if (func.name == "High Beams") func.behavior_output_ids = {"high_beams"};
+                else if (func.name == "Horn") func.behavior_output_ids = {"horn"};
+                else if (func.name == "Cooling Fan") func.behavior_output_ids = {"cooling_fan"};
+                else if (func.name == "Left Turn Signal Rear") func.behavior_output_ids = {"left_turn_rear"};
+                else if (func.name == "Right Turn Signal Rear") func.behavior_output_ids = {"right_turn_rear"};
+                else if (func.name == "Brake Lights") func.behavior_output_ids = {"brake_lights"};
+                else if (func.name == "Interior Lights") func.behavior_output_ids = {"interior_lights"};
+                else if (func.name == "Backup Lights") func.behavior_output_ids = {"backup_lights"};
+                else if (func.name == "Parking Lights Rear") func.behavior_output_ids = {"parking_rear"};
+                else if (func.name == "Fuel Pump") func.behavior_output_ids = {"fuel_pump"};
+            };
+
+            JsonArray functions = doc["functions"].as<JsonArray>();
+            for (JsonObject fObj : functions) {
+                Function f;
+                f.name = fObj["name"] | "";
+                f.renameable = fObj["renameable"] | false;
+
+                JsonArray behaviors = fObj["behaviors"].as<JsonArray>();
+                for (JsonVariant behavior : behaviors) {
+                    if (behavior.is<const char*>()) {
+                        f.allowed_behaviors.push_back(stringToBehavior(behavior.as<const char*>()));
+                    }
+                }
+
+                JsonArray requires = fObj["requires"].as<JsonArray>();
+                for (JsonVariant req : requires) {
+                    if (req.is<const char*>()) {
+                        f.requires.push_back(req.as<const char*>());
+                    }
+                }
+
+                JsonArray blocked = fObj["blocked_when"].as<JsonArray>();
+                for (JsonVariant blk : blocked) {
+                    if (blk.is<const char*>()) {
+                        f.blocked_when.push_back(blk.as<const char*>());
+                    }
+                }
+
+                String device = fObj["device"] | "";
+
+                JsonVariant output = fObj["output"];
+                if (!output.isNull()) {
+                    if (output.is<int>()) {
+                        const int output_num = output.as<int>();
+                        f.outputs.push_back({device.c_str(), static_cast<uint8_t>(output_num), "output_" + std::to_string(output_num)});
+                    } else if (output.is<const char*>()) {
+                        f.outputs.push_back({device.c_str(), 0, output.as<const char*>()});
+                    }
+                }
+
+                JsonArray outputs = fObj["outputs"].as<JsonArray>();
+                for (JsonVariant out : outputs) {
+                    if (!out.is<int>()) continue;
+                    const int output_num = out.as<int>();
+                    f.outputs.push_back({device.c_str(), static_cast<uint8_t>(output_num), "output_" + std::to_string(output_num)});
+                }
+
+                applyBehaviorBindings(f);
+
+                if (!f.name.empty()) {
+                    addFunction(f);
+                }
+            }
+            loaded_from_json = true;
+        } else {
+            Serial.printf("[IBOX] WARNING: Failed to parse system JSON (%s)\n", result.c_str());
+        }
     }
-    {
-        Function f;
-        f.name = "Right Turn Signal Front";
-        f.outputs = {{"pc_front", 2, "output_2"}};
-        f.allowed_behaviors = {BehaviorType::FLASH, BehaviorType::FLASH_TIMED};
-        f.requires = {"ignition"};
-        f.behavior_output_ids = {"right_turn_front"};
-        addFunction(f);
-    }
-    {
-        Function f;
-        f.name = "4-Ways";
-        f.outputs = {{"pc_front", 1, "output_1"}, {"pc_front", 2, "output_2"}};
-        f.allowed_behaviors = {BehaviorType::FLASH};
-        f.behavior_scene_id = "hazard";
-        addFunction(f);
-    }
-    
-    // Powertrain
-    {
-        Function f;
-        f.name = "Ignition";
-        f.outputs = {{"pc_front", 3, "output_3"}};
-        f.allowed_behaviors = {BehaviorType::TOGGLE};
-        f.behavior_output_ids = {"ignition"};
-        addFunction(f);
-    }
-    {
-        Function f;
-        f.name = "Starter";
-        f.outputs = {{"pc_front", 4, "output_4"}};
-        f.allowed_behaviors = {BehaviorType::MOMENTARY};
-        f.blocked_when = {"security"};
-        f.behavior_output_ids = {"starter"};
-        addFunction(f);
-    }
-    
-    // Lighting
-    {
-        Function f;
-        f.name = "Headlights";
-        f.outputs = {{"pc_front", 5, "output_5"}};
-        f.allowed_behaviors = {BehaviorType::TOGGLE, BehaviorType::SCENE, BehaviorType::FADE};
-        f.behavior_output_ids = {"headlights"};
-        addFunction(f);
-    }
-    {
-        Function f;
-        f.name = "Parking Lights Front";
-        f.outputs = {{"pc_front", 6, "output_6"}};
-        f.allowed_behaviors = {BehaviorType::TOGGLE};
-        f.behavior_output_ids = {"parking_front"};
-        addFunction(f);
-    }
-    {
-        Function f;
-        f.name = "High Beams";
-        f.outputs = {{"pc_front", 7, "output_7"}};
-        f.allowed_behaviors = {BehaviorType::MOMENTARY, BehaviorType::TOGGLE};
-        f.behavior_output_ids = {"high_beams"};
-        addFunction(f);
-    }
-    {
-        Function f;
-        f.name = "Horn";
-        f.outputs = {{"pc_front", 9, "output_9"}};
-        f.allowed_behaviors = {BehaviorType::MOMENTARY};
-        f.behavior_output_ids = {"horn"};
-        addFunction(f);
-    }
-    {
-        Function f;
-        f.name = "Cooling Fan";
-        f.outputs = {{"pc_front", 10, "output_10"}};
-        f.allowed_behaviors = {BehaviorType::TOGGLE, BehaviorType::TIMED};
-        f.behavior_output_ids = {"cooling_fan"};
-        addFunction(f);
-    }
-    
-    // Rear lighting
-    {
-        Function f;
-        f.name = "Left Turn Signal Rear";
-        f.outputs = {{"pc_rear", 1, "output_1"}};
-        f.allowed_behaviors = {BehaviorType::FLASH, BehaviorType::FLASH_TIMED};
-        f.behavior_output_ids = {"left_turn_rear"};
-        addFunction(f);
-    }
-    {
-        Function f;
-        f.name = "Right Turn Signal Rear";
-        f.outputs = {{"pc_rear", 2, "output_2"}};
-        f.allowed_behaviors = {BehaviorType::FLASH, BehaviorType::FLASH_TIMED};
-        f.behavior_output_ids = {"right_turn_rear"};
-        addFunction(f);
-    }
-    {
-        Function f;
-        f.name = "Brake Lights";
-        f.outputs = {{"pc_rear", 3, "output_3"}};
-        f.allowed_behaviors = {BehaviorType::TOGGLE};
-        f.behavior_output_ids = {"brake_lights"};
-        addFunction(f);
-    }
-    {
-        Function f;
-        f.name = "Interior Lights";
-        f.outputs = {{"pc_rear", 4, "output_4"}};
-        f.allowed_behaviors = {BehaviorType::TOGGLE, BehaviorType::FADE, BehaviorType::TIMED};
-        f.behavior_output_ids = {"interior_lights"};
-        addFunction(f);
-    }
-    {
-        Function f;
-        f.name = "Backup Lights";
-        f.outputs = {{"pc_rear", 5, "output_5"}};
-        f.allowed_behaviors = {BehaviorType::TOGGLE};
-        f.behavior_output_ids = {"backup_lights"};
-        addFunction(f);
-    }
-    {
-        Function f;
-        f.name = "Parking Lights Rear";
-        f.outputs = {{"pc_rear", 6, "output_6"}};
-        f.allowed_behaviors = {BehaviorType::TOGGLE};
-        f.behavior_output_ids = {"parking_rear"};
-        addFunction(f);
-    }
-    {
-        Function f;
-        f.name = "Fuel Pump";
-        f.outputs = {{"pc_rear", 10, "output_10"}};
-        f.allowed_behaviors = {BehaviorType::TOGGLE};
-        f.blocked_when = {"security"};
-        f.behavior_output_ids = {"fuel_pump"};
-        addFunction(f);
-    }
-    
-    // Window controls
-    {
-        Function f;
-        f.name = "Driver Window Up";
-        f.outputs = {{"im_df", 0, "relay_1a"}};
-        f.allowed_behaviors = {BehaviorType::MOMENTARY};
-        addFunction(f);
-    }
-    {
-        Function f;
-        f.name = "Driver Window Down";
-        f.outputs = {{"im_df", 0, "relay_1b"}};
-        f.allowed_behaviors = {BehaviorType::MOMENTARY};
-        addFunction(f);
-    }
-    {
-        Function f;
-        f.name = "Passenger Window Up";
-        f.outputs = {{"im_pf", 0, "relay_1a"}};
-        f.allowed_behaviors = {BehaviorType::MOMENTARY};
-        addFunction(f);
-    }
-    {
-        Function f;
-        f.name = "Passenger Window Down";
-        f.outputs = {{"im_pf", 0, "relay_1b"}};
-        f.allowed_behaviors = {BehaviorType::MOMENTARY};
-        addFunction(f);
-    }
-    
-    // Door locks
-    {
-        Function f;
-        f.name = "Driver Door Lock";
-        f.outputs = {{"im_df", 0, "relay_2a"}};
-        f.allowed_behaviors = {BehaviorType::ONE_SHOT};
-        addFunction(f);
-    }
-    {
-        Function f;
-        f.name = "Driver Door Unlock";
-        f.outputs = {{"im_df", 0, "relay_2b"}};
-        f.allowed_behaviors = {BehaviorType::ONE_SHOT};
-        addFunction(f);
-    }
-    
-    // AUX outputs (renameable)
-    {
-        Function f;
-        f.name = "AUX 03";
-        f.outputs = {{"im_df", 0, "aux_03"}};
-        f.allowed_behaviors = {BehaviorType::TOGGLE, BehaviorType::FLASH, BehaviorType::FADE, BehaviorType::TIMED};
-        f.renameable = true;
-        addFunction(f);
-    }
-    {
-        Function f;
-        f.name = "AUX 04";
-        f.outputs = {{"im_df", 0, "aux_04"}};
-        f.allowed_behaviors = {BehaviorType::TOGGLE, BehaviorType::FLASH, BehaviorType::FADE, BehaviorType::TIMED};
-        f.renameable = true;
-        addFunction(f);
+
+    if (!loaded_from_json) {
+        Serial.println("[IBOX] WARNING: Falling back to built-in function list");
     }
     
     Serial.printf("[IBOX] Initialized with %d devices and %d functions\n", 

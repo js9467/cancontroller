@@ -15,6 +15,7 @@
 #include "web_interface.h"
 #include "behavioral_output_integration.h"
 #include "output_frame_synthesizer.h"
+#include "infinitybox_control.h"
 
 namespace {
 const IPAddress kApIp(192, 168, 4, 250);
@@ -348,6 +349,19 @@ void WebServerManager::setupRoutes() {
         behaviors.add("strobe");
         behaviors.add("hold_timed");
         behaviors.add("ramp");
+
+        JsonArray iboxFunctions = doc.createNestedArray("infinitybox_functions");
+        auto names = InfinityboxControl::InfinityboxController::instance().getAllFunctionNames();
+        for (const auto& name : names) {
+            JsonObject obj = iboxFunctions.createNestedObject();
+            obj["name"] = name.c_str();
+            JsonArray allowed = obj.createNestedArray("behaviors");
+            if (const auto* func = InfinityboxControl::InfinityboxController::instance().getFunction(name)) {
+                for (auto behavior : func->allowed_behaviors) {
+                    allowed.add(InfinityboxControl::behaviorToString(behavior));
+                }
+            }
+        }
         
         String payload;
         serializeJson(doc, payload);
@@ -855,6 +869,115 @@ void WebServerManager::setupRoutes() {
             response["pgn"] = String(frame.pgn, HEX);
             response["bytes"] = idx;
             
+            String payload;
+            serializeJson(response, payload);
+            request->send(success ? 200 : 500, "application/json", payload);
+        });
+
+    // Standard 11-bit CAN frame endpoint
+    server_.on("/api/can/send_std", HTTP_POST, [](AsyncWebServerRequest* request) {}, nullptr,
+        [](AsyncWebServerRequest* request, uint8_t* data, size_t len, size_t index, size_t total) {
+            DynamicJsonDocument doc(512);
+            DeserializationError error = deserializeJson(doc, data, len);
+
+            if (error) {
+                request->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
+                return;
+            }
+
+            if (!doc.containsKey("id") || !doc.containsKey("data")) {
+                request->send(400, "application/json", "{\"error\":\"Missing id or data\"}");
+                return;
+            }
+
+            uint16_t id = doc["id"] | 0;
+            JsonArray dataArray = doc["data"];
+            if (dataArray.isNull()) {
+                request->send(400, "application/json", "{\"error\":\"Missing data array\"}");
+                return;
+            }
+
+            uint8_t payload_data[8] = {0};
+            size_t idx = 0;
+            for (JsonVariant v : dataArray) {
+                if (idx >= 8) break;
+                payload_data[idx++] = v.as<uint8_t>();
+            }
+
+            bool success = CanManager::instance().sendStandardFrame(id, payload_data, static_cast<uint8_t>(idx));
+
+            DynamicJsonDocument response(128);
+            response["success"] = success;
+            response["id"] = id;
+            response["bytes"] = idx;
+
+            String payload;
+            serializeJson(response, payload);
+            request->send(success ? 200 : 500, "application/json", payload);
+        });
+
+    // Suspension state endpoint (read only)
+    server_.on("/api/suspension/state", HTTP_GET, [](AsyncWebServerRequest* request) {
+        SuspensionState state = CanManager::instance().getSuspensionState();
+        SuspensionCANStats stats = CanManager::instance().getSuspensionStats();
+
+        DynamicJsonDocument response(512);
+        response["power_on"] = state.power_on;
+        response["front_left"] = state.front_left_percent;
+        response["front_right"] = state.front_right_percent;
+        response["rear_left"] = state.rear_left_percent;
+        response["rear_right"] = state.rear_right_percent;
+        response["calibration_active"] = state.calibration_active;
+
+        response["actual_fl"] = state.actual_fl_percent;
+        response["actual_fr"] = state.actual_fr_percent;
+        response["actual_rl"] = state.actual_rl_percent;
+        response["actual_rr"] = state.actual_rr_percent;
+        response["fault_flags"] = state.fault_flags;
+        response["last_feedback_ms"] = state.last_feedback_ms;
+
+        response["tx_count"] = stats.tx_count;
+        response["tx_fail_count"] = stats.tx_fail_count;
+        response["rx_count"] = stats.rx_count;
+        response["last_tx_ms"] = stats.last_tx_ms;
+        response["last_rx_ms"] = stats.last_rx_ms;
+
+        String payload;
+        serializeJson(response, payload);
+        request->send(200, "application/json", payload);
+    });
+
+    // Suspension control endpoint (updates state + sends 0x737 immediately)
+    server_.on("/api/suspension/set", HTTP_POST, [](AsyncWebServerRequest* request) {}, nullptr,
+        [](AsyncWebServerRequest* request, uint8_t* data, size_t len, size_t index, size_t total) {
+            DynamicJsonDocument doc(512);
+            DeserializationError error = deserializeJson(doc, data, len);
+
+            if (error) {
+                request->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
+                return;
+            }
+
+            SuspensionState state = CanManager::instance().getSuspensionState();
+
+            if (doc.containsKey("front_left")) state.front_left_percent = doc["front_left"];
+            if (doc.containsKey("front_right")) state.front_right_percent = doc["front_right"];
+            if (doc.containsKey("rear_left")) state.rear_left_percent = doc["rear_left"];
+            if (doc.containsKey("rear_right")) state.rear_right_percent = doc["rear_right"];
+            if (doc.containsKey("calibration_active")) state.calibration_active = doc["calibration_active"];
+
+            state.power_on = true;
+            CanManager::instance().updateSuspensionState(state);
+            bool success = CanManager::instance().sendSuspensionCommand();
+
+            DynamicJsonDocument response(256);
+            response["success"] = success;
+            response["front_left"] = state.front_left_percent;
+            response["front_right"] = state.front_right_percent;
+            response["rear_left"] = state.rear_left_percent;
+            response["rear_right"] = state.rear_right_percent;
+            response["calibration_active"] = state.calibration_active;
+
             String payload;
             serializeJson(response, payload);
             request->send(success ? 200 : 500, "application/json", payload);

@@ -183,6 +183,10 @@ void can_rx_task(void* param) {
             if (is_standard && msg.identifier == 0x738 && msg.length == 8) {
                 CanManager::instance().parseSuspensionStatus(msg.data);
             }
+            if (!is_standard && msg.length == 8) {
+                const uint32_t pgn = (msg.identifier >> 8) & 0x3FFFF;
+                CanManager::instance().updatePowercellStatusFromPgn(pgn, msg.data);
+            }
             
             // Queue frame for general processing (Infinitybox, diagnostics, etc.)
             CanFrame frame;

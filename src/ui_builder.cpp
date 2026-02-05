@@ -3077,6 +3077,7 @@ void UIBuilder::suspensionDamperEvent(lv_event_t* e) {
         
         // Update CAN manager (will be transmitted on next 300ms tick)
         CanManager::instance().updateSuspensionState(state);
+        CanManager::instance().sendSuspensionCommand();
         
         Serial.printf("[Suspension] %s %s -> %d%%\n", damper_id, 
                       delta > 0 ? "INC" : "DEC", new_val);
@@ -3115,6 +3116,7 @@ void UIBuilder::suspensionPresetEvent(lv_event_t* e) {
     
     state.power_on = true;
     CanManager::instance().updateSuspensionState(state);
+    CanManager::instance().sendSuspensionCommand();
     UIBuilder::instance().updateSuspensionUI();
 }
 
@@ -3123,6 +3125,7 @@ void UIBuilder::suspensionCalibrateEvent(lv_event_t* e) {
     state.calibration_active = !state.calibration_active;
     
     CanManager::instance().updateSuspensionState(state);
+    CanManager::instance().sendSuspensionCommand();
     UIBuilder::instance().updateSuspensionUI();
     
     Serial.printf("[Suspension] Calibration %s\n", 

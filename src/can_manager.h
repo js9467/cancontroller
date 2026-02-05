@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 #include <hal/gpio_types.h>
+#include <array>
 #include <vector>
 
 #include "config_types.h"
@@ -46,6 +47,20 @@ struct SuspensionCANStats {
     uint8_t last_rx_data[8] = {0};
 };
 
+struct PowercellOutputState {
+    bool valid = false;
+    bool on = false;
+    uint8_t current_raw = 0;
+    uint32_t last_seen_ms = 0;
+};
+
+struct PowercellCellTelemetry {
+    bool valid = false;
+    uint8_t voltage_raw = 0;
+    int8_t temperature_c = 0;
+    uint32_t last_seen_ms = 0;
+};
+
 class CanManager {
 public:
     static CanManager& instance();
@@ -62,6 +77,7 @@ public:
     bool sendButtonAction(const ButtonConfig& button);
     bool sendButtonReleaseAction(const ButtonConfig& button);
     bool sendFrame(const CanFrameConfig& frame);
+    bool sendStandardFrame(uint16_t identifier, const uint8_t data[8], uint8_t length);
     
     bool receiveMessage(CanRxMessage& msg, uint32_t timeout_ms = 10);
     std::vector<CanRxMessage> receiveAll(uint32_t timeout_ms = 100);
@@ -75,6 +91,10 @@ public:
     SuspensionCANStats getSuspensionStats() const;
     bool sendSuspensionCommand();  // Sends current state to 0x737
     void parseSuspensionStatus(const uint8_t data[8]);  // Parse 0x738 response
+
+    bool updatePowercellStatusFromPgn(uint32_t pgn, const uint8_t data[8]);
+    PowercellOutputState getPowercellOutputState(uint8_t cell_address, uint8_t output_number) const;
+    PowercellCellTelemetry getPowercellCellTelemetry(uint8_t cell_address) const;
 
     bool isReady() const { return ready_; }
     bool isBusAlive() const { return bus_alive_; }
@@ -98,6 +118,19 @@ private:
     SuspensionState suspension_state_;
     SuspensionCANStats suspension_stats_;
     mutable SemaphoreHandle_t suspension_mutex_ = nullptr;
+
+    static constexpr uint8_t kPowercellMaxAddress = 16;
+    static constexpr uint8_t kPowercellOutputsPerCell = 10;
+
+    struct PowercellCellStatus {
+        std::array<PowercellOutputState, kPowercellOutputsPerCell> outputs{};
+        uint8_t voltage_raw = 0;
+        int8_t temperature_c = 0;
+        uint32_t last_seen_ms = 0;
+    };
+
+    std::array<PowercellCellStatus, kPowercellMaxAddress> powercell_status_{};
+    mutable SemaphoreHandle_t powercell_mutex_ = nullptr;
 
     std::uint32_t buildIdentifier(const CanFrameConfig& frame) const;
 };

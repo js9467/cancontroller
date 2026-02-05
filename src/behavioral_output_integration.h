@@ -19,6 +19,7 @@
 #include "behavioral_output_ui.h"
 #include "behavioral_config_persistence.h"
 #include "can_manager.h"
+#include "infinitybox_control.h"
 #include "ipm1_can_library.h"
 #include <ESPAsyncWebServer.h>
 
@@ -35,6 +36,8 @@ inline BehavioralOutputAPI* outputAPI = nullptr;
 // Forward declarations
 inline void loadInfinityBoxDefaults();
 inline void loadDefaultScenes();
+inline void applySceneActivationActions(const Scene& scene);
+inline void applySceneDeactivationActions(const Scene& scene);
 
 // ═══════════════════════════════════════════════════════════════════════════
 // INITIALIZATION
@@ -74,6 +77,13 @@ inline void initBehavioralOutputSystem(AsyncWebServer* webServer) {
             request->send_P(200, "text/html", BEHAVIORAL_OUTPUT_UI);
         });
     }
+
+    behaviorEngine.setSceneActivatedCallback([](const Scene& scene) {
+        applySceneActivationActions(scene);
+    });
+    behaviorEngine.setSceneDeactivatedCallback([](const Scene& scene) {
+        applySceneDeactivationActions(scene);
+    });
     
     // Try to load from persistent storage first
     bool loaded = loadBehavioralConfig(behaviorEngine);
@@ -346,6 +356,77 @@ inline void loadInfinityBoxDefaults() {
     behaviorEngine.addOutput(masterAux4);
     
     Serial.printf("[Behavioral Output] Loaded %d InfinityBox IPM1 standard outputs\n", 25);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SCENE ACTION EXECUTION (CAN / INFINITYBOX / SUSPENSION)
+// ═══════════════════════════════════════════════════════════════════════════
+
+inline void applySceneActivationActions(const Scene& scene) {
+    for (const auto& frame : scene.can_frames) {
+        if (!frame.enabled) continue;
+        CanFrameConfig cfg;
+        cfg.enabled = true;
+        cfg.pgn = frame.pgn;
+        cfg.priority = frame.priority;
+        cfg.source_address = frame.source_address;
+        cfg.destination_address = frame.destination_address;
+        cfg.length = frame.length;
+        for (size_t i = 0; i < frame.length && i < cfg.data.size(); ++i) {
+            cfg.data[i] = frame.data[i];
+        }
+        CanManager::instance().sendFrame(cfg);
+    }
+
+    auto& ibox = InfinityboxControl::InfinityboxController::instance();
+    for (const auto& action : scene.infinitybox_actions) {
+        if (action.function_name.isEmpty()) continue;
+        const std::string func = action.function_name.c_str();
+        if (action.behavior == "on") {
+            ibox.activateFunction(func, true);
+        } else if (action.behavior == "off") {
+            ibox.deactivateFunction(func);
+        } else if (action.behavior == "toggle") {
+            const auto* fn = ibox.getFunction(func);
+            const bool is_on = fn && fn->state != InfinityboxControl::FunctionState::OFF;
+            if (is_on) {
+                ibox.deactivateFunction(func);
+            } else {
+                ibox.activateFunction(func, true);
+            }
+        } else if (action.behavior == "flash") {
+            ibox.activateFunctionFlash(func, action.on_ms, action.off_ms, action.duration_ms);
+        } else if (action.behavior == "fade") {
+            const uint16_t duration = action.duration_ms > 0 ? static_cast<uint16_t>(action.duration_ms) : 1000;
+            ibox.activateFunctionFade(func, action.level, duration);
+        } else if (action.behavior == "timed") {
+            ibox.activateFunctionWithBehavior(func, InfinityboxControl::BehaviorType::TIMED, true);
+        } else if (action.behavior == "one_shot") {
+            ibox.activateFunctionWithBehavior(func, InfinityboxControl::BehaviorType::ONE_SHOT, true);
+        }
+    }
+
+    if (scene.suspension.enabled) {
+        SuspensionState state = CanManager::instance().getSuspensionState();
+        state.front_left_percent = scene.suspension.front_left;
+        state.front_right_percent = scene.suspension.front_right;
+        state.rear_left_percent = scene.suspension.rear_left;
+        state.rear_right_percent = scene.suspension.rear_right;
+        state.calibration_active = scene.suspension.calibration_active;
+        state.power_on = true;
+        CanManager::instance().updateSuspensionState(state);
+        CanManager::instance().sendSuspensionCommand();
+    }
+}
+
+inline void applySceneDeactivationActions(const Scene& scene) {
+    auto& ibox = InfinityboxControl::InfinityboxController::instance();
+    for (const auto& action : scene.infinitybox_actions) {
+        if (!action.release_on_deactivate) continue;
+        if (action.function_name.isEmpty()) continue;
+        const std::string func = action.function_name.c_str();
+        ibox.deactivateFunction(func);
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
+#include <array>
 #include <vector>
 #include <map>
 #include <functional>
@@ -129,6 +130,36 @@ struct OutputChannel {
 struct SceneOutput {
     String outputId;
     BehaviorConfig behavior;
+    String action = "behavior"; // behavior, on, off, dim
+};
+
+struct SceneCanFrame {
+    bool enabled = true;
+    uint32_t pgn = 0x00FF00;
+    uint8_t priority = 6;
+    uint8_t source_address = 0xF9;
+    uint8_t destination_address = 0xFF;
+    std::array<uint8_t, 8> data{};
+    uint8_t length = 0;
+};
+
+struct SceneInfinityboxAction {
+    String function_name;
+    String behavior = "on";   // on, off, toggle, flash, fade, timed, one_shot
+    uint8_t level = 100;      // For fade (0-100)
+    uint16_t on_ms = 500;     // For flash
+    uint16_t off_ms = 500;    // For flash
+    uint32_t duration_ms = 0; // For flash/fade
+    bool release_on_deactivate = true;
+};
+
+struct SceneSuspensionSettings {
+    bool enabled = false;
+    uint8_t front_left = 0;
+    uint8_t front_right = 0;
+    uint8_t rear_left = 0;
+    uint8_t rear_right = 0;
+    bool calibration_active = false;
 };
 
 struct Scene {
@@ -137,6 +168,9 @@ struct Scene {
     String description = "";
     
     std::vector<SceneOutput> outputs;
+    std::vector<SceneCanFrame> can_frames;
+    std::vector<SceneInfinityboxAction> infinitybox_actions;
+    SceneSuspensionSettings suspension;
     
     // Scene behavior
     uint16_t duration_ms = 0;       // 0 = permanent until deactivated
@@ -155,6 +189,8 @@ struct Scene {
 class BehaviorEngine {
 public:
     BehaviorEngine() : _lastUpdate(0), _updateInterval(20) {}
+
+    using SceneActionCallback = std::function<void(const Scene&)>;
     
     // ───────────────────────────────────────────────────────────────────────
     // OUTPUT MANAGEMENT
@@ -244,7 +280,27 @@ public:
         
         // Apply scene outputs
         for (const auto& sceneOutput : scene.outputs) {
+            String action = sceneOutput.action;
+            action.toLowerCase();
+
+            if (action == "off") {
+                deactivateOutput(sceneOutput.outputId);
+                continue;
+            }
+
+            if (action == "on" || action == "dim") {
+                BehaviorConfig applied = sceneOutput.behavior;
+                applied.type = BehaviorType::STEADY;
+                applied.targetValue = (action == "on") ? 255 : applied.targetValue;
+                setBehavior(sceneOutput.outputId, applied);
+                continue;
+            }
+
             setBehavior(sceneOutput.outputId, sceneOutput.behavior);
+        }
+
+        if (_sceneActivatedCallback) {
+            _sceneActivatedCallback(scene);
         }
         
         return true;
@@ -261,8 +317,20 @@ public:
         for (const auto& sceneOutput : scene.outputs) {
             deactivateOutput(sceneOutput.outputId);
         }
+
+        if (_sceneDeactivatedCallback) {
+            _sceneDeactivatedCallback(scene);
+        }
         
         return true;
+    }
+
+    void setSceneActivatedCallback(SceneActionCallback callback) {
+        _sceneActivatedCallback = callback;
+    }
+
+    void setSceneDeactivatedCallback(SceneActionCallback callback) {
+        _sceneDeactivatedCallback = callback;
     }
     
     // ───────────────────────────────────────────────────────────────────────
@@ -338,6 +406,9 @@ private:
     
     unsigned long _lastUpdate;
     uint16_t _updateInterval;
+
+    SceneActionCallback _sceneActivatedCallback;
+    SceneActionCallback _sceneDeactivatedCallback;
     
     // ───────────────────────────────────────────────────────────────────────
     // BEHAVIOR COMPUTATION

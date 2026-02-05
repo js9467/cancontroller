@@ -197,10 +197,10 @@ class BackupRestoreGUI:
         
         # Upload to device checkbox
         self.upload_to_device_var = tk.BooleanVar(value=True)
-        upload_check = ttk.Checkbutton(parent, 
-                                      text='📤 Upload firmware to device after build',
-                                      variable=self.upload_to_device_var)
-        upload_check.grid(row=3, column=0, sticky=tk.W, pady=(0, 20))
+        self.upload_check = ttk.Checkbutton(parent, 
+                           text='📤 Upload firmware to device after build',
+                           variable=self.upload_to_device_var)
+        self.upload_check.grid(row=3, column=0, sticky=tk.W, pady=(0, 20))
         
         # Backup button
         backup_btn = ttk.Button(parent, text='🔽 Create Backup', 
@@ -334,6 +334,8 @@ class BackupRestoreGUI:
         # Change color for major releases
         if version_type == 'major':
             self.next_version_label.config(foreground='#dc3545')  # Red for major
+            # Major backups should not auto-flash by default (avoid accidental downgrades)
+            self.upload_to_device_var.set(False)
         else:
             self.next_version_label.config(foreground='#667eea')  # Blue for normal
     
@@ -385,6 +387,19 @@ class BackupRestoreGUI:
                                        "• Requires USB connection\n"
                                        "• Auto-pushes to Git\n\n"
                                        "This will take several minutes...")
+
+                    if upload_to_device:
+                        proceed = messagebox.askyesno(
+                            "Confirm Device Flash",
+                            "You enabled firmware upload after a FULL backup.\n\n"
+                            "This will flash the firmware built from the current source tree.\n"
+                            "If the device was running a newer build, this can downgrade it.\n\n"
+                            "Continue with device upload?",
+                            icon='warning'
+                        )
+                        if not proceed:
+                            upload_to_device = False
+                            self.upload_to_device_var.set(False)
                 
                 backup_folder, version = self.manager.backup_device(
                     increment_type=increment_type,
@@ -396,7 +411,12 @@ class BackupRestoreGUI:
                 
                 success_msg = f"Backup completed!\nVersion: v{version}\n\nLocation:\n{backup_folder}"
                 if increment_type == 'major':
-                    success_msg += "\n\n✓ FULL device backup (all sectors)\n✓ Firmware uploaded to device\n✓ Source code + firmware pushed to Git"
+                    success_msg += "\n\n✓ FULL device backup (all sectors)"
+                    if upload_to_device:
+                        success_msg += "\n✓ Firmware uploaded to device"
+                    else:
+                        success_msg += "\n⚠ Device NOT updated (upload disabled)"
+                    success_msg += "\n✓ Source code + firmware pushed to Git"
                 else:
                     if upload_to_device:
                         success_msg += f"\n\n✓ Firmware uploaded to device\n✓ Firmware pushed to Git (versions/bronco_v{version}.bin)"

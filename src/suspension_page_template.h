@@ -491,32 +491,51 @@ function sendCanCommand(command) {
 	// Command structure:
 	// anti_roll_decrease, anti_roll_neutral, anti_roll_increase
 	// anti_pitch_decrease, anti_pitch_neutral, anti_pitch_increase
-	console.log('[Suspension] Command:', command);
-	
-	// In actual implementation, this would be connected to button CAN config
-	// For now, just show feedback
-	updateStatus(command, true);
+	const map = {
+		anti_roll_decrease: [0x05, 0, 0, 0, 0, 0, 0, 0],
+		anti_roll_neutral:  [0x00, 0, 0, 0, 0, 0, 0, 0],
+		anti_roll_increase: [0x06, 0, 0, 0, 0, 0, 0, 0],
+		anti_pitch_decrease:[0x07, 0, 0, 0, 0, 0, 0, 0],
+		anti_pitch_neutral: [0x00, 0, 0, 0, 0, 0, 0, 0],
+		anti_pitch_increase:[0x08, 0, 0, 0, 0, 0, 0, 0]
+	};
+
+	const data = map[command];
+	if (!data) return;
+
+	fetch('/api/can/send_std', {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ id: 0x738, data })
+	}).then(() => updateStatus(command, true))
+	  .catch(() => updateStatus(command, false));
 }
 
 // Function to send suspension-specific CAN command
 function sendSuspensionCommand(location, value) {
-	// Map value (0-100) to CAN data byte
-	const canValue = Math.round((value / 100) * 255);
-	const data = [canValue, 0, 0, 0, 0, 0, 0, 0];
-	
-	console.log('[Suspension] Sending', location, 'to', value + '%', 'CAN data:', data);
-	
-	// Update status indicator
-	const locKey = location.split('_').map(x => x[0]).join('').toUpperCase();
-	const statusEl = document.getElementById(locKey + '-status');
-	if (statusEl) {
-		statusEl.style.color = '#7ad7f0';
-		statusEl.textContent = '◐';
-		setTimeout(() => {
-			statusEl.style.color = '#3dd598';
-			statusEl.textContent = '●';
-		}, 300);
-	}
+	const payload = {
+		front_left: suspensionState.front_left || 0,
+		front_right: suspensionState.front_right || 0,
+		rear_left: suspensionState.rear_left || 0,
+		rear_right: suspensionState.rear_right || 0
+	};
+
+	fetch('/api/suspension/set', {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(payload)
+	}).then(() => {
+		const locKey = location.split('_').map(x => x[0]).join('').toUpperCase();
+		const statusEl = document.getElementById(locKey + '-status');
+		if (statusEl) {
+			statusEl.style.color = '#7ad7f0';
+			statusEl.textContent = '◐';
+			setTimeout(() => {
+				statusEl.style.color = '#3dd598';
+				statusEl.textContent = '●';
+			}, 300);
+		}
+	});
 }
 
 // Function to update status indicator
