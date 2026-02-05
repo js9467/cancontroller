@@ -1509,6 +1509,7 @@ function renderPreview(){
 	const theme = config.theme || {};
 	const headerCfg = config.header || {};
 	const header = document.getElementById('preview-header');
+	if(!header) return; // Element not on this page
 	header.style.background = theme.surface_color || '#12141c';
 	header.style.borderBottom = `${firstDefined(theme.header_border_width, 0)}px solid ${firstDefined(theme.header_border_color, theme.accent_color, '#ff9d2e')}`;
 	const navSpacingValue = clampNavSpacing(firstDefined(headerCfg.nav_spacing, 12));
@@ -1598,6 +1599,7 @@ function renderPreview(){
 	renderNav();
 
 	const body = document.getElementById('preview-body');
+	if (!body) return; // Element not found
 	body.style.background = page.bg_color || theme.page_bg_color || '#0f0f0f';
 	body.innerHTML = '';
 	const grid = document.createElement('div');
@@ -1656,6 +1658,10 @@ function renderNav(){
 	console.log('[WEB] renderNav() called');
 	ensurePages();
 	const nav = document.getElementById('preview-nav');
+	if (!nav) {
+		console.log('[WEB] preview-nav element not found, skipping render');
+		return;
+	}
 	console.log('[WEB] preview-nav element:', nav);
 	console.log('[WEB] Rendering', config.pages.length, 'navigation pills');
 	const theme = config.theme || {};
@@ -1930,6 +1936,7 @@ function populateFontSelects(){
 
 function renderCanLibrary(){
 	const list = document.getElementById('can-library-list');
+	if(!list) return; // Element not on this page
 	const items = config.can_library || [];
 	if(items.length===0){ list.innerHTML = '<div class="muted">No messages yet.</div>'; return; }
 	list.innerHTML = '';
@@ -2074,7 +2081,7 @@ function renderWifiList(){
 
 async function refreshStatus(){
 	const statusContainer = document.getElementById('status');
-	if(!statusContainer) return;
+	if(!statusContainer) return; // Status element not on this page
 	try{
 		const res = await fetch('/api/status');
 		const status = await res.json();
@@ -2089,6 +2096,8 @@ async function refreshStatus(){
 			<div class="status-chip"><span>Station IP</span>${status.sta_ip || '—'}</div>
 		`;
 	}catch(err){
+		// Silently fail if status element doesn't exist
+		if(!statusContainer) return;
 		const firmwareVersion = statusContainer.dataset.version || '—';
 		statusContainer.innerHTML = `
 			<div class="status-chip"><span>Firmware</span>v${firmwareVersion}</div>
