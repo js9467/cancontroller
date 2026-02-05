@@ -322,6 +322,14 @@ class BackupRestoreManager:
         if not self.build_firmware():
             print("[Backup] ⚠ Build failed (continuing anyway)")
         
+        # Upload to device if requested
+        if upload_to_device:
+            print(f"\n[Backup] Uploading firmware to device...")
+            if not self.upload_firmware():
+                print("[Backup] ⚠ Upload failed (continuing anyway)")
+            else:
+                print(f"[Backup] ✓ Device updated with v{version}")
+        
         # Copy firmware.bin for OTA distribution
         print(f"\n[Backup] Preparing OTA firmware...")
         self.copy_firmware_for_ota(version)
