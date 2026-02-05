@@ -554,24 +554,31 @@ pause
     def build_firmware(self):
         """Build firmware using PlatformIO"""
         try:
-            print("[Build] Running PlatformIO build...")
+            print("[Build] Running PlatformIO build (this may take a few minutes)...")
+            import time
+            start_time = time.time()
+            
+            # Run with real-time output instead of capturing
             result = subprocess.run(
                 ['pio', 'run', '-e', 'waveshare_7in'],
                 cwd=self.project_dir,
-                capture_output=True,
+                capture_output=False,  # Show output in real-time
                 text=True,
-                timeout=300
+                timeout=600  # 10 minutes
             )
+            
+            elapsed = time.time() - start_time
+            print(f"[Build] Completed in {elapsed:.1f} seconds")
             
             if result.returncode == 0:
                 print("[Build] ✓ Build successful")
                 return True
             else:
-                print(f"[Build] ✗ Build failed: {result.stderr}")
+                print(f"[Build] ✗ Build failed with exit code {result.returncode}")
                 return False
                 
         except subprocess.TimeoutExpired:
-            print("[Build] ✗ Build timeout")
+            print("[Build] ✗ Build timeout (exceeded 10 minutes)")
             return False
         except Exception as e:
             print(f"[Build] ✗ Build error: {e}")
@@ -580,24 +587,30 @@ pause
     def upload_firmware(self):
         """Upload firmware to device using PlatformIO"""
         try:
-            print("[Upload] Uploading to ESP32-S3...")
+            print("[Upload] Uploading to ESP32-S3 (checking for COM port)...")
+            import time
+            start_time = time.time()
+            
             result = subprocess.run(
                 ['pio', 'run', '-e', 'waveshare_7in', '-t', 'upload'],
                 cwd=self.project_dir,
-                capture_output=True,
+                capture_output=False,  # Show output in real-time
                 text=True,
                 timeout=120
             )
+            
+            elapsed = time.time() - start_time
+            print(f"[Upload] Completed in {elapsed:.1f} seconds")
             
             if result.returncode == 0:
                 print("[Upload] ✓ Upload successful")
                 return True
             else:
-                print(f"[Upload] ✗ Upload failed: {result.stderr}")
+                print(f"[Upload] ✗ Upload failed with exit code {result.returncode}")
                 return False
                 
         except subprocess.TimeoutExpired:
-            print("[Upload] ✗ Upload timeout")
+            print("[Upload] ✗ Upload timeout (exceeded 2 minutes)")
             return False
         except Exception as e:
             print(f"[Upload] ✗ Upload error: {e}")
