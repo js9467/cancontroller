@@ -48,7 +48,50 @@ class BackupRestoreManager:
         self.github_repo = 'js9467/cancontroller'
         self.github_branch = 'master'
         self.github_folder = 'versions'
-        self.github_token = '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'
+        self.github_token = (
+            os.getenv('BRONCO_GITHUB_TOKEN')
+            or os.getenv('GITHUB_TOKEN')
+            or os.getenv('GITHUB_PAT')
+        )
+
+    def _github_headers(self, accept='application/vnd.github.v3+json', require_token=False):
+        """Helper to build GitHub API headers with optional auth"""
+        headers = {'Accept': accept}
+        if self.github_token:
+            headers['Authorization'] = f'token {self.github_token}'
+        elif require_token:
+            print("[GitHub] ⚠ No GitHub token found. Set BRONCO_GITHUB_TOKEN or GITHUB_TOKEN.")
+            return None
+        return headers
+
+    def _upload_release_asset(self, upload_url, file_path, content_type):
+        """Helper to upload a file as a GitHub release asset"""
+        file_path = Path(file_path)
+        if not file_path.exists():
+            print(f"[GitHub] ⚠ Asset not found: {file_path}")
+            return False
+
+        headers = self._github_headers(accept='application/vnd.github.v3+json', require_token=True)
+        if headers is None:
+            return False
+
+        upload_headers = headers.copy()
+        upload_headers['Content-Type'] = content_type
+
+        with open(file_path, 'rb') as f:
+            response = requests.post(
+                f'{upload_url}?name={file_path.name}',
+                headers=upload_headers,
+                data=f
+            )
+
+        if response.status_code == 201:
+            print(f"[GitHub] ✓ Uploaded {file_path.name}")
+            return True
+
+        print(f"[GitHub] ✗ Upload failed for {file_path.name}: {response.status_code}")
+        print(f"[GitHub] {response.text}")
+        return False
         
     def get_current_version(self):
         """Read current version from version state file"""
@@ -447,11 +490,7 @@ pause
             print(f"{'='*60}\n")
             
             # Download zip file
-            headers = {
-                'Authorization': f'token {self.github_token}',
-                'Accept': 'application/octet-stream'
-            }
-            
+            headers = self._github_headers(accept='application/octet-stream', require_token=False)
             response = requests.get(download_url, headers=headers, stream=True)
             
             if response.status_code != 200:
@@ -675,10 +714,10 @@ pause
             print(f"[GitHub] Created {zip_filename} ({zip_size_mb:.1f} MB)")
             
             # Create GitHub release
-            headers = {
-                'Authorization': f'token {self.github_token}',
-                'Accept': 'application/vnd.github.v3+json'
-            }
+            headers = self._github_headers(accept='application/vnd.github.v3+json', require_token=True)
+            if headers is None:
+                print("[GitHub] ✗ Release creation requires a GitHub token")
+                return
             
             release_data = {
                 'tag_name': f'v{version}',
@@ -702,22 +741,14 @@ pause
                 
                 # Upload zip file as release asset
                 print(f"[GitHub] Uploading backup archive...")
-                upload_headers = headers.copy()
-                upload_headers['Content-Type'] = 'application/zip'
-                
-                with open(zip_path, 'rb') as f:
-                    upload_response = requests.post(
-                        f'{upload_url}?name={zip_filename}',
-                        headers=upload_headers,
-                        data=f
-                    )
-                
-                if upload_response.status_code == 201:
-                    print(f"[GitHub] ✓ Backup uploaded successfully")
-                    print(f"[GitHub] Release URL: https://github.com/{self.github_repo}/releases/tag/v{version}")
-                else:
-                    print(f"[GitHub] ✗ Upload failed: {upload_response.status_code}")
-                    print(f"[GitHub] {upload_response.text}")
+                self._upload_release_asset(upload_url, zip_path, 'application/zip')
+
+                # Upload updater batch file for online updater
+                updater_bat = self.project_dir / 'BackupRestore.bat'
+                print(f"[GitHub] Uploading updater batch file...")
+                self._upload_release_asset(upload_url, updater_bat, 'application/octet-stream')
+
+                print(f"[GitHub] Release URL: https://github.com/{self.github_repo}/releases/tag/v{version}")
                 
                 # Clean up local zip file
                 zip_path.unlink()
@@ -734,15 +765,18 @@ pause
     def fetch_github_releases(self):
         """Fetch available releases from GitHub"""
         try:
-            headers = {
-                'Authorization': f'token {self.github_token}',
-                'Accept': 'application/vnd.github.v3+json'
-            }
-            
+            headers = self._github_headers(accept='application/vnd.github.v3+json', require_token=False)
             response = requests.get(
                 f'https://api.github.com/repos/{self.github_repo}/releases',
                 headers=headers
             )
+
+            if response.status_code in (401, 403) and self.github_token:
+                print(f"[GitHub] Auth failed ({response.status_code}). Retrying without token...")
+                response = requests.get(
+                    f'https://api.github.com/repos/{self.github_repo}/releases',
+                    headers={'Accept': 'application/vnd.github.v3+json'}
+                )
             
             if response.status_code == 200:
                 releases = response.json()
