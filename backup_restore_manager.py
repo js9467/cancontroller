@@ -601,6 +601,23 @@ pause
     def git_push_all(self, version, is_major=False, backup_folder=None):
         """Commit all source code and push to git repository"""
         try:
+            # Ensure we're on a branch (not detached HEAD)
+            print(f"[Git] Checking branch status...")
+            branch_check = subprocess.run(
+                ['git', 'rev-parse', '--abbrev-ref', 'HEAD'],
+                cwd=self.project_dir,
+                capture_output=True,
+                text=True
+            )
+            current_branch = branch_check.stdout.strip()
+            
+            if current_branch == 'HEAD':
+                # We're in detached HEAD state - switch to master
+                print(f"[Git] Detached HEAD detected, switching to master branch...")
+                subprocess.run(['git', 'checkout', 'master'], cwd=self.project_dir, check=True)
+                current_branch = 'master'
+            
+            print(f"[Git] Current branch: {current_branch}")
             print(f"[Git] Adding all source files...")
             
             # Add all source files
@@ -616,7 +633,7 @@ pause
             
             # Push to remote
             print(f"[Git] Pushing to remote repository...")
-            result = subprocess.run(['git', 'push'], cwd=self.project_dir, capture_output=True, text=True)
+            result = subprocess.run(['git', 'push', 'origin', current_branch], cwd=self.project_dir, capture_output=True, text=True)
             
             if result.returncode == 0:
                 print(f"[Git] ✓ Successfully pushed to repository")
