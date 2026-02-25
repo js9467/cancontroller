@@ -1,0 +1,11 @@
+﻿{
+  "version": "3.0.2",
+  "channel": "stable",
+  "changelog": "inMOTION NGX H-bridge support and auto-detect RX frames",
+  "min_version": "1.0.0",
+  "firmware": {
+    "url": "https://image-optimizer-still-flower-1282.fly.dev/ota/releases/3.0.2/firmware.bin",
+    "md5": "ee763e320896f9c70f0d8e9f825fca5c",
+    "size": 2811056
+  }
+}
