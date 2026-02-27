@@ -487,10 +487,9 @@ function switchTab(tabName){
 				<h3>Diagnostics & Monitoring</h3>
 				<div class="muted">Quick access to diagnostic and monitoring tools.</div>
 				<div class="row" style="margin-top:10px;">
-					<a class="btn primary" href="http://192.168.7.116/can-monitor" target="_blank" rel="noopener">CAN Monitor</a>
-					<a class="btn" href="http://192.168.7.116/behavioral" target="_blank" rel="noopener">Behavioral Outputs</a>
+					<a class="btn primary" href="/can-monitor" target="_blank" rel="noopener">CAN Monitor</a>
+					<a class="btn" href="/behavioral" target="_blank" rel="noopener">Behavioral Outputs</a>
 				</div>
-				<div class="muted" style="margin-top:8px; font-size:0.85rem;">IP shown is placeholder and will be dynamic.</div>
 			</div>
 		</div>
 	</section>

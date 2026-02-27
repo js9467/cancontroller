@@ -9,6 +9,7 @@
  */
 
 #include <lvgl.h>
+#include <WiFi.h>
 #include "output_behavior_engine.h"
 
 namespace BehavioralUI {
@@ -175,7 +176,12 @@ inline void buildBehavioralPage(lv_obj_t* parent, BehaviorEngine* engine) {
     
     // Info text
     lv_obj_t* info = lv_label_create(parent);
-    lv_label_set_text(info, "Access http://192.168.7.116/behavioral\nfor advanced controls");
+    {
+        String ip = WiFi.softAPIP().toString();
+        String url = "http://" + ip + "/behavioral";
+        String msg = "Access " + url + "\nfor advanced controls";
+        lv_label_set_text(info, msg.c_str());
+    }
     lv_obj_set_style_text_font(info, &lv_font_montserrat_12, LV_PART_MAIN);
     lv_obj_set_style_text_color(info, lv_color_hex(0x888888), LV_PART_MAIN);
     lv_obj_set_style_text_align(info, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
