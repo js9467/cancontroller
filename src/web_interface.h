@@ -504,6 +504,69 @@ function switchTab(tabName){
 					<button class="btn primary" onclick="addSuspensionPageTemplate()">Add Suspension Page (TCU S15)</button>
 				</div>
 			</div>
+			<div class="card">
+				<h3>inMOTION NGX Frame Builder</h3>
+				<p class="muted" style="margin-bottom:12px;">Build precise per-output CAN frames for inMOTION NGX H-bridge modules (power windows, locks, actuators). Frames are added to the CAN Library and can then be assigned to any button.</p>
+				<div class="grid two-col" style="gap:10px;">
+					<div>
+						<label>Module</label>
+						<select id="imotion-module" onchange="inmotionUpdateUI()">
+							<option value="df">Driver Front (PGN FF03, SA 1A)</option>
+							<option value="pf">Passenger Front (PGN FF04, SA 1A)</option>
+							<option value="dr">Driver Rear (PGN FF05, SA 1A)</option>
+							<option value="pr">Passenger Rear (PGN FF06, SA 1A)</option>
+						</select>
+					</div>
+					<div>
+						<label>Output</label>
+						<select id="imotion-output" onchange="inmotionUpdateUI()">
+							<option value="0">Relay 1A — 25A H-bridge, direction A</option>
+							<option value="1">Relay 1B — 25A H-bridge, direction B</option>
+							<option value="2">Relay 2A — 25A H-bridge, direction A</option>
+							<option value="3">Relay 2B — 25A H-bridge, direction B</option>
+							<option value="4">Output 1 — 1A MOSFET</option>
+							<option value="5">Output 2 — 1A MOSFET</option>
+							<option value="6">Output 3 — 1A MOSFET</option>
+							<option value="7">Output 4 — 1A MOSFET</option>
+						</select>
+					</div>
+					<div>
+						<label>Mode</label>
+						<select id="imotion-mode" onchange="inmotionUpdateUI()">
+							<option value="track">Track — ON while commanded (0x90)</option>
+							<option value="off">OFF — Turn output off (0x80)</option>
+							<option value="express">Express — Run until current limit (0xB0) ★</option>
+							<option value="timed">Timed — ON for timer duration (0xA_)</option>
+						</select>
+					</div>
+					<div id="imotion-timer-row" style="display:none;">
+						<label>Timer Duration (seconds)</label>
+						<select id="imotion-timer">
+							<option value="0.25">0.25 s</option>
+							<option value="0.5">0.5 s</option>
+							<option value="0.75">0.75 s</option>
+							<option value="1" selected>1.0 s</option>
+							<option value="1.25">1.25 s</option>
+							<option value="1.5">1.5 s</option>
+							<option value="2">2.0 s</option>
+							<option value="2.5">2.5 s</option>
+							<option value="3">3.0 s</option>
+							<option value="3.75">3.75 s (max)</option>
+						</select>
+					</div>
+				</div>
+				<div id="imotion-express-note" class="muted" style="display:none;margin-top:8px;padding:8px;background:#1A1A00;border-radius:6px;border:1px solid #AA8800;">
+					⚠ Express mode is only valid for H-bridge relay outputs (Relay 1A/1B, 2A/2B). MOSFET outputs do not support Express. The current threshold that stops the output must be configured in the inMOTION EEPROM via USB.
+				</div>
+				<div style="margin-top:10px;padding:8px;background:#0A1A0A;border-radius:6px;font-size:12px;" class="muted">
+					Response PGN: <strong id="imotion-resp-pgn">FF331B</strong> &nbsp;·&nbsp;
+					<span id="imotion-cmd-preview">Command byte: 0x90 at byte 0</span>
+				</div>
+				<div class="row" style="margin-top:12px;">
+					<button class="btn primary" onclick="inmotionBuildFrame()">Add to CAN Library</button>
+				</div>
+				<div id="imotion-status" class="muted" style="margin-top:8px;font-size:12px;"></div>
+			</div>
 		</div>
 	</section>
 
@@ -538,13 +601,13 @@ function switchTab(tabName){
 		<h4>CAN Frame</h4>
 		<div class="row" style="margin-bottom:10px;"><label><input id="btn-can-enabled" type="checkbox" onchange="toggleCanFields()" /> Send CAN on press</label></div>
 		<div id="can-config-wrapper" class="grid two-col" style="display:none;">
-			<div><label>PGN (hex)</label><input id="btn-can-pgn" type="text" placeholder="FEF9" /></div>
+			<div><label>PGN (hex)</label><input id="btn-can-pgn" type="text" placeholder="FEF9" oninput="autoDetectStatusPgn(true)" /></div>
 			<div><label>Priority</label><input id="btn-can-priority" type="number" min="0" max="7" /></div>
 			<div><label>Source (hex)</label><input id="btn-can-src" type="text" placeholder="F9" /></div>
 			<div><label>Dest (hex)</label><input id="btn-can-dest" type="text" placeholder="FF" /></div>
 			<div class="row" style="grid-column:1/-1;">
 				<label>Data Bytes</label>
-				<input id="btn-can-data" type="text" placeholder="00 00 00 00 00 00 00 00" />
+				<input id="btn-can-data" type="text" placeholder="00 00 00 00 00 00 00 00" oninput="autoDetectStatusPgn(true)" />
 			</div>
 			<div class="row" style="grid-column:1/-1;">
 				<label>From Library</label>
@@ -565,6 +628,20 @@ function switchTab(tabName){
 			<div class="row" style="grid-column:1/-1;">
 				<label>From Library</label>
 				<select id="btn-can-off-library-select" onchange="loadCanOffFromLibrary()"></select>
+			</div>
+		</div>
+		<h4>CAN Status Feedback</h4>
+		<div class="row" style="margin-bottom:8px;">
+			<label><input id="btn-status-enabled" type="checkbox" onchange="toggleStatusFields()" /> Show ON state from received CAN message</label>
+		</div>
+		<div id="status-config-wrapper" class="grid two-col" style="display:none;">
+			<div><label>Response PGN (hex)</label><input id="btn-status-pgn" type="text" placeholder="FF33" /></div>
+			<div><label>Source Address (hex, FF=any)</label><input id="btn-status-sa" type="text" placeholder="FF" /></div>
+			<div><label>Byte Index (0&ndash;7)</label><input id="btn-status-byte" type="number" min="0" max="7" value="0" /></div>
+			<div><label>Bitmask (hex)</label><input id="btn-status-mask" type="text" placeholder="10" /></div>
+			<div class="row" style="grid-column:1/-1; align-items:center; gap:8px;">
+				<span id="status-hint" class="muted" style="font-size:12px;flex:1;"></span>
+				<button class="btn ghost" onclick="autoDetectStatusPgn(false)" style="flex:0 0 auto;font-size:11px;padding:2px 8px;">Re-detect</button>
 			</div>
 		</div>
 		<div class="row" style="margin-top:12px; justify-content:flex-end; gap:8px;">
@@ -1125,7 +1202,8 @@ function openButtonModal(row,col){
 		text_align: 'center',
 		momentary: false,
 		can:{enabled:false,pgn:0,priority:6,source_address:0xF9,destination_address:0xFF,data:[0,0,0,0,0,0,0,0]},
-		can_off:{enabled:false,pgn:0,priority:6,source_address:0xF9,destination_address:0xFF,data:[0,0,0,0,0,0,0,0]}
+		can_off:{enabled:false,pgn:0,priority:6,source_address:0xF9,destination_address:0xFF,data:[0,0,0,0,0,0,0,0]},
+		can_status:{enabled:false,pgn:0,source_address:0xFF,byte_index:0,mask:0}
 	};
 	const data = btn || defaults;
 	document.getElementById('btn-label').value = data.label || '';
@@ -1155,8 +1233,16 @@ function openButtonModal(row,col){
 	document.getElementById('btn-can-off-dest').value = (firstDefined(canOffCfg.destination_address, 0xFF)).toString(16).toUpperCase();
 	const canOffData = (canOffCfg.data && canOffCfg.data.length) ? canOffCfg.data : defaults.can_off.data;
 	document.getElementById('btn-can-off-data').value = canOffData.map(b=>b.toString(16).toUpperCase().padStart(2,'0')).join(' ');
+	const canStatusCfg = data.can_status || {};
+	document.getElementById('btn-status-enabled').checked = canStatusCfg.enabled || false;
+	document.getElementById('btn-status-pgn').value = (canStatusCfg.pgn||0).toString(16).toUpperCase();
+	document.getElementById('btn-status-sa').value = (firstDefined(canStatusCfg.source_address,0xFF)).toString(16).toUpperCase();
+	document.getElementById('btn-status-byte').value = firstDefined(canStatusCfg.byte_index, 0);
+	document.getElementById('btn-status-mask').value = (canStatusCfg.mask||0).toString(16).toUpperCase();
+	if(document.getElementById('status-hint')) document.getElementById('status-hint').textContent='';
 	populateCanLibraryDropdown();
 	toggleCanFields();
+	toggleStatusFields();
 	document.getElementById('button-modal').classList.add('open');
 }
 
@@ -1207,6 +1293,13 @@ function saveButtonFromModal(){
 			source_address: canOffEnabled ? parseInt(document.getElementById('btn-can-off-src').value,16)||0xF9 : 0xF9,
 			destination_address: canOffEnabled ? parseInt(document.getElementById('btn-can-off-dest').value,16)||0xFF : 0xFF,
 			data: canOffData
+		},
+		can_status: {
+			enabled: document.getElementById('btn-status-enabled').checked,
+			pgn: document.getElementById('btn-status-enabled').checked ? parseInt(document.getElementById('btn-status-pgn').value,16)||0 : 0,
+			source_address: parseInt(document.getElementById('btn-status-sa').value,16)||0xFF,
+			byte_index: parseInt(document.getElementById('btn-status-byte').value)||0,
+			mask: parseInt(document.getElementById('btn-status-mask').value,16)||0
 		}
 	};
 	if(idx>=0) page.buttons[idx] = button; else page.buttons.push(button);
@@ -1229,6 +1322,65 @@ function toggleCanFields(){
 	document.getElementById('can-config-wrapper').style.display = showOn ? 'grid' : 'none';
 	const showOff = document.getElementById('btn-can-off-enabled').checked;
 	document.getElementById('can-off-config-wrapper').style.display = showOff ? 'grid' : 'none';
+}
+
+function toggleStatusFields(){
+	document.getElementById('status-config-wrapper').style.display =
+		document.getElementById('btn-status-enabled').checked ? 'grid' : 'none';
+}
+
+// Auto-detect response PGN, byte index, and bitmask for known Infinitybox modules.
+// silent=true  → called automatically as the user types; only fills if a match is found,
+//                never shows a "not found" message (avoids noise while mid-typing).
+// silent=false → called by the Re-detect button; always gives feedback.
+function autoDetectStatusPgn(silent){
+	const txPgn = parseInt(document.getElementById('btn-can-pgn').value||'0', 16);
+	const txData = (document.getElementById('btn-can-data').value||'').trim().split(/\s+/).map(v=>parseInt(v,16)||0);
+	const hint = document.getElementById('status-hint');
+	function apply(pgn, sa, byteIdx, mask, label){
+		document.getElementById('btn-status-enabled').checked = true;
+		document.getElementById('btn-status-pgn').value  = pgn.toString(16).toUpperCase();
+		document.getElementById('btn-status-sa').value   = sa.toString(16).toUpperCase();
+		document.getElementById('btn-status-byte').value = byteIdx;
+		document.getElementById('btn-status-mask').value = mask.toString(16).toUpperCase();
+		toggleStatusFields();
+		if(hint) hint.textContent = '\u2713 ' + label;
+	}
+	// ── inMOTION NGX ──────────────────────────────────────────────────────────
+	// TX PGN → Response PGN mapping (SA 0x1B on all response frames)
+	// TX byte position → [response byte index, response bitmask]
+	// Derived from the Infinitybox inMOTION NGX Quick Start Guide outbound table.
+	const imRx  = {0xFF03:0xFF33, 0xFF04:0xFF34, 0xFF05:0xFF35, 0xFF06:0xFF36};
+	const imMap = [[0,0x10],[0,0x01],[1,0x10],[1,0x01],[2,0x10],[2,0x01],[3,0x10],[3,0x01]];
+	if(imRx[txPgn] !== undefined){
+		const ci = txData.findIndex(b => b !== 0);
+		if(ci >= 0 && ci < 8){
+			apply(imRx[txPgn], 0x1B, imMap[ci][0], imMap[ci][1], 'inMOTION NGX — auto-filled');
+			return;
+		}
+		// PGN recognised but data all zeros (module base frame, no specific output)
+		if(!silent && hint) hint.textContent = 'inMOTION NGX detected — set data bytes to identify the output';
+		return;
+	}
+	// ── POWERCELL NGX ─────────────────────────────────────────────────────────
+	// TX PGN → {base response PGN for outputs 1-5, ext for 6-10}
+	// Bit mapping from the Infinitybox POWERCELL interface document.
+	const pcMap = {0xFF01:{base:0xFF11,ext:0xFF21}, 0xFF02:{base:0xFF12,ext:0xFF22}};
+	if(pcMap[txPgn]){
+		const {base,ext} = pcMap[txPgn];
+		const b0 = txData[0]||0, b1 = txData[1]||0;
+		let rp, rb=0, rm;
+		if     (b0 >= 0x08){ rp=base; rm=b0;    }  // outputs 1-5  (bit stays same)
+		else if(b0 === 0x04){ rp=ext;  rm=0x80; }  // output 6
+		else if(b0 === 0x02){ rp=ext;  rm=0x40; }  // output 7
+		else if(b0 === 0x01){ rp=ext;  rm=0x20; }  // output 8
+		else if(b1 === 0x80){ rp=ext;  rm=0x10; }  // output 9
+		else if(b1 === 0x40){ rp=ext;  rm=0x08; }  // output 10
+		if(rp){ apply(rp, 0x1E, rb, rm, 'POWERCELL NGX — auto-filled'); return; }
+		if(!silent && hint) hint.textContent = 'POWERCELL NGX detected — set data bytes to identify the output';
+		return;
+	}
+	if(!silent && hint) hint.textContent = 'Unknown frame — fill in manually';
 }
 
 function renderPreview(){
@@ -1709,11 +1861,33 @@ function importCanMessage(type){
 		// Infinitybox NGX (from email/docs): front listens FF011E, rear listens FF021E (priority omitted)
 		powercell_front:{name:'POWERCELL NGX Front (FF011E control)',pgn:0xFF01,data:[0,0,0,0,0,0,0,0],priority:6,source_address:0x1E,destination_address:0xFF},
 		powercell_rear:{name:'POWERCELL NGX Rear (FF021E control)',pgn:0xFF02,data:[0,0,0,0,0,0,0,0],priority:6,source_address:0x1E,destination_address:0xFF},
-		// inMOTION NGX listens on different proprietary PGNs; OFF uses a distinct payload
-		imotion_df:{name:'inMOTION NGX Driver Front (PGN FF03)',pgn:0xFF03,data:[0,0,0,0,0,0,0,0]},
-		imotion_pf:{name:'inMOTION NGX Passenger Front (PGN FF04)',pgn:0xFF04,data:[0,0,0,0,0,0,0,0]},
-		imotion_dr:{name:'inMOTION NGX Driver Rear (PGN FF05)',pgn:0xFF05,data:[0,0,0,0,0,0,0,0]},
-		imotion_pr:{name:'inMOTION NGX Passenger Rear (PGN FF06)',pgn:0xFF06,data:[0,0,0,0,0,0,0,0]}
+		// ── inMOTION NGX ──────────────────────────────────────────────────────────
+		// J1939 H-bridge module for power windows, door locks, actuators.
+		// SA 0x1A = inMOTION unit address (from AF031A / AF041A / AF051A / AF061A).
+		// Byte layout: [Relay1A, Relay1B, Relay2A, Relay2B, Out1, Out2, Out3, Out4]
+		// Per-byte:  0x90=Track ON  |  0x80=OFF  |  0xB0=Express  |  0x00=no-change
+		// Response PGNs (module sends back every 500 ms or on state change):
+		//   Driver Front→FF331B  Passenger Front→FF341B  Driver Rear→FF351B  Passenger Rear→FF361B
+		//
+		// Module base frames (all bytes 0x00 = no output affected — use as a template):
+		imotion_df:{name:'inMOTION NGX Driver Front',   pgn:0xFF03,data:[0,0,0,0,0,0,0,0],priority:6,source_address:0x1A,destination_address:0xFF},
+		imotion_pf:{name:'inMOTION NGX Passenger Front',pgn:0xFF04,data:[0,0,0,0,0,0,0,0],priority:6,source_address:0x1A,destination_address:0xFF},
+		imotion_dr:{name:'inMOTION NGX Driver Rear',    pgn:0xFF05,data:[0,0,0,0,0,0,0,0],priority:6,source_address:0x1A,destination_address:0xFF},
+		imotion_pr:{name:'inMOTION NGX Passenger Rear', pgn:0xFF06,data:[0,0,0,0,0,0,0,0],priority:6,source_address:0x1A,destination_address:0xFF},
+		// Driver Front — individual output shortcuts:
+		imotion_df_r1a_on: {name:'inMOTION DF Relay1A Track ON', pgn:0xFF03,data:[0x90,0,0,0,0,0,0,0],priority:6,source_address:0x1A,destination_address:0xFF},
+		imotion_df_r1a_off:{name:'inMOTION DF Relay1A OFF',      pgn:0xFF03,data:[0x80,0,0,0,0,0,0,0],priority:6,source_address:0x1A,destination_address:0xFF},
+		imotion_df_r1a_exp:{name:'inMOTION DF Relay1A Express',  pgn:0xFF03,data:[0xB0,0,0,0,0,0,0,0],priority:6,source_address:0x1A,destination_address:0xFF},
+		imotion_df_r1b_on: {name:'inMOTION DF Relay1B Track ON', pgn:0xFF03,data:[0,0x90,0,0,0,0,0,0],priority:6,source_address:0x1A,destination_address:0xFF},
+		imotion_df_r1b_off:{name:'inMOTION DF Relay1B OFF',      pgn:0xFF03,data:[0,0x80,0,0,0,0,0,0],priority:6,source_address:0x1A,destination_address:0xFF},
+		imotion_df_r1b_exp:{name:'inMOTION DF Relay1B Express',  pgn:0xFF03,data:[0,0xB0,0,0,0,0,0,0],priority:6,source_address:0x1A,destination_address:0xFF},
+		// Passenger Front — individual output shortcuts:
+		imotion_pf_r1a_on: {name:'inMOTION PF Relay1A Track ON', pgn:0xFF04,data:[0x90,0,0,0,0,0,0,0],priority:6,source_address:0x1A,destination_address:0xFF},
+		imotion_pf_r1a_off:{name:'inMOTION PF Relay1A OFF',      pgn:0xFF04,data:[0x80,0,0,0,0,0,0,0],priority:6,source_address:0x1A,destination_address:0xFF},
+		imotion_pf_r1a_exp:{name:'inMOTION PF Relay1A Express',  pgn:0xFF04,data:[0xB0,0,0,0,0,0,0,0],priority:6,source_address:0x1A,destination_address:0xFF},
+		imotion_pf_r1b_on: {name:'inMOTION PF Relay1B Track ON', pgn:0xFF04,data:[0,0x90,0,0,0,0,0,0],priority:6,source_address:0x1A,destination_address:0xFF},
+		imotion_pf_r1b_off:{name:'inMOTION PF Relay1B OFF',      pgn:0xFF04,data:[0,0x80,0,0,0,0,0,0],priority:6,source_address:0x1A,destination_address:0xFF},
+		imotion_pf_r1b_exp:{name:'inMOTION PF Relay1B Express',  pgn:0xFF04,data:[0,0xB0,0,0,0,0,0,0],priority:6,source_address:0x1A,destination_address:0xFF}
 	};
 	const t = templates[type];
 	if(!t) return;
@@ -1721,6 +1895,122 @@ function importCanMessage(type){
 	config.can_library.push({ id:'msg_'+Date.now(), name:t.name, pgn:t.pgn, priority:firstDefined(t.priority,6), source_address:firstDefined(t.source_address,0xF9), destination_address:firstDefined(t.destination_address,0xFF), data:t.data, description:'Quick import' });
 	renderCanLibrary();
 }
+
+// ── inMOTION NGX Frame Builder ─────────────────────────────────────────────────
+// Generates precise J1939 output-control frames for inMOTION NGX H-bridge modules.
+//
+// Protocol summary:
+//   • SA 0x1A for all inMOTION units; priority 6.
+//   • 8-byte payload; each byte controls one output: [R1A,R1B,R2A,R2B,O1,O2,O3,O4]
+//   • Per-byte encoding (MSB = bit 0):
+//       0x90 = Track ON   (modifier=1, personality=01)
+//       0x80 = OFF        (modifier=1, personality=00)
+//       0xB0 = Express    (modifier=1, personality=11) ← H-bridge relays only
+//       0xA? = Timed      (modifier=1, personality=10, lower nibble = 0.25s steps)
+//       0x00 = No change  (modifier=0 — inMOTION silently ignores this byte)
+//
+// Express mode: relay runs until the current threshold set in the inMOTION's
+// EEPROM is exceeded.  Ideal for power windows — the motor stalls when the
+// glass reaches the end of travel, causing a current spike that stops the relay.
+
+const _inmotionModules = {
+	df:{label:'Driver Front',   pgn:0xFF03, resp:'FF331B'},
+	pf:{label:'Passenger Front',pgn:0xFF04, resp:'FF341B'},
+	dr:{label:'Driver Rear',    pgn:0xFF05, resp:'FF351B'},
+	pr:{label:'Passenger Rear', pgn:0xFF06, resp:'FF361B'}
+};
+const _inmotionOutputs = [
+	{label:'Relay 1A',pos:0,relay:true},
+	{label:'Relay 1B',pos:1,relay:true},
+	{label:'Relay 2A',pos:2,relay:true},
+	{label:'Relay 2B',pos:3,relay:true},
+	{label:'Output 1',pos:4,relay:false},
+	{label:'Output 2',pos:5,relay:false},
+	{label:'Output 3',pos:6,relay:false},
+	{label:'Output 4',pos:7,relay:false}
+];
+
+function inmotionUpdateUI(){
+	const modeEl   = document.getElementById('imotion-mode');
+	const outIdx   = parseInt(document.getElementById('imotion-output').value);
+	const mode     = modeEl ? modeEl.value : 'track';
+	const isRelay  = outIdx <= 3;
+	const modKey   = document.getElementById('imotion-module').value;
+	const mod      = _inmotionModules[modKey];
+
+	// Express only valid for relay outputs
+	const expOpt = modeEl ? modeEl.querySelector('option[value="express"]') : null;
+	if(expOpt){ expOpt.disabled = !isRelay; }
+	if(!isRelay && mode === 'express' && modeEl){ modeEl.value = 'track'; }
+
+	// Show/hide timer row
+	const curMode = modeEl ? modeEl.value : mode;
+	const timerRow = document.getElementById('imotion-timer-row');
+	if(timerRow) timerRow.style.display = (curMode === 'timed') ? '' : 'none';
+
+	// Express warning
+	const expNote = document.getElementById('imotion-express-note');
+	if(expNote) expNote.style.display = (!isRelay && curMode === 'express') ? '' : 'none';
+
+	// Response PGN display
+	const respEl = document.getElementById('imotion-resp-pgn');
+	if(respEl && mod) respEl.textContent = mod.resp;
+
+	// Preview command byte
+	const out = _inmotionOutputs[outIdx] || _inmotionOutputs[0];
+	let cmd = 0x90;
+	if(curMode === 'off')     cmd = 0x80;
+	else if(curMode === 'express') cmd = 0xB0;
+	else if(curMode === 'timed'){
+		const t = parseFloat((document.getElementById('imotion-timer')||{}).value || 1);
+		const counts = Math.max(1, Math.min(15, Math.round(t / 0.25)));
+		cmd = 0x80 | 0x20 | (counts & 0x0F);
+	}
+	const prevEl = document.getElementById('imotion-cmd-preview');
+	if(prevEl) prevEl.textContent = 'Command byte: 0x' + cmd.toString(16).toUpperCase().padStart(2,'0') + ' at byte ' + out.pos + ' (' + out.label + ')';
+}
+
+function inmotionBuildFrame(){
+	const modKey  = document.getElementById('imotion-module').value;
+	const outIdx  = parseInt(document.getElementById('imotion-output').value);
+	const mode    = document.getElementById('imotion-mode').value;
+	const timer_s = parseFloat((document.getElementById('imotion-timer')||{}).value || 1);
+
+	const mod = _inmotionModules[modKey];
+	const out = _inmotionOutputs[outIdx];
+	if(!mod || !out){ alert('Select a valid module and output.'); return; }
+
+	let cmd = 0x90;
+	if(mode === 'off')     cmd = 0x80;
+	else if(mode === 'express') cmd = 0xB0;
+	else if(mode === 'timed'){
+		const counts = Math.max(1, Math.min(15, Math.round(timer_s / 0.25)));
+		cmd = 0x80 | 0x20 | (counts & 0x0F);
+	}
+
+	const data = [0,0,0,0,0,0,0,0];
+	data[out.pos] = cmd;
+
+	const modeLabels = {track:'Track ON',off:'OFF',express:'Express',timed:'Timed '+timer_s+'s'};
+	const name = 'inMOTION NGX ' + mod.label + ' \u2014 ' + out.label + ' ' + (modeLabels[mode]||mode);
+	const description = 'Response PGN: ' + mod.resp + ' | cmd=0x' + cmd.toString(16).toUpperCase().padStart(2,'0') + ' @ byte ' + out.pos;
+
+	if(!config.can_library) config.can_library = [];
+	config.can_library.push({
+		id: 'msg_' + Date.now(),
+		name,
+		pgn: mod.pgn,
+		priority: 6,
+		source_address: 0x1A,
+		destination_address: 0xFF,
+		data,
+		description
+	});
+	renderCanLibrary();
+	const statusEl = document.getElementById('imotion-status');
+	if(statusEl) statusEl.textContent = '\u2713 Added \u201c' + name + '\u201d to CAN Library';
+}
+// ── end inMOTION NGX Frame Builder ────────────────────────────────────────────
 
 function populateCanLibraryDropdown(){
 	const sels = [
@@ -1753,6 +2043,7 @@ function loadCanFromLibrary(){
 	document.getElementById('btn-can-dest').value = msg.destination_address.toString(16).toUpperCase();
 	document.getElementById('btn-can-data').value = msg.data.map(b=>b.toString(16).toUpperCase().padStart(2,'0')).join(' ');
 	toggleCanFields();
+	autoDetectStatusPgn(false);  // auto-fill status fields from the loaded frame
 }
 
 function loadCanOffFromLibrary(){

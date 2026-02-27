@@ -483,6 +483,13 @@ void ConfigManager::encodeConfig(const DeviceConfig& source, DynamicJsonDocument
             for (std::uint8_t i = 0; i < button.can_off.length; ++i) {
                 off_data_arr.add(button.can_off.data[i]);
             }
+
+            JsonObject can_status_obj = btn_obj["can_status"].to<JsonObject>();
+            can_status_obj["enabled"] = button.can_status.enabled;
+            can_status_obj["pgn"] = button.can_status.pgn;
+            can_status_obj["source_address"] = button.can_status.source_address;
+            can_status_obj["byte_index"] = button.can_status.byte_index;
+            can_status_obj["mask"] = button.can_status.mask;
         }
     }
 
@@ -708,6 +715,15 @@ bool ConfigManager::decodeConfig(JsonVariantConst json, DeviceConfig& target, st
                             }
                             button.can_off.length = static_cast<std::uint8_t>(i);  // Set length based on actual data bytes
                         }
+                    }
+
+                    JsonObjectConst can_status_obj = btn_obj["can_status"];
+                    if (!can_status_obj.isNull()) {
+                        button.can_status.enabled = can_status_obj["enabled"] | false;
+                        button.can_status.pgn = can_status_obj["pgn"] | 0u;
+                        button.can_status.source_address = clampValue<std::uint8_t>(can_status_obj["source_address"] | 0xFF, 0u, 255u);
+                        button.can_status.byte_index = clampValue<std::uint8_t>(can_status_obj["byte_index"] | 0, 0u, 7u);
+                        button.can_status.mask = clampValue<std::uint8_t>(can_status_obj["mask"] | 0, 0u, 255u);
                     }
 
                     page.buttons.push_back(std::move(button));

@@ -23,6 +23,16 @@ struct CanFrameConfig {
     std::uint8_t length = 0;  // Actual number of data bytes to transmit (0-8)
 };
 
+// Per-button CAN receive config: when a CAN frame matching PGN/SA arrives and
+// (data[byte_index] & mask) != 0, the button visually shows as "active/ON".
+struct CanStatusConfig {
+    bool enabled = false;
+    uint32_t pgn = 0;              // Response PGN to monitor (e.g. 0xFF33 for inMOTION DF)
+    uint8_t source_address = 0xFF; // SA to match; 0xFF = accept any SA
+    uint8_t byte_index = 0;        // Which data byte to inspect (0–7)
+    uint8_t mask = 0x00;           // Active when (data[byte_index] & mask) != 0
+};
+
 struct ButtonConfig {
     std::string id = "button_0";
     std::string label = "Button";
@@ -45,6 +55,7 @@ struct ButtonConfig {
     std::string border_color = "#FFFFFF";  // Button border color
     CanFrameConfig can;
     CanFrameConfig can_off;  // Optional OFF/release frame (used by some modules like inMOTION NGX)
+    CanStatusConfig can_status;  // CAN receive → visual ON/OFF feedback (active = confirmed from bus)
 };
 
 struct PageConfig {

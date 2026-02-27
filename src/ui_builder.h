@@ -4,6 +4,8 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <map>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -25,6 +27,11 @@ public:
                              bool sta_connected,
                              const std::string& sta_ssid);
     void setBrightness(uint8_t percent);
+
+    // Thread-safe: may be called from any FreeRTOS task.
+    // Queues a visual ON/OFF update for the given button ID.
+    // The LVGL timer drains the queue inside the LVGL task context.
+    void notifyButtonActive(const std::string& id, bool active);
 
 private:
     UIBuilder() = default;
@@ -84,6 +91,19 @@ private:
     static lv_color_t colorFromHex(const std::string& hex, lv_color_t fallback);
 
     const DeviceConfig* config_ = nullptr;
+
+    // ── CAN status feedback ───────────────────────────────────────────────────
+    // btn_lvgl_map_     : button ID → LVGL obj for the currently-rendered page
+    // btn_status_pending_: pending active/inactive updates posted by the CAN task
+    // btn_status_mutex_ : protects btn_status_pending_ (accessed from two tasks)
+    // can_status_timer_ : LVGL timer that drains pending updates (LVGL task context)
+    std::map<std::string, lv_obj_t*> btn_lvgl_map_;
+    std::map<std::string, bool>      btn_status_pending_;
+    std::mutex                       btn_status_mutex_;
+    lv_timer_t*                      can_status_timer_ = nullptr;
+    static void canStatusTimerCb(lv_timer_t* t);
+    void        flushButtonStatus();
+    // ──────────────────────────────────────────────────────────────────────────────
     lv_obj_t* base_screen_ = nullptr;
     lv_obj_t* header_bar_ = nullptr;
     lv_obj_t* header_brand_row_ = nullptr;

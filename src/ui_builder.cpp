@@ -50,6 +50,12 @@ void UIBuilder::begin() {
     }
     createInfoModal();
 
+    // Register a 150 ms LVGL timer that drains notifyButtonActive() updates.
+    // Runs entirely inside the LVGL task — safe to call lv_obj_* here.
+    if (!can_status_timer_) {
+        can_status_timer_ = lv_timer_create(canStatusTimerCb, 150, nullptr);
+    }
+
     if (config_ && !config_->pages.empty()) {
         buildNavigation();
         buildPage(0);
@@ -491,8 +497,11 @@ void UIBuilder::buildPage(std::size_t index) {
     lv_obj_set_style_pad_gap(page_container_, UITheme::SPACE_SM, 0);
     lv_obj_set_grid_dsc_array(page_container_, grid_cols_.data(), grid_rows_.data());
 
+    btn_lvgl_map_.clear();  // Rebuild every time a page is rendered
+
     for (const auto& button : page.buttons) {
         lv_obj_t* btn = lv_btn_create(page_container_);
+        btn_lvgl_map_[button.id] = btn;  // track for CAN status feedback
         lv_obj_remove_style_all(btn);
 
         // Apply per-button styling; fall back to theme only when button fields are empty
@@ -651,6 +660,39 @@ void UIBuilder::actionButtonEvent(lv_event_t* e) {
     if (code == LV_EVENT_CLICKED) {
         CanManager::instance().sendButtonAction(*config);
     }
+}
+
+// ── CAN Status Feedback ───────────────────────────────────────────────────
+
+// Thread-safe: may be called from any FreeRTOS task.
+void UIBuilder::notifyButtonActive(const std::string& id, bool active) {
+    std::lock_guard<std::mutex> lock(btn_status_mutex_);
+    btn_status_pending_[id] = active;
+}
+
+// Called by LVGL timer — always runs inside the LVGL task with lvgl_mux held.
+void UIBuilder::flushButtonStatus() {
+    std::map<std::string, bool> pending;
+    {
+        std::lock_guard<std::mutex> lock(btn_status_mutex_);
+        if (btn_status_pending_.empty()) return;
+        pending = std::move(btn_status_pending_);
+    }
+    for (const auto& kv : pending) {
+        auto it = btn_lvgl_map_.find(kv.first);
+        if (it == btn_lvgl_map_.end() || !it->second) continue;
+        lv_obj_t* btn = it->second;
+        if (kv.second) {
+            lv_obj_add_state(btn, LV_STATE_CHECKED);
+        } else {
+            lv_obj_clear_state(btn, LV_STATE_CHECKED);
+        }
+        lv_obj_invalidate(btn);
+    }
+}
+
+void UIBuilder::canStatusTimerCb(lv_timer_t* /*t*/) {
+    UIBuilder::instance().flushButtonStatus();
 }
 
 lv_color_t UIBuilder::colorFromHex(const std::string& hex, lv_color_t fallback) {

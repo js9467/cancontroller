@@ -145,6 +145,50 @@ void lvgl_port_task(void* arg) {
     }
 }
 
+// ── CAN Status Feedback Task ──────────────────────────────────────────────────
+// Continuously dequeues inbound CAN frames, decodes the J1939 PGN/SA, and
+// matches against every button's can_status config.  Safe state updates are
+// posted via UIBuilder::notifyButtonActive() (mutex-protected); the LVGL
+// timer in UIBuilder drains them in the LVGL task context.
+
+static void canStatusTask(void* /*pvParameters*/) {
+    vTaskDelay(pdMS_TO_TICKS(3000));  // let TWAI driver stabilise after boot
+
+    for (;;) {
+        if (CanManager::instance().isReady()) {
+            std::vector<CanRxMessage> msgs = CanManager::instance().receiveAll(40);
+            if (!msgs.empty()) {
+                const DeviceConfig& cfg = ConfigManager::instance().getConfig();
+                for (const auto& msg : msgs) {
+                    // Decode J1939 29-bit identifier → PGN and SA
+                    const uint8_t  sa         = static_cast<uint8_t>(msg.identifier & 0xFF);
+                    const uint8_t  pdu_format = static_cast<uint8_t>((msg.identifier >> 16) & 0xFF);
+                    const uint8_t  pdu_spec   = static_cast<uint8_t>((msg.identifier >>  8) & 0xFF);
+                    const uint8_t  data_page  = static_cast<uint8_t>((msg.identifier >> 24) & 0x01);
+                    const uint32_t pgn = (pdu_format >= 240)
+                        ? (static_cast<uint32_t>(data_page) << 16) | (static_cast<uint32_t>(pdu_format) << 8) | pdu_spec
+                        : (static_cast<uint32_t>(data_page) << 16) | (static_cast<uint32_t>(pdu_format) << 8);
+
+                    for (const auto& page : cfg.pages) {
+                        for (const auto& btn : page.buttons) {
+                            if (!btn.can_status.enabled)               continue;
+                            if (btn.can_status.pgn != pgn)             continue;
+                            if (btn.can_status.source_address != 0xFF &&
+                                btn.can_status.source_address != sa)   continue;
+                            if (btn.can_status.byte_index >= msg.length) continue;
+                            const bool active =
+                                (msg.data[btn.can_status.byte_index] & btn.can_status.mask) != 0;
+                            UIBuilder::instance().notifyButtonActive(btn.id, active);
+                        }
+                    }
+                }
+            }
+        }
+        vTaskDelay(pdMS_TO_TICKS(50));
+    }
+}
+// ───────────────────────────────────────────────────────────────────────────────
+
 void setup() {
     Serial.begin(115200);
     
@@ -253,6 +297,8 @@ void setup() {
     // Start LVGL background task
     lvgl_mux = xSemaphoreCreateRecursiveMutex();
     xTaskCreate(lvgl_port_task, "lvgl", LVGL_TASK_STACK_SIZE, nullptr, LVGL_TASK_PRIORITY, nullptr);
+    // CAN status feedback task — background, lowest priority, separate core if available
+    xTaskCreate(canStatusTask, "canSts", 4096, nullptr, 1, nullptr);
 
     // Load configuration from flash
     if (!ConfigManager::instance().begin()) {
