@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <lvgl.h>
 
@@ -27,10 +27,6 @@ public:
                              bool sta_connected,
                              const std::string& sta_ssid);
     void setBrightness(uint8_t percent);
-
-    // Thread-safe: may be called from any FreeRTOS task.
-    // Queues a visual ON/OFF update for the given button ID.
-    // The LVGL timer drains the queue inside the LVGL task context.
     void notifyButtonActive(const std::string& id, bool active);
 
 private:
@@ -45,6 +41,32 @@ private:
     void buildEmptyState();
     void buildPage(std::size_t index);
     void updateNavSelection();
+    
+    // Suspension interface UI
+    void buildSuspensionInterfacePage(const PageConfig& page);
+    lv_obj_t* createDamperCard(lv_obj_t* parent, const char* label, const char* id);
+    lv_obj_t* createControlCard(lv_obj_t* parent, const char* label);
+    void updateSuspensionUI();  // Refresh UI from CAN feedback
+    static void suspensionDamperEvent(lv_event_t* e);  // +/- button handler
+    static void suspensionPresetEvent(lv_event_t* e);  // Preset 1-5 handler
+    static void suspensionCalibrateEvent(lv_event_t* e);  // Calibrate handler
+    static void suspensionControlEvent(lv_event_t* e);  // Anti-roll/pitch buttons
+    static void suspensionBackEvent(lv_event_t* e);  // Back button handler
+    
+    // Infinitybox UI methods
+    void buildInfinityboxPage(std::size_t category_index);
+    void buildInfinityboxDrivingPage();
+    void buildInfinityboxExteriorPage();
+    void buildInfinityboxInteriorPage();
+    void buildInfinityboxBodyPage();
+    void buildInfinityboxPowertrainPage();
+    void buildInfinityboxAuxPage();
+    lv_obj_t* createFunctionToggle(lv_obj_t* parent, const char* label, const char* function_name);
+    lv_obj_t* createFunctionMomentary(lv_obj_t* parent, const char* label, const char* function_name);
+    lv_obj_t* createFunctionFlash(lv_obj_t* parent, const char* label, const char* function_name);
+    static void infinityboxToggleEvent(lv_event_t* e);
+    static void infinityboxMomentaryEvent(lv_event_t* e);
+    static void infinityboxFlashEvent(lv_event_t* e);
     void updateHeaderBranding();
     void createInfoModal();
     void showInfoModal();
@@ -91,19 +113,6 @@ private:
     static lv_color_t colorFromHex(const std::string& hex, lv_color_t fallback);
 
     const DeviceConfig* config_ = nullptr;
-
-    // ── CAN status feedback ───────────────────────────────────────────────────
-    // btn_lvgl_map_     : button ID → LVGL obj for the currently-rendered page
-    // btn_status_pending_: pending active/inactive updates posted by the CAN task
-    // btn_status_mutex_ : protects btn_status_pending_ (accessed from two tasks)
-    // can_status_timer_ : LVGL timer that drains pending updates (LVGL task context)
-    std::map<std::string, lv_obj_t*> btn_lvgl_map_;
-    std::map<std::string, bool>      btn_status_pending_;
-    std::mutex                       btn_status_mutex_;
-    lv_timer_t*                      can_status_timer_ = nullptr;
-    static void canStatusTimerCb(lv_timer_t* t);
-    void        flushButtonStatus();
-    // ──────────────────────────────────────────────────────────────────────────────
     lv_obj_t* base_screen_ = nullptr;
     lv_obj_t* header_bar_ = nullptr;
     lv_obj_t* header_brand_row_ = nullptr;
@@ -133,6 +142,7 @@ private:
     lv_obj_t* ota_status_label_ = nullptr;
     lv_obj_t* ota_primary_button_ = nullptr;
     lv_obj_t* ota_primary_button_label_ = nullptr;
+    lv_obj_t* ota_modal_ = nullptr;  // Separate OTA updates popup
     lv_obj_t* network_status_bar_ = nullptr;
     lv_obj_t* ota_status_bar_ = nullptr;
     lv_obj_t* diagnostics_label_ = nullptr;
@@ -152,6 +162,7 @@ private:
     std::vector<lv_coord_t> grid_cols_;
     std::vector<lv_coord_t> grid_rows_;
     std::size_t active_page_ = 0;
+    std::size_t last_page_before_suspension_ = 0;  // Track page before entering suspension
     bool dirty_ = false;
     lv_coord_t nav_base_pad_top_ = UITheme::SPACE_XS;
     std::string last_ap_ip_ = "";
@@ -185,7 +196,39 @@ private:
     lv_img_dsc_t sleep_logo_dsc_{};
     bool sleep_logo_ready_ = false;
     std::string ota_status_text_ = "idle";
+    std::string latest_github_version_;
     OtaAction ota_primary_action_ = OtaAction::INSTALL;
     DiagnosticsPriority diag_priority_ = DiagnosticsPriority::NORMAL;
     bool info_modal_visible_ = false;
+    
+    // Suspension UI element tracking
+    struct {
+        lv_obj_t* fl_value_label = nullptr;
+        lv_obj_t* fr_value_label = nullptr;
+        lv_obj_t* rl_value_label = nullptr;
+        lv_obj_t* rr_value_label = nullptr;
+        lv_obj_t* fl_status_label = nullptr;
+        lv_obj_t* fr_status_label = nullptr;
+        lv_obj_t* rl_status_label = nullptr;
+        lv_obj_t* rr_status_label = nullptr;
+        lv_obj_t* calibrate_btn = nullptr;
+        lv_obj_t* calibrate_label = nullptr;
+        lv_obj_t* front_preset_btns[5] = {nullptr, nullptr, nullptr, nullptr, nullptr};
+        lv_obj_t* rear_preset_btns[5] = {nullptr, nullptr, nullptr, nullptr, nullptr};
+        lv_obj_t* roll_btns[3] = {nullptr, nullptr, nullptr};
+        lv_obj_t* pitch_btns[3] = {nullptr, nullptr, nullptr};
+    } suspension_ui_;
+
+    int8_t suspension_front_preset_active_ = -1;
+    int8_t suspension_rear_preset_active_ = -1;
+    int8_t suspension_roll_active_ = 1;
+    int8_t suspension_pitch_active_ = 1;
+
+    // CAN status feedback
+    std::map<std::string, lv_obj_t*> btn_lvgl_map_;
+    std::map<std::string, bool>      btn_status_pending_;
+    std::mutex                       btn_status_mutex_;
+    lv_timer_t*                      can_status_timer_ = nullptr;
+    static void canStatusTimerCb(lv_timer_t* t);
+    void        flushButtonStatus();
 };

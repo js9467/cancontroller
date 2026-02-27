@@ -1,4 +1,4 @@
-#include "config_manager.h"
+﻿#include "config_manager.h"
 
 #include <Arduino.h>
 #include <FS.h>
@@ -171,6 +171,18 @@ bool ConfigManager::save() const {
     return writeToStorage(json);
 }
 
+void ConfigManager::factoryReset() {
+    Serial.println("[ConfigManager] Factory reset - deleting config file");
+    if (LittleFS.exists(kConfigPath)) {
+        LittleFS.remove(kConfigPath);
+    }
+    if (LittleFS.exists("/config.tmp")) {
+        LittleFS.remove("/config.tmp");
+    }
+    // Reset to defaults in memory
+    config_ = buildDefaultConfig();
+}
+
 bool ConfigManager::resetToDefaults() {
     config_ = buildDefaultConfig();
     return save();
@@ -221,15 +233,36 @@ bool ConfigManager::loadFromStorage() {
 }
 
 bool ConfigManager::writeToStorage(const std::string& json) const {
-    File file = LittleFS.open(kConfigPath, FILE_WRITE);
+    // ATOMIC WRITE: Use temp file + rename to prevent corruption during brownout
+    const char* kTempPath = "/config.tmp";
+    
+    // Write to temp file first
+    File file = LittleFS.open(kTempPath, FILE_WRITE);
     if (!file) {
-        Serial.println("[ConfigManager] Could not open config file for writing");
+        Serial.println("[ConfigManager] Could not open temp file for writing");
         return false;
     }
 
     size_t written = file.print(json.c_str());
     file.close();
-    return written == json.size();
+    
+    if (written != json.size()) {
+        Serial.println("[ConfigManager] Incomplete write to temp file");
+        LittleFS.remove(kTempPath);
+        return false;
+    }
+    
+    // Atomic rename (remove old, rename temp)
+    if (LittleFS.exists(kConfigPath)) {
+        LittleFS.remove(kConfigPath);
+    }
+    
+    if (!LittleFS.rename(kTempPath, kConfigPath)) {
+        Serial.println("[ConfigManager] Failed to rename temp to config");
+        return false;
+    }
+    
+    return true;
 }
 
 DeviceConfig ConfigManager::buildDefaultConfig() const {
@@ -436,6 +469,8 @@ void ConfigManager::encodeConfig(const DeviceConfig& source, DynamicJsonDocument
         page_obj["button_radius"] = page.button_radius;
         page_obj["rows"] = page.rows;
         page_obj["cols"] = page.cols;
+        page_obj["type"] = page.type.c_str();
+        page_obj["custom_content"] = page.custom_content.c_str();
 
         JsonArray buttons = page_obj["buttons"].to<JsonArray>();
         for (const auto& button : page.buttons) {
@@ -490,6 +525,32 @@ void ConfigManager::encodeConfig(const DeviceConfig& source, DynamicJsonDocument
             can_status_obj["source_address"] = button.can_status.source_address;
             can_status_obj["byte_index"] = button.can_status.byte_index;
             can_status_obj["mask"] = button.can_status.mask;
+            
+            // Behavioral output system fields
+            btn_obj["mode"] = button.mode.c_str();
+            btn_obj["scene_id"] = button.scene_id.c_str();
+            btn_obj["scene_action"] = button.scene_action.c_str();
+            btn_obj["scene_duration_ms"] = button.scene_duration_ms;
+            btn_obj["scene_release_off"] = button.scene_release_off;
+            
+            JsonObject output_behavior = btn_obj["output_behavior"].to<JsonObject>();
+            output_behavior["output_id"] = button.output_behavior.output_id.c_str();
+            output_behavior["action"] = button.output_behavior.action.c_str();
+            output_behavior["behavior_type"] = button.output_behavior.behavior_type.c_str();
+            output_behavior["target_value"] = button.output_behavior.target_value;
+            output_behavior["period_ms"] = button.output_behavior.period_ms;
+            output_behavior["duty_cycle"] = button.output_behavior.duty_cycle;
+            output_behavior["fade_time_ms"] = button.output_behavior.fade_time_ms;
+            output_behavior["hold_duration_ms"] = button.output_behavior.hold_duration_ms;
+            output_behavior["on_time_ms"] = button.output_behavior.on_time_ms;
+            output_behavior["off_time_ms"] = button.output_behavior.off_time_ms;
+            output_behavior["auto_off"] = button.output_behavior.auto_off;
+            
+            // Legacy fields (backward compatibility)
+            btn_obj["infinitybox_function"] = button.infinitybox_function.c_str();
+            btn_obj["flash_frequency"] = button.flash_frequency;
+            btn_obj["fade_time"] = button.fade_time;
+            btn_obj["on_time"] = button.on_time;
         }
     }
 
@@ -643,6 +704,8 @@ bool ConfigManager::decodeConfig(JsonVariantConst json, DeviceConfig& target, st
             page.button_radius = clampValue<std::uint8_t>(page_obj["button_radius"] | page.button_radius, 0u, 50u);
             page.rows = clampValue<std::uint8_t>(page_obj["rows"] | 2, 1, 4);
             page.cols = clampValue<std::uint8_t>(page_obj["cols"] | 2, 1, 4);
+            page.type = safeString(page_obj["type"], "");
+            page.custom_content = safeString(page_obj["custom_content"], "");
 
             JsonArrayConst buttons = page_obj["buttons"].as<JsonArrayConst>();
             if (!buttons.isNull()) {
@@ -723,8 +786,40 @@ bool ConfigManager::decodeConfig(JsonVariantConst json, DeviceConfig& target, st
                         button.can_status.pgn = can_status_obj["pgn"] | 0u;
                         button.can_status.source_address = clampValue<std::uint8_t>(can_status_obj["source_address"] | 0xFF, 0u, 255u);
                         button.can_status.byte_index = clampValue<std::uint8_t>(can_status_obj["byte_index"] | 0, 0u, 7u);
-                        button.can_status.mask = clampValue<std::uint8_t>(can_status_obj["mask"] | 0, 0u, 255u);
+                        button.can_status.mask = can_status_obj["mask"] | 0u;
                     }
+                    
+                    // Behavioral output system fields
+                    button.mode = safeString(btn_obj["mode"], "can");
+                    button.scene_id = safeString(btn_obj["scene_id"], "");
+                    button.scene_action = safeString(btn_obj["scene_action"], "on");
+                    button.scene_duration_ms = clampValue<std::uint16_t>(btn_obj["scene_duration_ms"] | 0, 0u, 60000u);
+                    button.scene_release_off = btn_obj["scene_release_off"] | false;
+                    
+                    JsonObjectConst output_behavior = btn_obj["output_behavior"];
+                    if (!output_behavior.isNull()) {
+                        button.output_behavior.output_id = safeString(output_behavior["output_id"], "");
+                        button.output_behavior.action = safeString(output_behavior["action"], "on");
+                        button.output_behavior.behavior_type = safeString(output_behavior["behavior_type"], "steady");
+                        button.output_behavior.target_value = clampValue<std::uint8_t>(output_behavior["target_value"] | 100, 0u, 100u);
+                        button.output_behavior.period_ms = clampValue<std::uint16_t>(output_behavior["period_ms"] | 500, 1u, 10000u);
+                        button.output_behavior.duty_cycle = clampValue<std::uint8_t>(output_behavior["duty_cycle"] | 50, 0u, 100u);
+                        button.output_behavior.fade_time_ms = clampValue<std::uint16_t>(output_behavior["fade_time_ms"] | 1000, 0u, 10000u);
+                        button.output_behavior.hold_duration_ms = clampValue<std::uint16_t>(output_behavior["hold_duration_ms"] | 0, 0u, 60000u);
+                        button.output_behavior.on_time_ms = clampValue<std::uint16_t>(output_behavior["on_time_ms"] | 100, 1u, 10000u);
+                        button.output_behavior.off_time_ms = clampValue<std::uint16_t>(output_behavior["off_time_ms"] | 100, 1u, 10000u);
+                        if (output_behavior.containsKey("auto_off")) {
+                            button.output_behavior.auto_off = output_behavior["auto_off"] | false;
+                        } else {
+                            button.output_behavior.auto_off = (button.mode == "output");
+                        }
+                    }
+                    
+                    // Legacy fields (backward compatibility)
+                    button.infinitybox_function = btn_obj["infinitybox_function"] | "";
+                    button.flash_frequency = btn_obj["flash_frequency"] | 500;
+                    button.fade_time = btn_obj["fade_time"] | 1000;
+                    button.on_time = btn_obj["on_time"] | 2000;
 
                     page.buttons.push_back(std::move(button));
                     ++button_index;

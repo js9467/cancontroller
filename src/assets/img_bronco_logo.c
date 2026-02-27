@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file img_bronco_logo.c
  * LVGL image data - auto-generated
  */

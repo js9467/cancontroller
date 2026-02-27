@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 const char WEB_INTERFACE_HTML[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
@@ -228,7 +228,7 @@ function switchTab(tabName){
 	<div class="tabs">
 		<button class="tab-btn active" data-tab="wifi" onclick="switchTab('wifi')">WiFi</button>
 		<button class="tab-btn" data-tab="builder" onclick="switchTab('builder')">Interface Builder</button>
-		<button class="tab-btn" data-tab="can" onclick="switchTab('can')">CAN Library</button>
+		<button class="tab-btn" data-tab="settings" onclick="switchTab('settings')">Settings</button>
 	</div>
 	<div id="status-banner" class="status-banner"></div>
 
@@ -275,18 +275,20 @@ function switchTab(tabName){
 		</div>
 		<div class="card">
 			<h3>Device Info & Updates</h3>
-			<div class="muted">Version and current network addresses.</div>
+			<div class="muted">OTA firmware updates via .bin files from GitHub.</div>
 			<div class="status-grid" id="status" data-version="{{VERSION}}">
 				<div class="status-chip"><span>Firmware</span>v{{VERSION}}</div>
-				<div class="status-chip"><span>Available Update</span><span id="update-available">Checking...</span></div>
-				<div class="status-chip"><span>Device IP</span>—</div>
-				<div class="status-chip"><span>Connected Network</span>—</div>
-				<div class="status-chip"><span>AP IP</span>—</div>
-				<div class="status-chip"><span>Station IP</span>—</div>
+				<div class="status-chip"><span>Available Update</span><span id="update-available">Tap check</span></div>
+				<div class="status-chip"><span>Device IP</span>ΓÇö</div>
+				<div class="status-chip"><span>Connected Network</span>ΓÇö</div>
+				<div class="status-chip"><span>AP IP</span>ΓÇö</div>
+				<div class="status-chip"><span>Station IP</span>ΓÇö</div>
 			</div>
 			<div class="row" style="margin-top: 12px; gap: 8px;">
 				<button class="btn" onclick="checkForUpdates()">Check Updates</button>
-				<button class="btn primary" id="update-btn" onclick="triggerOTAUpdate()" style="display:none;">Update Available</button>
+			</div>
+			<div id="update-section" class="row" style="margin-top: 8px;">
+				<!-- Version selector will appear here after checking -->
 			</div>
 			<div class="row" style="margin-top: 8px; gap: 8px;">
 				<a class="btn ghost" href="/suspension" target="_blank" rel="noopener">Open Suspension Interface</a>
@@ -338,7 +340,7 @@ function switchTab(tabName){
 						<label><input id="header-logo-keep-aspect" type="checkbox" checked onchange="updateHeaderFromInputs()" /> Maintain proportions</label>
 					</div>
 					<div class="row align-center">
-						<label>Header ↔ Nav Gap</label>
+						<label>Header Γåö Nav Gap</label>
 						<input id="header-nav-spacing" type="range" min="0" max="48" value="12" oninput="handleNavSpacingInput(this.value)" />
 						<span class="muted" id="header-nav-spacing-label">12px</span>
 					</div>
@@ -374,6 +376,7 @@ function switchTab(tabName){
 					<div class="field"><label>Window</label><select id="quick-page-select" onchange="quickPageSelectChanged()"></select></div>
 					<button class="btn small" onclick="addPage()">Add</button>
 					<button class="btn small" onclick="deletePage()">Delete</button>
+					<button class="btn small ghost" onclick="addSuspensionPageTemplate()" title="Add pre-configured suspension control window">+ Suspension</button>
 					<div class="field" style="min-width:140px;"><label>Grid</label>
 						<select id="page-rows" onchange="updateGrid()"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select>
 						<span style="color:var(--muted);">x</span>
@@ -415,7 +418,7 @@ function switchTab(tabName){
 
 		<div class="layout" style="margin-top:16px;">
 			<div class="card">
-				<h3>🖼️ Image Assets</h3>
+				<h3>≡ƒû╝∩╕Å Image Assets</h3>
 				
 				<h4>Header Logo</h4>
 				<div class="grid">
@@ -478,94 +481,16 @@ function switchTab(tabName){
 		</div>
 	</section>
 
-	<section id="tab-can" class="tab">
+	<section id="tab-settings" class="tab">
 		<div class="layout">
 			<div class="card">
-				<h3>CAN Message Library</h3>
-				<div class="row" style="margin-bottom:10px;">
-					<button class="btn primary" onclick="addCanMessage()">Add Message</button>
-				</div>
-				<div id="can-library-list" class="grid"></div>
-			</div>
-			<div class="card">
-				<h3>Quick Import</h3>
-				<div class="row">
-					<button class="btn" onclick="importCanMessage('windows')">Windows</button>
-					<button class="btn" onclick="importCanMessage('locks')">Locks</button>
-					<button class="btn" onclick="importCanMessage('boards')">Running Boards</button>
-					<button class="btn" onclick="importCanMessage('powercell_front')">POWERCELL Front</button>
-					<button class="btn" onclick="importCanMessage('powercell_rear')">POWERCELL Rear</button>
-					<button class="btn" onclick="importCanMessage('imotion_df')">inMOTION DF</button>
-					<button class="btn" onclick="importCanMessage('imotion_pf')">inMOTION PF</button>
-					<button class="btn" onclick="importCanMessage('imotion_dr')">inMOTION DR</button>
-					<button class="btn" onclick="importCanMessage('imotion_pr')">inMOTION PR</button>
-				</div>
+				<h3>Diagnostics & Monitoring</h3>
+				<div class="muted">Quick access to diagnostic and monitoring tools.</div>
 				<div class="row" style="margin-top:10px;">
-					<button class="btn primary" onclick="addSuspensionPageTemplate()">Add Suspension Page (TCU S15)</button>
+					<a class="btn primary" href="http://192.168.7.116/can-monitor" target="_blank" rel="noopener">CAN Monitor</a>
+					<a class="btn" href="http://192.168.7.116/behavioral" target="_blank" rel="noopener">Behavioral Outputs</a>
 				</div>
-			</div>
-			<div class="card">
-				<h3>inMOTION NGX Frame Builder</h3>
-				<p class="muted" style="margin-bottom:12px;">Build precise per-output CAN frames for inMOTION NGX H-bridge modules (power windows, locks, actuators). Frames are added to the CAN Library and can then be assigned to any button.</p>
-				<div class="grid two-col" style="gap:10px;">
-					<div>
-						<label>Module</label>
-						<select id="imotion-module" onchange="inmotionUpdateUI()">
-							<option value="df">Driver Front (PGN FF03, SA 1A)</option>
-							<option value="pf">Passenger Front (PGN FF04, SA 1A)</option>
-							<option value="dr">Driver Rear (PGN FF05, SA 1A)</option>
-							<option value="pr">Passenger Rear (PGN FF06, SA 1A)</option>
-						</select>
-					</div>
-					<div>
-						<label>Output</label>
-						<select id="imotion-output" onchange="inmotionUpdateUI()">
-							<option value="0">Relay 1A — 25A H-bridge, direction A</option>
-							<option value="1">Relay 1B — 25A H-bridge, direction B</option>
-							<option value="2">Relay 2A — 25A H-bridge, direction A</option>
-							<option value="3">Relay 2B — 25A H-bridge, direction B</option>
-							<option value="4">Output 1 — 1A MOSFET</option>
-							<option value="5">Output 2 — 1A MOSFET</option>
-							<option value="6">Output 3 — 1A MOSFET</option>
-							<option value="7">Output 4 — 1A MOSFET</option>
-						</select>
-					</div>
-					<div>
-						<label>Mode</label>
-						<select id="imotion-mode" onchange="inmotionUpdateUI()">
-							<option value="track">Track — ON while commanded (0x90)</option>
-							<option value="off">OFF — Turn output off (0x80)</option>
-							<option value="express">Express — Run until current limit (0xB0) ★</option>
-							<option value="timed">Timed — ON for timer duration (0xA_)</option>
-						</select>
-					</div>
-					<div id="imotion-timer-row" style="display:none;">
-						<label>Timer Duration (seconds)</label>
-						<select id="imotion-timer">
-							<option value="0.25">0.25 s</option>
-							<option value="0.5">0.5 s</option>
-							<option value="0.75">0.75 s</option>
-							<option value="1" selected>1.0 s</option>
-							<option value="1.25">1.25 s</option>
-							<option value="1.5">1.5 s</option>
-							<option value="2">2.0 s</option>
-							<option value="2.5">2.5 s</option>
-							<option value="3">3.0 s</option>
-							<option value="3.75">3.75 s (max)</option>
-						</select>
-					</div>
-				</div>
-				<div id="imotion-express-note" class="muted" style="display:none;margin-top:8px;padding:8px;background:#1A1A00;border-radius:6px;border:1px solid #AA8800;">
-					⚠ Express mode is only valid for H-bridge relay outputs (Relay 1A/1B, 2A/2B). MOSFET outputs do not support Express. The current threshold that stops the output must be configured in the inMOTION EEPROM via USB.
-				</div>
-				<div style="margin-top:10px;padding:8px;background:#0A1A0A;border-radius:6px;font-size:12px;" class="muted">
-					Response PGN: <strong id="imotion-resp-pgn">FF331B</strong> &nbsp;·&nbsp;
-					<span id="imotion-cmd-preview">Command byte: 0x90 at byte 0</span>
-				</div>
-				<div class="row" style="margin-top:12px;">
-					<button class="btn primary" onclick="inmotionBuildFrame()">Add to CAN Library</button>
-				</div>
-				<div id="imotion-status" class="muted" style="margin-top:8px;font-size:12px;"></div>
+				<div class="muted" style="margin-top:8px; font-size:0.85rem;">IP shown is placeholder and will be dynamic.</div>
 			</div>
 		</div>
 	</section>
@@ -598,16 +523,73 @@ function switchTab(tabName){
 			<div><label>Corner Radius</label><input id="btn-corner-radius" type="number" min="0" max="50" /></div>
 			<div class="row"><label><input id="btn-momentary" type="checkbox" /> Momentary</label></div>
 		</div>
+		<h4>Button Action Mode</h4>
+		<div class="grid two-col">
+			<div style="grid-column:1/-1;">
+				<label>Mode</label>
+				<select id="btn-mode" onchange="toggleBehavioralFields()">
+					<option value="can">CAN Frames (Advanced)</option>
+					<option value="output">Behavioral Output</option>
+					<option value="scene">Scene (Multiple Outputs)</option>
+				</select>
+			</div>
+			<div class="muted" style="grid-column:1/-1; font-size:0.85rem;">Choose CAN for manual control, Output for single light/function, or Scene for choreographed sequences</div>
+		</div>
+		
+		<div id="behavioral-output-config" style="display:none;">
+			<h4>Output Configuration</h4>
+			<div class="grid two-col">
+				<div style="grid-column:1/-1;"><label>Output</label><select id="btn-output-id"><option value="">Select output...</option></select></div>
+				<div style="grid-column:1/-1;"><label>Action</label><select id="btn-output-action">
+					<option value="on">On (apply behavior)</option>
+					<option value="off">Off</option>
+					<option value="toggle">Toggle</option>
+				</select></div>
+				<div style="grid-column:1/-1;"><label>Behavior</label><select id="btn-behavior-type">
+					<option value="steady">Steady</option>
+					<option value="flash">Flash</option>
+					<option value="pulse">Pulse</option>
+					<option value="fade_in">Fade In</option>
+					<option value="fade_out">Fade Out</option>
+					<option value="strobe">Strobe</option>
+					<option value="hold_timed">Hold Timed</option>
+					<option value="ramp">Ramp</option>
+				</select></div>
+				<div><label>Target Value (0-255)</label><input id="btn-target-value" type="number" min="0" max="255" value="255" /></div>
+				<div><label>Period (ms)</label><input id="btn-period-ms" type="number" min="50" max="10000" value="1000" /></div>
+				<div><label>Duty Cycle (%)</label><input id="btn-duty-cycle" type="number" min="0" max="100" value="50" /></div>
+				<div><label>Fade Time (ms)</label><input id="btn-fade-time-ms" type="number" min="0" max="5000" value="500" /></div>
+				<div><label>Hold Duration (ms)</label><input id="btn-hold-duration-ms" type="number" min="0" max="30000" value="2000" /></div>
+				<div class="row"><label><input id="btn-auto-off" type="checkbox" /> Release to OFF</label></div>
+			</div>
+		</div>
+		
+		<div id="behavioral-scene-config" style="display:none;">
+			<h4>Scene Selection</h4>
+			<div class="grid two-col">
+				<div style="grid-column:1/-1;"><label>Scene</label><select id="btn-scene-id"><option value="">Select scene...</option></select></div>
+				<div style="grid-column:1/-1;"><label>Action</label><select id="btn-scene-action">
+					<option value="on">On</option>
+					<option value="off">Off</option>
+					<option value="toggle">Toggle</option>
+				</select></div>
+				<div><label>Duration (ms)</label><input id="btn-scene-duration-ms" type="number" min="0" max="60000" value="0" /></div>
+				<div class="row"><label><input id="btn-scene-release-off" type="checkbox" /> Release to OFF</label></div>
+				<div class="muted" style="grid-column:1/-1; font-size:0.85rem;">Scenes control multiple outputs with coordinated behaviors. Configure scenes in the Behavioral Output tab.</div>
+			</div>
+		</div>
+		
+		<div id="can-config-section" style="display:none;">
 		<h4>CAN Frame</h4>
 		<div class="row" style="margin-bottom:10px;"><label><input id="btn-can-enabled" type="checkbox" onchange="toggleCanFields()" /> Send CAN on press</label></div>
 		<div id="can-config-wrapper" class="grid two-col" style="display:none;">
-			<div><label>PGN (hex)</label><input id="btn-can-pgn" type="text" placeholder="FEF9" oninput="autoDetectStatusPgn(true)" /></div>
+			<div><label>PGN (hex)</label><input id="btn-can-pgn" type="text" placeholder="FEF9" /></div>
 			<div><label>Priority</label><input id="btn-can-priority" type="number" min="0" max="7" /></div>
 			<div><label>Source (hex)</label><input id="btn-can-src" type="text" placeholder="F9" /></div>
 			<div><label>Dest (hex)</label><input id="btn-can-dest" type="text" placeholder="FF" /></div>
 			<div class="row" style="grid-column:1/-1;">
 				<label>Data Bytes</label>
-				<input id="btn-can-data" type="text" placeholder="00 00 00 00 00 00 00 00" oninput="autoDetectStatusPgn(true)" />
+				<input id="btn-can-data" type="text" placeholder="00 00 00 00 00 00 00 00" />
 			</div>
 			<div class="row" style="grid-column:1/-1;">
 				<label>From Library</label>
@@ -631,19 +613,15 @@ function switchTab(tabName){
 			</div>
 		</div>
 		<h4>CAN Status Feedback</h4>
-		<div class="row" style="margin-bottom:8px;">
-			<label><input id="btn-status-enabled" type="checkbox" onchange="toggleStatusFields()" /> Show ON state from received CAN message</label>
+		<div class="row" style="margin-bottom:10px;"><label><input id="btn-status-enabled" type="checkbox" onchange="toggleStatusFields()" /> Show active state from CAN bus</label></div>
+		<div id="can-status-config-wrapper" class="grid two-col" style="display:none;">
+			<div><label>Status PGN (hex)</label><input id="btn-status-pgn" type="text" placeholder="FF01" /></div>
+			<div><label>Source (hex, FF=any)</label><input id="btn-status-src" type="text" placeholder="FF" /></div>
+			<div><label>Byte Index (0-7)</label><input id="btn-status-byte" type="number" min="0" max="7" /></div>
+			<div><label>Mask (hex)</label><input id="btn-status-mask" type="text" placeholder="01" /></div>
 		</div>
-		<div id="status-config-wrapper" class="grid two-col" style="display:none;">
-			<div><label>Response PGN (hex)</label><input id="btn-status-pgn" type="text" placeholder="FF33" /></div>
-			<div><label>Source Address (hex, FF=any)</label><input id="btn-status-sa" type="text" placeholder="FF" /></div>
-			<div><label>Byte Index (0&ndash;7)</label><input id="btn-status-byte" type="number" min="0" max="7" value="0" /></div>
-			<div><label>Bitmask (hex)</label><input id="btn-status-mask" type="text" placeholder="10" /></div>
-			<div class="row" style="grid-column:1/-1; align-items:center; gap:8px;">
-				<span id="status-hint" class="muted" style="font-size:12px;flex:1;"></span>
-				<button class="btn ghost" onclick="autoDetectStatusPgn(false)" style="flex:0 0 auto;font-size:11px;padding:2px 8px;">Re-detect</button>
-			</div>
-		</div>
+		</div><!-- end can-config-section -->
+		
 		<div class="row" style="margin-top:12px; justify-content:flex-end; gap:8px;">
 			<button class="btn danger" onclick="deleteButtonFromModal()">Delete</button>
 			<button class="btn primary" onclick="saveButtonFromModal()">Save</button>
@@ -728,10 +706,13 @@ function showBanner(msg,type='success'){
 }
 
 function ensurePages(){
+	console.log('[WEB] ensurePages() - current pages:', config.pages);
 	if(!config.pages || config.pages.length===0){
+		console.log('[WEB] No pages found, creating default Home page');
 		config.pages = [{ id:'page_0', name:'Home', rows:2, cols:2, buttons:[] }];
 		activePageIndex = 0;
 	}
+	console.log('[WEB] ensurePages() - final pages:', config.pages);
 }
 
 function renderPageSelect(){
@@ -807,68 +788,25 @@ function addPage(){
 function addSuspensionPageTemplate(){
 	ensurePages();
 	const id = 'page_suspension_'+Date.now();
-	const buttonSpecs = [
-		{ label:'Power On', pgn:0x737, data:[0,0,0,0,0,0,0,0x30] },
-		{ label:'Power Off', pgn:0x737, data:[0,0,0,0,0,0,0,0x00] },
-		{ label:'Calibrate', pgn:0x738, data:[0,0,0,0,0,0,0,0x01] },
-		{ label:'Info', pgn:0x737, data:[0,0,0,0,0,0,0,0] },
-		{ label:'Mode 1', pgn:0x737, data:[0,0,0,0x01,0x01,0x01,0x01,0] },
-		{ label:'Mode 2', pgn:0x737, data:[0,0,0,0x02,0x02,0x02,0x02,0] },
-		{ label:'Mode 3', pgn:0x737, data:[0,0,0,0x03,0x03,0x03,0x03,0] },
-		{ label:'Mode 4', pgn:0x737, data:[0,0,0,0x04,0x04,0x04,0x04,0] },
-		{ label:'Mode 5', pgn:0x737, data:[0,0,0,0x05,0x05,0x05,0x05,0] },
-		{ label:'Front Soft', pgn:0x737, data:[0,0,0,0,0,0,0x01,0] },
-		{ label:'Front Medium', pgn:0x737, data:[0,0,0,0,0,0,0x03,0] },
-		{ label:'Front Firm', pgn:0x737, data:[0,0,0,0,0,0,0x05,0] },
-		{ label:'Rear Soft', pgn:0x737, data:[0,0,0,0,0,0x01,0,0] },
-		{ label:'Rear Medium', pgn:0x737, data:[0,0,0,0,0,0x03,0,0] },
-		{ label:'Rear Firm', pgn:0x737, data:[0,0,0,0,0,0x05,0,0] },
-		{ label:'Pitch Soft', pgn:0x737, data:[0,0,0,0x01,0,0,0,0] },
-		{ label:'Pitch Medium', pgn:0x737, data:[0,0,0,0x03,0,0,0,0] },
-		{ label:'Pitch Firm', pgn:0x737, data:[0,0,0,0x05,0,0,0,0] },
-		{ label:'Roll Soft', pgn:0x737, data:[0,0,0,0,0x01,0,0,0] },
-		{ label:'Roll Medium', pgn:0x737, data:[0,0,0,0,0x03,0,0,0] },
-		{ label:'Roll Firm', pgn:0x737, data:[0,0,0,0,0x05,0,0,0] }
-	];
-
-	const buttons = buttonSpecs.map((spec, i) => {
-		const row = Math.floor(i / 4);
-		const col = i % 4;
-		return {
-			id: `${spec.label.toLowerCase().replace(/[^a-z0-9]+/g,'_')}_${i}`,
-			label: spec.label,
-			row,
-			col,
-			row_span: 1,
-			col_span: 1,
-			momentary: false,
-			font_size: 20,
-			corner_radius: 12,
-			can: {
-				enabled: true,
-				pgn: spec.pgn,
-				priority: 6,
-				source_address: 0xF9,
-				destination_address: 0xFF,
-				data: spec.data
-			}
-		};
-	});
-
+	
+	// Create a page with custom suspension interface content
 	const page = {
 		id,
 		name: 'Suspension',
-		rows: 6,
-		cols: 4,
-		buttons
+		type: 'custom_html',
+		custom_content: 'suspension_interface',
+		rows: 1,
+		cols: 1,
+		buttons: []
 	};
+	
 	config.pages.push(page);
 	activePageIndex = config.pages.length - 1;
 	renderPageList();
 	hydratePageFields();
 	renderGrid();
 	renderPreview();
-	showBanner('Suspension page added', 'success');
+	showBanner('Suspension interface added', 'success');
 }
 
 function deletePage(){
@@ -1125,6 +1063,13 @@ function renderGrid(){
 	const grid = document.getElementById('layout-grid');
 	if(!grid) return;
 	const page = config.pages[activePageIndex];
+	
+	// Check if this is a custom suspension page
+	if(page.type === 'custom_html' && page.custom_content === 'suspension_interface'){
+		grid.innerHTML = '<div style="padding: 20px; text-align: center; color: #8d92a3;"><p>Suspension Interface (Preview not available in editor)</p><p style="font-size: 0.85rem; margin-top: 8px;">This page will display the interactive suspension control interface on the device</p></div>';
+		return;
+	}
+	
 	const theme = config.theme || {};
 	const fallbackText = page.text_color || theme.text_primary || '#f2f4f8';
 	const fallbackFill = page.button_color || theme.accent_color || '#ff9d2e';
@@ -1201,11 +1146,31 @@ function openButtonModal(row,col){
 		font_family: firstDefined(theme.button_font_family, 'montserrat'),
 		text_align: 'center',
 		momentary: false,
+		mode: 'can',
+		output_behavior: {
+			output_id: '',
+			action: 'on',
+			behavior_type: 'steady',
+			target_value: 255,
+			period_ms: 1000,
+			duty_cycle: 50,
+			fade_time_ms: 500,
+			hold_duration_ms: 2000,
+			on_time_ms: 0,
+			off_time_ms: 0,
+			auto_off: true
+		},
+		scene_id: '',
+		scene_action: 'on',
+		scene_duration_ms: 0,
+		scene_release_off: false,
 		can:{enabled:false,pgn:0,priority:6,source_address:0xF9,destination_address:0xFF,data:[0,0,0,0,0,0,0,0]},
 		can_off:{enabled:false,pgn:0,priority:6,source_address:0xF9,destination_address:0xFF,data:[0,0,0,0,0,0,0,0]},
 		can_status:{enabled:false,pgn:0,source_address:0xFF,byte_index:0,mask:0}
 	};
 	const data = btn || defaults;
+	
+	// Load basic fields first
 	document.getElementById('btn-label').value = data.label || '';
 	document.getElementById('btn-color').value = data.color;
 	document.getElementById('btn-pressed-color').value = firstDefined(data.pressed_color, defaults.pressed_color);
@@ -1217,6 +1182,33 @@ function openButtonModal(row,col){
 	document.getElementById('btn-font-family').value = data.font_family || 'montserrat';
 	document.getElementById('btn-text-align').value = data.text_align || 'center';
 	document.getElementById('btn-momentary').checked = data.momentary || false;
+	
+	// Mode and behavioral fields (set non-dropdown fields first)
+	document.getElementById('btn-mode').value = data.mode || 'can';
+	const ob = data.output_behavior || defaults.output_behavior;
+	document.getElementById('btn-output-action').value = ob.action || 'on';
+	document.getElementById('btn-behavior-type').value = ob.behavior_type || 'steady';
+	document.getElementById('btn-target-value').value = ob.target_value || 255;
+	document.getElementById('btn-period-ms').value = ob.period_ms || 1000;
+	document.getElementById('btn-duty-cycle').value = ob.duty_cycle || 50;
+	document.getElementById('btn-fade-time-ms').value = ob.fade_time_ms || 500;
+	document.getElementById('btn-hold-duration-ms').value = ob.hold_duration_ms || 2000;
+	document.getElementById('btn-auto-off').checked = ob.auto_off !== undefined ? ob.auto_off : true;
+	
+	// Load behavioral options from server, then set dropdown values
+	loadBehavioralOptions().then(() => {
+		// Set dropdown values AFTER options are loaded
+		document.getElementById('btn-output-id').value = ob.output_id || '';
+		document.getElementById('btn-scene-id').value = data.scene_id || '';
+	}).catch(err => {
+		console.error('Failed to load behavioral options:', err);
+		// Set values anyway even if loading failed
+		document.getElementById('btn-output-id').value = ob.output_id || '';
+		document.getElementById('btn-scene-id').value = data.scene_id || '';
+	});
+	document.getElementById('btn-scene-action').value = data.scene_action || 'on';
+	document.getElementById('btn-scene-duration-ms').value = data.scene_duration_ms || 0;
+	document.getElementById('btn-scene-release-off').checked = data.scene_release_off || false;
 	const canCfg = data.can || {};
 	document.getElementById('btn-can-enabled').checked = canCfg.enabled || false;
 	document.getElementById('btn-can-pgn').value = (canCfg.pgn || 0).toString(16).toUpperCase();
@@ -1233,16 +1225,14 @@ function openButtonModal(row,col){
 	document.getElementById('btn-can-off-dest').value = (firstDefined(canOffCfg.destination_address, 0xFF)).toString(16).toUpperCase();
 	const canOffData = (canOffCfg.data && canOffCfg.data.length) ? canOffCfg.data : defaults.can_off.data;
 	document.getElementById('btn-can-off-data').value = canOffData.map(b=>b.toString(16).toUpperCase().padStart(2,'0')).join(' ');
-	const canStatusCfg = data.can_status || {};
+	const canStatusCfg = data.can_status || defaults.can_status;
 	document.getElementById('btn-status-enabled').checked = canStatusCfg.enabled || false;
-	document.getElementById('btn-status-pgn').value = (canStatusCfg.pgn||0).toString(16).toUpperCase();
-	document.getElementById('btn-status-sa').value = (firstDefined(canStatusCfg.source_address,0xFF)).toString(16).toUpperCase();
+	document.getElementById('btn-status-pgn').value = (canStatusCfg.pgn || 0).toString(16).toUpperCase() || '';
+	document.getElementById('btn-status-src').value = (firstDefined(canStatusCfg.source_address, 0xFF)).toString(16).toUpperCase();
 	document.getElementById('btn-status-byte').value = firstDefined(canStatusCfg.byte_index, 0);
-	document.getElementById('btn-status-mask').value = (canStatusCfg.mask||0).toString(16).toUpperCase();
-	if(document.getElementById('status-hint')) document.getElementById('status-hint').textContent='';
+	document.getElementById('btn-status-mask').value = (canStatusCfg.mask || 0).toString(16).toUpperCase() || '0';
 	populateCanLibraryDropdown();
-	toggleCanFields();
-	toggleStatusFields();
+	toggleBehavioralFields();
 	document.getElementById('button-modal').classList.add('open');
 }
 
@@ -1278,6 +1268,24 @@ function saveButtonFromModal(){
 		font_name: document.getElementById('btn-font-family').value+'_16',
 		text_align: document.getElementById('btn-text-align').value,
 		momentary: document.getElementById('btn-momentary').checked,
+		mode: document.getElementById('btn-mode').value,
+		output_behavior: {
+			output_id: document.getElementById('btn-output-id').value || '',
+			action: document.getElementById('btn-output-action').value || 'on',
+			behavior_type: document.getElementById('btn-behavior-type').value,
+			target_value: parseInt(document.getElementById('btn-target-value').value) || 255,
+			period_ms: parseInt(document.getElementById('btn-period-ms').value) || 1000,
+			duty_cycle: parseInt(document.getElementById('btn-duty-cycle').value) || 50,
+			fade_time_ms: parseInt(document.getElementById('btn-fade-time-ms').value) || 500,
+			hold_duration_ms: parseInt(document.getElementById('btn-hold-duration-ms').value) || 2000,
+			on_time_ms: 0,
+			off_time_ms: 0,
+			auto_off: document.getElementById('btn-auto-off').checked
+		},
+		scene_id: document.getElementById('btn-scene-id').value || '',
+		scene_action: document.getElementById('btn-scene-action').value || 'on',
+		scene_duration_ms: parseInt(document.getElementById('btn-scene-duration-ms').value) || 0,
+		scene_release_off: document.getElementById('btn-scene-release-off').checked,
 		can: {
 			enabled: canEnabled,
 			pgn: canEnabled ? parseInt(document.getElementById('btn-can-pgn').value,16)||0 : 0,
@@ -1296,8 +1304,8 @@ function saveButtonFromModal(){
 		},
 		can_status: {
 			enabled: document.getElementById('btn-status-enabled').checked,
-			pgn: document.getElementById('btn-status-enabled').checked ? parseInt(document.getElementById('btn-status-pgn').value,16)||0 : 0,
-			source_address: parseInt(document.getElementById('btn-status-sa').value,16)||0xFF,
+			pgn: parseInt(document.getElementById('btn-status-pgn').value,16)||0,
+			source_address: parseInt(document.getElementById('btn-status-src').value,16)||0xFF,
 			byte_index: parseInt(document.getElementById('btn-status-byte').value)||0,
 			mask: parseInt(document.getElementById('btn-status-mask').value,16)||0
 		}
@@ -1317,6 +1325,45 @@ function deleteButtonFromModal(){
 	renderPreview();
 }
 
+function toggleBehavioralFields(){
+	const mode = document.getElementById('btn-mode').value;
+	document.getElementById('behavioral-output-config').style.display = mode === 'output' ? 'block' : 'none';
+	document.getElementById('behavioral-scene-config').style.display = mode === 'scene' ? 'block' : 'none';
+	document.getElementById('can-config-section').style.display = mode === 'can' ? 'block' : 'none';
+	const momentary = document.getElementById('btn-momentary');
+	if (momentary) {
+		momentary.disabled = mode !== 'can';
+		if (mode !== 'can') {
+			momentary.checked = false;
+		}
+	}
+	if(mode === 'can') toggleCanFields(); // Update CAN sub-sections
+}
+
+function loadBehavioralOptions(){
+	return fetch('/api/behavioral/options')
+		.then(r => r.json())
+		.then(data => {
+			const outputSel = document.getElementById('btn-output-id');
+			outputSel.innerHTML = '<option value="">Select output...</option>';
+			(data.outputs || []).forEach(out => {
+				const opt = document.createElement('option');
+				opt.value = out.id;
+				opt.textContent = out.name;
+				outputSel.appendChild(opt);
+			});
+			
+			const sceneSel = document.getElementById('btn-scene-id');
+			sceneSel.innerHTML = '<option value="">Select scene...</option>';
+			(data.scenes || []).forEach(scene => {
+				const opt = document.createElement('option');
+				opt.value = scene.id;
+				opt.textContent = scene.name;
+				sceneSel.appendChild(opt);
+			});
+		});
+}
+
 function toggleCanFields(){
 	const showOn = document.getElementById('btn-can-enabled').checked;
 	document.getElementById('can-config-wrapper').style.display = showOn ? 'grid' : 'none';
@@ -1325,70 +1372,152 @@ function toggleCanFields(){
 }
 
 function toggleStatusFields(){
-	document.getElementById('status-config-wrapper').style.display =
-		document.getElementById('btn-status-enabled').checked ? 'grid' : 'none';
+	const show = document.getElementById('btn-status-enabled').checked;
+	document.getElementById('can-status-config-wrapper').style.display = show ? 'grid' : 'none';
 }
 
-// Auto-detect response PGN, byte index, and bitmask for known Infinitybox modules.
-// silent=true  → called automatically as the user types; only fills if a match is found,
-//                never shows a "not found" message (avoids noise while mid-typing).
-// silent=false → called by the Re-detect button; always gives feedback.
 function autoDetectStatusPgn(silent){
-	const txPgn = parseInt(document.getElementById('btn-can-pgn').value||'0', 16);
-	const txData = (document.getElementById('btn-can-data').value||'').trim().split(/\s+/).map(v=>parseInt(v,16)||0);
-	const hint = document.getElementById('status-hint');
-	function apply(pgn, sa, byteIdx, mask, label){
-		document.getElementById('btn-status-enabled').checked = true;
-		document.getElementById('btn-status-pgn').value  = pgn.toString(16).toUpperCase();
-		document.getElementById('btn-status-sa').value   = sa.toString(16).toUpperCase();
-		document.getElementById('btn-status-byte').value = byteIdx;
-		document.getElementById('btn-status-mask').value = mask.toString(16).toUpperCase();
-		toggleStatusFields();
-		if(hint) hint.textContent = '\u2713 ' + label;
+	const pgnEl = document.getElementById('btn-status-pgn');
+	if(!pgnEl) return;
+	if(!silent && pgnEl.value) return; // Don't overwrite in manual mode
+	const canPgn = document.getElementById('btn-can-pgn').value;
+	if(canPgn) pgnEl.value = canPgn;
+}
+
+function applyInfinityboxTemplate(){
+	const funcName = document.getElementById('btn-infinitybox-function').value;
+	if(!funcName) return;
+	
+	// POWERCELL NGX J1939 function mapping
+	// Format: {cell: address, output: 1-10, label: display name, softStart: boolean}
+	const templates = {
+		left_turn: {cell:1, output:1, label:'Left Turn', softStart:false},
+		right_turn: {cell:1, output:2, label:'Right Turn', softStart:false},
+		four_way: {cell:1, output:1, label:'4-Ways', softStart:false, dual:2}, // Controls outputs 1 & 2
+		horn: {cell:1, output:6, label:'Horn', softStart:false},
+		high_beams: {cell:1, output:7, label:'High Beams', softStart:false},
+		headlights: {cell:1, output:5, label:'Headlights', softStart:true},
+		parking_lights: {cell:1, output:8, label:'Parking Lights', softStart:true},
+		backup_lights: {cell:2, output:1, label:'Backup Lights', softStart:false},
+		brake_lights: {cell:2, output:2, label:'Brake Lights', softStart:false},
+		interior_lights: {cell:1, output:9, label:'Interior Lights', softStart:true},
+		gauge_illumination: {cell:1, output:10, label:'Gauge Illum', softStart:true},
+		door_lock: {cell:2, output:3, label:'Door Lock', softStart:false},
+		door_unlock: {cell:2, output:4, label:'Door Unlock', softStart:false},
+		window_up_driver: {cell:2, output:5, label:'Win Up Drv', softStart:false},
+		window_down_driver: {cell:2, output:6, label:'Win Dn Drv', softStart:false},
+		window_up_passenger: {cell:2, output:7, label:'Win Up Pax', softStart:false},
+		window_down_passenger: {cell:2, output:8, label:'Win Dn Pax', softStart:false},
+		ignition: {cell:1, output:3, label:'Ignition', softStart:false},
+		starter: {cell:1, output:4, label:'Starter', softStart:false},
+		fuel_pump: {cell:2, output:9, label:'Fuel Pump', softStart:false},
+		cooling_fan: {cell:2, output:10, label:'Cooling Fan', softStart:false},
+		aux_1: {cell:3, output:1, label:'AUX 1', softStart:false},
+		aux_2: {cell:3, output:2, label:'AUX 2', softStart:false},
+		security_arm: {cell:3, output:3, label:'Sec Arm', softStart:false},
+		security_disarm: {cell:3, output:4, label:'Sec Disarm', softStart:false}
+	};
+	
+	const tmpl = templates[funcName];
+	if(!tmpl) return;
+	
+	// Auto-populate label if still default
+	const currentLabel = document.getElementById('btn-label').value;
+	if(!currentLabel || currentLabel.match(/^Button \d+$/)){
+		document.getElementById('btn-label').value = tmpl.label;
 	}
-	// ── inMOTION NGX ──────────────────────────────────────────────────────────
-	// TX PGN → Response PGN mapping (SA 0x1B on all response frames)
-	// TX byte position → [response byte index, response bitmask]
-	// Derived from the Infinitybox inMOTION NGX Quick Start Guide outbound table.
-	const imRx  = {0xFF03:0xFF33, 0xFF04:0xFF34, 0xFF05:0xFF35, 0xFF06:0xFF36};
-	const imMap = [[0,0x10],[0,0x01],[1,0x10],[1,0x01],[2,0x10],[2,0x01],[3,0x10],[3,0x01]];
-	if(imRx[txPgn] !== undefined){
-		const ci = txData.findIndex(b => b !== 0);
-		if(ci >= 0 && ci < 8){
-			apply(imRx[txPgn], 0x1B, imMap[ci][0], imMap[ci][1], 'inMOTION NGX — auto-filled');
-			return;
+	
+	// POWERCELL NGX uses address-specific PGNs: FF01-FF10
+	const pgn = 0xFF00 + tmpl.cell;
+	
+	// Build POWERCELL NGX format:
+	// Byte 1 bits 7-0: Track outputs 1-8
+	// Byte 2 bits 7-6: Track outputs 9-10
+	// Byte 2 bits 5-0 + Byte 3 bits 7-6: Soft-Start outputs 1-10
+	// Byte 3 bits 5-0 + Byte 4 bits 7-6: PWM enable outputs 1-8
+	// Bytes 5-8: PWM duty cycle (4 bits per output)
+	
+	function buildPowercellFrame(output, state, softStart, dualOutput) {
+		const data = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
+		
+		if(state) {
+			// Set the appropriate bit(s) based on output number
+			if(softStart) {
+				// Soft-Start: Byte 2 bits 5-0 + Byte 3 bits 7-6
+				if(output <= 6) {
+					data[1] |= (1 << (5 - (output - 1))); // Outputs 1-6 in byte 2
+				} else if(output <= 10) {
+					data[2] |= (1 << (13 - output)); // Outputs 7-10 in byte 3
+				}
+				if(dualOutput) {
+					if(dualOutput <= 6) {
+						data[1] |= (1 << (5 - (dualOutput - 1)));
+					} else if(dualOutput <= 10) {
+						data[2] |= (1 << (13 - dualOutput));
+					}
+				}
+			} else {
+				// Track: Byte 1 bits 7-0 (outputs 1-8), Byte 2 bits 7-6 (outputs 9-10)
+				if(output <= 8) {
+					data[0] |= (1 << (8 - output)); // Outputs 1-8 in byte 1
+				} else if(output === 9) {
+					data[1] |= 0x80; // Output 9 = bit 7 of byte 2
+				} else if(output === 10) {
+					data[1] |= 0x40; // Output 10 = bit 6 of byte 2
+				}
+				if(dualOutput) {
+					if(dualOutput <= 8) {
+						data[0] |= (1 << (8 - dualOutput));
+					} else if(dualOutput === 9) {
+						data[1] |= 0x80;
+					} else if(dualOutput === 10) {
+						data[1] |= 0x40;
+					}
+				}
+			}
 		}
-		// PGN recognised but data all zeros (module base frame, no specific output)
-		if(!silent && hint) hint.textContent = 'inMOTION NGX detected — set data bytes to identify the output';
-		return;
+		// OFF state = all zeros (already initialized)
+		
+		return data;
 	}
-	// ── POWERCELL NGX ─────────────────────────────────────────────────────────
-	// TX PGN → {base response PGN for outputs 1-5, ext for 6-10}
-	// Bit mapping from the Infinitybox POWERCELL interface document.
-	const pcMap = {0xFF01:{base:0xFF11,ext:0xFF21}, 0xFF02:{base:0xFF12,ext:0xFF22}};
-	if(pcMap[txPgn]){
-		const {base,ext} = pcMap[txPgn];
-		const b0 = txData[0]||0, b1 = txData[1]||0;
-		let rp, rb=0, rm;
-		if     (b0 >= 0x08){ rp=base; rm=b0;    }  // outputs 1-5  (bit stays same)
-		else if(b0 === 0x04){ rp=ext;  rm=0x80; }  // output 6
-		else if(b0 === 0x02){ rp=ext;  rm=0x40; }  // output 7
-		else if(b0 === 0x01){ rp=ext;  rm=0x20; }  // output 8
-		else if(b1 === 0x80){ rp=ext;  rm=0x10; }  // output 9
-		else if(b1 === 0x40){ rp=ext;  rm=0x08; }  // output 10
-		if(rp){ apply(rp, 0x1E, rb, rm, 'POWERCELL NGX — auto-filled'); return; }
-		if(!silent && hint) hint.textContent = 'POWERCELL NGX detected — set data bytes to identify the output';
-		return;
-	}
-	if(!silent && hint) hint.textContent = 'Unknown frame — fill in manually';
+	
+	const dataOn = buildPowercellFrame(tmpl.output, true, tmpl.softStart, tmpl.dual);
+	const dataOff = buildPowercellFrame(tmpl.output, false, tmpl.softStart, tmpl.dual);
+	
+	// Populate CAN ON frame
+	document.getElementById('btn-can-enabled').checked = true;
+	document.getElementById('btn-can-pgn').value = pgn.toString(16).toUpperCase();
+	document.getElementById('btn-can-priority').value = '6';
+	document.getElementById('btn-can-src').value = '1E'; // Default controller source address
+	document.getElementById('btn-can-dest').value = 'FF'; // Broadcast
+	document.getElementById('btn-can-data').value = dataOn.map(b=>b.toString(16).toUpperCase().padStart(2,'0')).join(' ');
+	
+	// Populate CAN OFF frame
+	document.getElementById('btn-can-off-enabled').checked = true;
+	document.getElementById('btn-can-off-pgn').value = pgn.toString(16).toUpperCase();
+	document.getElementById('btn-can-off-priority').value = '6';
+	document.getElementById('btn-can-off-src').value = '1E';
+	document.getElementById('btn-can-off-dest').value = 'FF';
+	document.getElementById('btn-can-off-data').value = dataOff.map(b=>b.toString(16).toUpperCase().padStart(2,'0')).join(' ');
+	
+	toggleCanFields();
 }
 
 function renderPreview(){
 	ensurePages();
 	const page = config.pages[activePageIndex];
+	
+	// Handle suspension interface preview
+	if(page.type === 'custom_html' && page.custom_content === 'suspension_interface'){
+		renderNav();  // Update navigation colors before rendering suspension preview
+		renderSuspensionPreview();
+		return;
+	}
+	
 	const theme = config.theme || {};
 	const headerCfg = config.header || {};
 	const header = document.getElementById('preview-header');
+	if(!header) return; // Element not on this page
 	header.style.background = theme.surface_color || '#12141c';
 	header.style.borderBottom = `${firstDefined(theme.header_border_width, 0)}px solid ${firstDefined(theme.header_border_color, theme.accent_color, '#ff9d2e')}`;
 	const navSpacingValue = clampNavSpacing(firstDefined(headerCfg.nav_spacing, 12));
@@ -1478,6 +1607,7 @@ function renderPreview(){
 	renderNav();
 
 	const body = document.getElementById('preview-body');
+	if (!body) return; // Element not found
 	body.style.background = page.bg_color || theme.page_bg_color || '#0f0f0f';
 	body.innerHTML = '';
 	const grid = document.createElement('div');
@@ -1532,9 +1662,98 @@ function renderPreview(){
 	body.appendChild(grid);
 }
 
+function renderSuspensionPreview(){
+	const body = document.getElementById('preview-body');
+	if(!body) return;
+	
+	const page = config.pages[activePageIndex];
+	const bgColor = page.bg_color || config.theme?.page_bg_color || '#0F0F0F';
+	
+	body.innerHTML = `
+		<div style="width:100%;height:100%;background:${bgColor};padding:12px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;">
+			<div style="display:flex;justify-content:space-between;align-items:center;width:100%;margin-bottom:4px;">
+				<div style="font-size:18px;font-weight:700;color:#ff9d2e;">Suspension Controls</div>
+				<button style="padding:6px 16px;border-radius:8px;border:none;background:#7ad7f0;color:#0a0f0a;font-size:11px;font-weight:700;cursor:pointer;" onmouseover="this.style.background='#5ac0d0';" onmouseout="this.style.background='#7ad7f0';">Calibrate</button>
+			</div>
+			
+			<div style="text-align:center;font-size:10px;color:#8d92a3;text-transform:uppercase;letter-spacing:1px;">FRONT DAMPER SETTINGS</div>
+			<div style="display:flex;gap:4px;justify-content:center;margin-bottom:4px;">
+				${createPresetButtonsHTML()}
+			</div>
+			<div style="display:flex;gap:8px;justify-content:center;">
+				${createDamperCardHTML('Front Left')}
+				${createDamperCardHTML('Front Right')}
+			</div>
+			
+			<div style="text-align:center;font-size:10px;color:#8d92a3;text-transform:uppercase;letter-spacing:1px;margin-top:8px;">REAR DAMPER SETTINGS</div>
+			<div style="display:flex;gap:4px;justify-content:center;margin-bottom:4px;">
+				${createPresetButtonsHTML()}
+			</div>
+			<div style="display:flex;gap:8px;justify-content:center;">
+				${createDamperCardHTML('Rear Left')}
+				${createDamperCardHTML('Rear Right')}
+			</div>
+			
+			<div style="text-align:center;font-size:10px;color:#8d92a3;text-transform:uppercase;letter-spacing:1px;margin-top:8px;">ANTI-ROLL & PITCH</div>
+			<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+				${createControlCardHTML('Anti-Roll')}
+				${createControlCardHTML('Anti-Pitch')}
+			</div>
+		</div>
+	`;
+}
+
+function createPresetButtonsHTML(){
+	let html = '';
+	for(let i = 1; i <= 5; i++) {
+		html += `<button style="width:45px;height:26px;border-radius:6px;border:1px solid #3a3a4a;background:#2a2a3a;color:#f2f4f8;font-size:13px;font-weight:700;cursor:pointer;" onmouseover="this.style.background='#ff9d2e';this.style.color='#16110a';" onmouseout="this.style.background='#2a2a3a';this.style.color='#f2f4f8';">${i}</button>`;
+	}
+	return html;
+}
+
+function createDamperCardHTML(label){
+	return `
+		<div style="background:#12141c;border:1px solid #20232f;border-radius:14px;padding:12px;width:160px;display:flex;flex-direction:column;align-items:center;gap:8px;">
+			<div style="font-size:11px;font-weight:700;color:#7ad7f0;text-transform:uppercase;letter-spacing:0.5px;">${label}</div>
+			<div style="display:flex;align-items:center;gap:8px;width:100%;justify-content:center;">
+				<button style="width:32px;height:32px;border-radius:8px;border:1px solid #3a3a4a;background:#1a1d28;color:#f2f4f8;font-size:16px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;" onmouseover="this.style.background='#ff6b6b';this.style.borderColor='#ff6b6b';" onmouseout="this.style.background='#1a1d28';this.style.borderColor='#3a3a4a';">ΓêÆ</button>
+				<div style="display:flex;flex-direction:column;align-items:center;min-width:40px;">
+					<span style="font-size:18px;font-weight:700;color:#ff9d2e;">0</span>
+					<span style="font-size:9px;color:#8d92a3;">%</span>
+				</div>
+				<button style="width:32px;height:32px;border-radius:8px;border:1px solid #3a3a4a;background:#1a1d28;color:#f2f4f8;font-size:16px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;" onmouseover="this.style.background='#3dd598';this.style.borderColor='#3dd598';" onmouseout="this.style.background='#1a1d28';this.style.borderColor='#3a3a4a';">+</button>
+			</div>
+			<div style="display:flex;align-items:center;gap:6px;font-size:10px;color:#8d92a3;">
+				<span style="color:#3dd598;font-size:11px;">ΓùÅ</span>
+				<span>Ready</span>
+			</div>
+		</div>
+	`;
+}
+
+function createControlCardHTML(label){
+	return `
+		<div style="background:#12141c;border:1px solid #20232f;border-radius:14px;padding:12px;width:200px;display:flex;flex-direction:column;align-items:center;gap:10px;">
+			<div style="font-size:12px;font-weight:700;color:#7ad7f0;text-transform:uppercase;letter-spacing:0.5px;">${label}</div>
+			<div style="display:flex;gap:4px;width:100%;justify-content:space-evenly;">
+				<button style="padding:8px 6px;border-radius:8px;border:1px solid #3a3a4a;background:#1a1d28;color:#f2f4f8;font-size:9px;font-weight:700;cursor:pointer;text-transform:uppercase;letter-spacing:0.5px;flex:1;" onmouseover="this.style.background='#ff9d2e';this.style.color='#16110a';" onmouseout="this.style.background='#1a1d28';this.style.color='#f2f4f8';">Decrease</button>
+				<button style="padding:8px 6px;border-radius:8px;border:1px solid #3dd598;background:#3dd598;color:#0a0f0a;font-size:9px;font-weight:700;cursor:pointer;text-transform:uppercase;letter-spacing:0.5px;flex:1;" onmouseover="this.style.background='#2eb882';" onmouseout="this.style.background='#3dd598';">Neutral</button>
+				<button style="padding:8px 6px;border-radius:8px;border:1px solid #3a3a4a;background:#1a1d28;color:#f2f4f8;font-size:9px;font-weight:700;cursor:pointer;text-transform:uppercase;letter-spacing:0.5px;flex:1;" onmouseover="this.style.background='#ff9d2e';this.style.color='#16110a';" onmouseout="this.style.background='#1a1d28';this.style.color='#f2f4f8';">Increase</button>
+			</div>
+		</div>
+	`;
+}
+
 function renderNav(){
+	console.log('[WEB] renderNav() called');
 	ensurePages();
 	const nav = document.getElementById('preview-nav');
+	if (!nav) {
+		console.log('[WEB] preview-nav element not found, skipping render');
+		return;
+	}
+	console.log('[WEB] preview-nav element:', nav);
+	console.log('[WEB] Rendering', config.pages.length, 'navigation pills');
 	const theme = config.theme || {};
 	nav.innerHTML = '';
 	nav.style.background = firstDefined(theme.surface_color, '#12141c');
@@ -1573,7 +1792,9 @@ function renderNav(){
 		};
 		chip.onclick = ()=>setActivePage(idx);
 		nav.appendChild(chip);
+		console.log('[WEB] Added nav pill:', p.name || 'Page '+(idx+1));
 	});
+	console.log('[WEB] renderNav() complete - nav children:', nav.children.length);
 }
 
 function updateHeaderFromInputs(){
@@ -1805,6 +2026,7 @@ function populateFontSelects(){
 
 function renderCanLibrary(){
 	const list = document.getElementById('can-library-list');
+	if(!list) return; // Element not on this page
 	const items = config.can_library || [];
 	if(items.length===0){ list.innerHTML = '<div class="muted">No messages yet.</div>'; return; }
 	list.innerHTML = '';
@@ -1857,37 +2079,7 @@ function importCanMessage(type){
 	const templates = {
 		windows:{name:'Windows',pgn:0xFEF6,data:[255,255,255,255,255,255,255,255]},
 		locks:{name:'Locks',pgn:0xFECA,data:[0,0,0,0,255,255,255,255]},
-		boards:{name:'Running Boards',pgn:0xFE00,data:[1,0,0,0,255,255,255,255]},
-		// Infinitybox NGX (from email/docs): front listens FF011E, rear listens FF021E (priority omitted)
-		powercell_front:{name:'POWERCELL NGX Front (FF011E control)',pgn:0xFF01,data:[0,0,0,0,0,0,0,0],priority:6,source_address:0x1E,destination_address:0xFF},
-		powercell_rear:{name:'POWERCELL NGX Rear (FF021E control)',pgn:0xFF02,data:[0,0,0,0,0,0,0,0],priority:6,source_address:0x1E,destination_address:0xFF},
-		// ── inMOTION NGX ──────────────────────────────────────────────────────────
-		// J1939 H-bridge module for power windows, door locks, actuators.
-		// SA 0x1A = inMOTION unit address (from AF031A / AF041A / AF051A / AF061A).
-		// Byte layout: [Relay1A, Relay1B, Relay2A, Relay2B, Out1, Out2, Out3, Out4]
-		// Per-byte:  0x90=Track ON  |  0x80=OFF  |  0xB0=Express  |  0x00=no-change
-		// Response PGNs (module sends back every 500 ms or on state change):
-		//   Driver Front→FF331B  Passenger Front→FF341B  Driver Rear→FF351B  Passenger Rear→FF361B
-		//
-		// Module base frames (all bytes 0x00 = no output affected — use as a template):
-		imotion_df:{name:'inMOTION NGX Driver Front',   pgn:0xFF03,data:[0,0,0,0,0,0,0,0],priority:6,source_address:0x1A,destination_address:0xFF},
-		imotion_pf:{name:'inMOTION NGX Passenger Front',pgn:0xFF04,data:[0,0,0,0,0,0,0,0],priority:6,source_address:0x1A,destination_address:0xFF},
-		imotion_dr:{name:'inMOTION NGX Driver Rear',    pgn:0xFF05,data:[0,0,0,0,0,0,0,0],priority:6,source_address:0x1A,destination_address:0xFF},
-		imotion_pr:{name:'inMOTION NGX Passenger Rear', pgn:0xFF06,data:[0,0,0,0,0,0,0,0],priority:6,source_address:0x1A,destination_address:0xFF},
-		// Driver Front — individual output shortcuts:
-		imotion_df_r1a_on: {name:'inMOTION DF Relay1A Track ON', pgn:0xFF03,data:[0x90,0,0,0,0,0,0,0],priority:6,source_address:0x1A,destination_address:0xFF},
-		imotion_df_r1a_off:{name:'inMOTION DF Relay1A OFF',      pgn:0xFF03,data:[0x80,0,0,0,0,0,0,0],priority:6,source_address:0x1A,destination_address:0xFF},
-		imotion_df_r1a_exp:{name:'inMOTION DF Relay1A Express',  pgn:0xFF03,data:[0xB0,0,0,0,0,0,0,0],priority:6,source_address:0x1A,destination_address:0xFF},
-		imotion_df_r1b_on: {name:'inMOTION DF Relay1B Track ON', pgn:0xFF03,data:[0,0x90,0,0,0,0,0,0],priority:6,source_address:0x1A,destination_address:0xFF},
-		imotion_df_r1b_off:{name:'inMOTION DF Relay1B OFF',      pgn:0xFF03,data:[0,0x80,0,0,0,0,0,0],priority:6,source_address:0x1A,destination_address:0xFF},
-		imotion_df_r1b_exp:{name:'inMOTION DF Relay1B Express',  pgn:0xFF03,data:[0,0xB0,0,0,0,0,0,0],priority:6,source_address:0x1A,destination_address:0xFF},
-		// Passenger Front — individual output shortcuts:
-		imotion_pf_r1a_on: {name:'inMOTION PF Relay1A Track ON', pgn:0xFF04,data:[0x90,0,0,0,0,0,0,0],priority:6,source_address:0x1A,destination_address:0xFF},
-		imotion_pf_r1a_off:{name:'inMOTION PF Relay1A OFF',      pgn:0xFF04,data:[0x80,0,0,0,0,0,0,0],priority:6,source_address:0x1A,destination_address:0xFF},
-		imotion_pf_r1a_exp:{name:'inMOTION PF Relay1A Express',  pgn:0xFF04,data:[0xB0,0,0,0,0,0,0,0],priority:6,source_address:0x1A,destination_address:0xFF},
-		imotion_pf_r1b_on: {name:'inMOTION PF Relay1B Track ON', pgn:0xFF04,data:[0,0x90,0,0,0,0,0,0],priority:6,source_address:0x1A,destination_address:0xFF},
-		imotion_pf_r1b_off:{name:'inMOTION PF Relay1B OFF',      pgn:0xFF04,data:[0,0x80,0,0,0,0,0,0],priority:6,source_address:0x1A,destination_address:0xFF},
-		imotion_pf_r1b_exp:{name:'inMOTION PF Relay1B Express',  pgn:0xFF04,data:[0,0xB0,0,0,0,0,0,0],priority:6,source_address:0x1A,destination_address:0xFF}
+		boards:{name:'Running Boards',pgn:0xFE00,data:[1,0,0,0,255,255,255,255]}
 	};
 	const t = templates[type];
 	if(!t) return;
@@ -1895,122 +2087,6 @@ function importCanMessage(type){
 	config.can_library.push({ id:'msg_'+Date.now(), name:t.name, pgn:t.pgn, priority:firstDefined(t.priority,6), source_address:firstDefined(t.source_address,0xF9), destination_address:firstDefined(t.destination_address,0xFF), data:t.data, description:'Quick import' });
 	renderCanLibrary();
 }
-
-// ── inMOTION NGX Frame Builder ─────────────────────────────────────────────────
-// Generates precise J1939 output-control frames for inMOTION NGX H-bridge modules.
-//
-// Protocol summary:
-//   • SA 0x1A for all inMOTION units; priority 6.
-//   • 8-byte payload; each byte controls one output: [R1A,R1B,R2A,R2B,O1,O2,O3,O4]
-//   • Per-byte encoding (MSB = bit 0):
-//       0x90 = Track ON   (modifier=1, personality=01)
-//       0x80 = OFF        (modifier=1, personality=00)
-//       0xB0 = Express    (modifier=1, personality=11) ← H-bridge relays only
-//       0xA? = Timed      (modifier=1, personality=10, lower nibble = 0.25s steps)
-//       0x00 = No change  (modifier=0 — inMOTION silently ignores this byte)
-//
-// Express mode: relay runs until the current threshold set in the inMOTION's
-// EEPROM is exceeded.  Ideal for power windows — the motor stalls when the
-// glass reaches the end of travel, causing a current spike that stops the relay.
-
-const _inmotionModules = {
-	df:{label:'Driver Front',   pgn:0xFF03, resp:'FF331B'},
-	pf:{label:'Passenger Front',pgn:0xFF04, resp:'FF341B'},
-	dr:{label:'Driver Rear',    pgn:0xFF05, resp:'FF351B'},
-	pr:{label:'Passenger Rear', pgn:0xFF06, resp:'FF361B'}
-};
-const _inmotionOutputs = [
-	{label:'Relay 1A',pos:0,relay:true},
-	{label:'Relay 1B',pos:1,relay:true},
-	{label:'Relay 2A',pos:2,relay:true},
-	{label:'Relay 2B',pos:3,relay:true},
-	{label:'Output 1',pos:4,relay:false},
-	{label:'Output 2',pos:5,relay:false},
-	{label:'Output 3',pos:6,relay:false},
-	{label:'Output 4',pos:7,relay:false}
-];
-
-function inmotionUpdateUI(){
-	const modeEl   = document.getElementById('imotion-mode');
-	const outIdx   = parseInt(document.getElementById('imotion-output').value);
-	const mode     = modeEl ? modeEl.value : 'track';
-	const isRelay  = outIdx <= 3;
-	const modKey   = document.getElementById('imotion-module').value;
-	const mod      = _inmotionModules[modKey];
-
-	// Express only valid for relay outputs
-	const expOpt = modeEl ? modeEl.querySelector('option[value="express"]') : null;
-	if(expOpt){ expOpt.disabled = !isRelay; }
-	if(!isRelay && mode === 'express' && modeEl){ modeEl.value = 'track'; }
-
-	// Show/hide timer row
-	const curMode = modeEl ? modeEl.value : mode;
-	const timerRow = document.getElementById('imotion-timer-row');
-	if(timerRow) timerRow.style.display = (curMode === 'timed') ? '' : 'none';
-
-	// Express warning
-	const expNote = document.getElementById('imotion-express-note');
-	if(expNote) expNote.style.display = (!isRelay && curMode === 'express') ? '' : 'none';
-
-	// Response PGN display
-	const respEl = document.getElementById('imotion-resp-pgn');
-	if(respEl && mod) respEl.textContent = mod.resp;
-
-	// Preview command byte
-	const out = _inmotionOutputs[outIdx] || _inmotionOutputs[0];
-	let cmd = 0x90;
-	if(curMode === 'off')     cmd = 0x80;
-	else if(curMode === 'express') cmd = 0xB0;
-	else if(curMode === 'timed'){
-		const t = parseFloat((document.getElementById('imotion-timer')||{}).value || 1);
-		const counts = Math.max(1, Math.min(15, Math.round(t / 0.25)));
-		cmd = 0x80 | 0x20 | (counts & 0x0F);
-	}
-	const prevEl = document.getElementById('imotion-cmd-preview');
-	if(prevEl) prevEl.textContent = 'Command byte: 0x' + cmd.toString(16).toUpperCase().padStart(2,'0') + ' at byte ' + out.pos + ' (' + out.label + ')';
-}
-
-function inmotionBuildFrame(){
-	const modKey  = document.getElementById('imotion-module').value;
-	const outIdx  = parseInt(document.getElementById('imotion-output').value);
-	const mode    = document.getElementById('imotion-mode').value;
-	const timer_s = parseFloat((document.getElementById('imotion-timer')||{}).value || 1);
-
-	const mod = _inmotionModules[modKey];
-	const out = _inmotionOutputs[outIdx];
-	if(!mod || !out){ alert('Select a valid module and output.'); return; }
-
-	let cmd = 0x90;
-	if(mode === 'off')     cmd = 0x80;
-	else if(mode === 'express') cmd = 0xB0;
-	else if(mode === 'timed'){
-		const counts = Math.max(1, Math.min(15, Math.round(timer_s / 0.25)));
-		cmd = 0x80 | 0x20 | (counts & 0x0F);
-	}
-
-	const data = [0,0,0,0,0,0,0,0];
-	data[out.pos] = cmd;
-
-	const modeLabels = {track:'Track ON',off:'OFF',express:'Express',timed:'Timed '+timer_s+'s'};
-	const name = 'inMOTION NGX ' + mod.label + ' \u2014 ' + out.label + ' ' + (modeLabels[mode]||mode);
-	const description = 'Response PGN: ' + mod.resp + ' | cmd=0x' + cmd.toString(16).toUpperCase().padStart(2,'0') + ' @ byte ' + out.pos;
-
-	if(!config.can_library) config.can_library = [];
-	config.can_library.push({
-		id: 'msg_' + Date.now(),
-		name,
-		pgn: mod.pgn,
-		priority: 6,
-		source_address: 0x1A,
-		destination_address: 0xFF,
-		data,
-		description
-	});
-	renderCanLibrary();
-	const statusEl = document.getElementById('imotion-status');
-	if(statusEl) statusEl.textContent = '\u2713 Added \u201c' + name + '\u201d to CAN Library';
-}
-// ── end inMOTION NGX Frame Builder ────────────────────────────────────────────
 
 function populateCanLibraryDropdown(){
 	const sels = [
@@ -2043,7 +2119,7 @@ function loadCanFromLibrary(){
 	document.getElementById('btn-can-dest').value = msg.destination_address.toString(16).toUpperCase();
 	document.getElementById('btn-can-data').value = msg.data.map(b=>b.toString(16).toUpperCase().padStart(2,'0')).join(' ');
 	toggleCanFields();
-	autoDetectStatusPgn(false);  // auto-fill status fields from the loaded frame
+	autoDetectStatusPgn(false);
 }
 
 function loadCanOffFromLibrary(){
@@ -2083,7 +2159,7 @@ function renderWifiList(){
 	wifiNetworks.forEach((net,idx)=>{
 		const item = document.createElement('div');
 		item.className = 'wifi-item';
-		item.innerHTML = `<div><strong>${net.ssid}</strong><div class="muted">Channel ${net.channel||'?'} · RSSI ${net.rssi||''}</div></div><div>${net.secure?'Locked':'Open'}</div>`;
+		item.innerHTML = `<div><strong>${net.ssid}</strong><div class="muted">Channel ${net.channel||'?'} ┬╖ RSSI ${net.rssi||''}</div></div><div>${net.secure?'Locked':'Open'}</div>`;
 		item.onclick = ()=>{
 			document.getElementById('sta-ssid').value = net.ssid;
 			document.getElementById('sta-password').focus();
@@ -2096,22 +2172,24 @@ function renderWifiList(){
 
 async function refreshStatus(){
 	const statusContainer = document.getElementById('status');
-	if(!statusContainer) return;
+	if(!statusContainer) return; // Status element not on this page
 	try{
 		const res = await fetch('/api/status');
 		const status = await res.json();
-		const firmwareVersion = status.firmware_version || statusContainer.dataset.version || '—';
-		const deviceIp = status.device_ip || status.sta_ip || status.ap_ip || '—';
-		const connectedNetwork = status.connected_network || (status.sta_connected ? 'Hidden network' : '—');
+		const firmwareVersion = status.firmware_version || statusContainer.dataset.version || 'ΓÇö';
+		const deviceIp = status.device_ip || status.sta_ip || status.ap_ip || 'ΓÇö';
+		const connectedNetwork = status.connected_network || (status.sta_connected ? 'Hidden network' : 'ΓÇö');
 		statusContainer.innerHTML = `
 			<div class="status-chip"><span>Firmware</span>v${firmwareVersion}</div>
-			<div class="status-chip"><span>Device IP</span>${deviceIp || '—'}</div>
-			<div class="status-chip"><span>Connected Network</span>${connectedNetwork || '—'}</div>
+			<div class="status-chip"><span>Device IP</span>${deviceIp || 'ΓÇö'}</div>
+			<div class="status-chip"><span>Connected Network</span>${connectedNetwork || 'ΓÇö'}</div>
 			<div class="status-chip"><span>AP IP</span>${status.ap_ip || 'N/A'}</div>
-			<div class="status-chip"><span>Station IP</span>${status.sta_ip || '—'}</div>
+			<div class="status-chip"><span>Station IP</span>${status.sta_ip || 'ΓÇö'}</div>
 		`;
 	}catch(err){
-		const firmwareVersion = statusContainer.dataset.version || '—';
+		// Silently fail if status element doesn't exist
+		if(!statusContainer) return;
+		const firmwareVersion = statusContainer.dataset.version || 'ΓÇö';
 		statusContainer.innerHTML = `
 			<div class="status-chip"><span>Firmware</span>v${firmwareVersion}</div>
 			<div class="status-chip"><span>Device IP</span>Unavailable</div>
@@ -2593,7 +2671,7 @@ async function handleImageUpload(evt, imageType) {
 		}
 
 		renderPreview();
-		showBanner(`✅ ${imageType} image optimized & uploaded! Check device display.`, 'success');
+		showBanner(`Γ£à ${imageType} image optimized & uploaded! Check device display.`, 'success');
 		evt.target.value = '';
 	} catch (error) {
 		console.error('Image upload error:', error);
@@ -2695,11 +2773,15 @@ function hydrateDisplay(){
 }
 
 async function loadConfig(){
+	console.log('[WEB] loadConfig() called');
 	try{
 		const res = await fetch('/api/config');
 		config = await res.json();
+		console.log('[WEB] Config loaded:', config);
+		console.log('[WEB] Pages before ensurePages:', config.pages);
 		lvimgPreviewCache.clear();
 		ensurePages();
+		console.log('[WEB] Pages after ensurePages:', config.pages);
 		populateFontSelects();  // Must populate fonts BEFORE hydrating header fields
 		hydrateThemeFields();
 		hydrateHeaderFields();
@@ -2788,21 +2870,36 @@ async function checkForUpdates(){
 	const updateChip = document.getElementById('update-available');
 	if (updateChip) updateChip.textContent = 'Checking...';
 	try{
-		const res = await fetch('/api/ota/check');
+		const res = await fetch('/api/ota/github/versions');
 		const data = await res.json();
-		if (data.update_available) {
-			if (updateChip) updateChip.innerHTML = `<span style="color: var(--success);">v${data.available_version}</span>`;
-			const updateBtn = document.getElementById('update-btn');
-			if (updateBtn) {
-				updateBtn.style.display = 'block';
-				updateBtn.textContent = `Update to v${data.available_version}`;
+		if (data.status === 'ok' && data.versions && data.versions.length > 0) {
+			const currentVersion = data.current;
+			
+			// Create version selector dropdown
+			const updateSection = document.getElementById('update-section');
+			if (updateSection) {
+				updateSection.innerHTML = `
+					<div style="display:flex;flex-direction:column;gap:10px;width:100%;">
+						<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+							<label for="version-select" style="color:var(--text-secondary);">Select Version:</label>
+							<select id="version-select" style="padding:8px;border-radius:4px;background:#2a2a2a;color:#ffffff;border:1px solid #444;flex:1;min-width:150px;">
+								${data.versions.map(v => `<option value="${v}" style="background:#2a2a2a;color:#ffffff;" ${v === currentVersion ? 'selected' : ''}>${v}${v === currentVersion ? ' (current)' : ''}</option>`).join('')}
+							</select>
+						</div>
+						<button id="update-btn" onclick="triggerOTAUpdate()" style="padding:10px 20px;background:var(--accent);color:#000;border:none;border-radius:4px;cursor:pointer;font-weight:600;">Install Selected Version</button>
+						<div style="font-size:0.85em;color:var(--text-secondary);line-height:1.4;">
+							<strong>Current:</strong> ${currentVersion} ΓÇó <strong>Available:</strong> ${data.versions.length} version(s)<br/>
+							<em>OTA updates use .bin firmware files for fast wireless installation</em>
+						</div>
+					</div>
+				`;
 			}
-			showBanner(`Update available: v${data.available_version}`, 'success');
+			
+			if (updateChip) updateChip.innerHTML = `<span style="color: var(--success);">${data.versions.length} available</span>`;
+			showBanner(`Found ${data.versions.length} OTA-capable version(s)`, 'success');
 		} else {
-			if (updateChip) updateChip.textContent = 'Up to date';
-			const updateBtn = document.getElementById('update-btn');
-			if (updateBtn) updateBtn.style.display = 'none';
-			showBanner('Firmware is up to date', 'success');
+			if (updateChip) updateChip.textContent = 'No versions found';
+			showBanner('No GitHub versions available', 'error');
 		}
 	}catch(err){
 		if (updateChip) updateChip.textContent = 'Error';
@@ -2813,31 +2910,130 @@ async function checkForUpdates(){
 }
 
 async function triggerOTAUpdate(){
-	if (!confirm('Ready to update firmware? The device will reboot.')) return;
+	const select = document.getElementById('version-select');
+	const version = select ? select.value : null;
+	
+	if (!version) {
+		showBanner('No version selected', 'error');
+		return;
+	}
+	
+	if (!confirm(`Install version ${version}? The device will reboot.`)) return;
+	
 	const btn = document.getElementById('update-btn');
 	if (btn) {
 		btn.disabled = true;
-		btn.textContent = 'Updating...';
+		btn.textContent = 'Starting...';
 	}
+	
+	// Create progress indicator
+	const updateSection = document.getElementById('update-section');
+	if (updateSection) {
+		updateSection.innerHTML = `
+			<div style="display:flex;flex-direction:column;gap:15px;width:100%;padding:20px;background:#1a1a1a;border-radius:8px;">
+				<div style="text-align:center;">
+					<h3 style="margin:0;color:var(--accent);">Installing Version ${version}</h3>
+					<p id="ota-status-text" style="color:var(--text-secondary);margin:10px 0;">Initializing...</p>
+				</div>
+				<div style="width:100%;height:30px;background:#333;border-radius:15px;overflow:hidden;position:relative;">
+					<div id="ota-progress-bar" style="width:0%;height:100%;background:linear-gradient(90deg, var(--accent) 0%, #ffa500 100%);transition:width 0.3s ease;"></div>
+					<div id="ota-progress-text" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#fff;font-weight:600;">0%</div>
+				</div>
+				<div id="ota-messages" style="font-size:0.85em;color:var(--text-secondary);max-height:150px;overflow-y:auto;"></div>
+			</div>
+		`;
+	}
+	
 	try{
-		const res = await fetch('/api/ota/update', { method: 'POST' });
+		const res = await fetch('/api/ota/github/install', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ version: version })
+		});
 		const data = await res.json();
 		if (data.status === 'ok') {
-			showBanner('Update started! Device rebooting...', 'success');
-			setTimeout(() => {
-				window.location.reload();
-			}, 3000);
+			// Start polling for status
+			pollOTAStatus();
 		} else {
 			showBanner(data.message || 'Update failed', 'error');
+			setTimeout(() => checkForUpdates(), 2000);
 		}
 	}catch(err){
 		showBanner('Update request failed: '+err.message, 'error');
-	}finally{
-		if (btn) {
-			btn.disabled = false;
-			btn.textContent = 'Update Available';
-		}
+		setTimeout(() => checkForUpdates(), 2000);
 	}
+}
+
+let otaPolling = null;
+async function pollOTAStatus() {
+	if (otaPolling) clearInterval(otaPolling);
+	
+	let lastProgress = 0;
+	let consecutiveErrors = 0;
+	
+	otaPolling = setInterval(async () => {
+		try {
+			const res = await fetch('/api/ota/status');
+			if (!res.ok) {
+				consecutiveErrors++;
+				if (consecutiveErrors > 5) {
+					clearInterval(otaPolling);
+					showBanner('Lost connection to device. It may be rebooting...', 'info');
+					setTimeout(() => {
+						showBanner('Attempting to reconnect...', 'info');
+						window.location.reload();
+					}, 10000);
+				}
+				return;
+			}
+			
+			consecutiveErrors = 0;
+			const data = await res.json();
+			
+			// Update progress bar
+			const progressBar = document.getElementById('ota-progress-bar');
+			const progressText = document.getElementById('ota-progress-text');
+			const statusText = document.getElementById('ota-status-text');
+			
+			if (progressBar && data.progress !== undefined) {
+				progressBar.style.width = data.progress + '%';
+				if (progressText) progressText.textContent = data.progress + '%';
+			}
+			
+			if (statusText && data.message) {
+				statusText.textContent = data.message;
+			}
+			
+			// Add status messages
+			const messages = document.getElementById('ota-messages');
+			if (messages && data.message && data.progress > lastProgress) {
+				const msg = document.createElement('div');
+				msg.textContent = `[${new Date().toLocaleTimeString()}] ${data.message} (${data.progress}%)`;
+				messages.appendChild(msg);
+				messages.scrollTop = messages.scrollHeight;
+				lastProgress = data.progress;
+			}
+			
+			// Check if update completed
+			if (data.progress >= 100 || data.message.includes('Success') || data.message.includes('Rebooting')) {
+				clearInterval(otaPolling);
+				showBanner('Update successful! Device is rebooting...', 'success');
+				setTimeout(() => {
+					showBanner('Waiting for device to come back online...', 'info');
+					window.location.reload();
+				}, 5000);
+			}
+			
+		} catch (err) {
+			consecutiveErrors++;
+			console.error('OTA status poll error:', err);
+			if (consecutiveErrors > 5) {
+				clearInterval(otaPolling);
+				showBanner('Device is rebooting. Please wait...', 'info');
+				setTimeout(() => window.location.reload(), 15000);
+			}
+		}
+	}, 500); // Poll every 500ms for smooth updates
 }
 
 document.addEventListener('DOMContentLoaded',()=>{

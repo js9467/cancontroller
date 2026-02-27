@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file img_home_icon.c
  * LVGL image data - auto-generated
  */

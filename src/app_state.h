@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file app_state.h
  * Global application state management
  * 

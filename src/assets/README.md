@@ -1,12 +1,12 @@
-# Assets Folder
+﻿# Assets Folder
 
 This folder contains LVGL image assets converted to C arrays.
 
 ## How to Add Images
 
 1. **Resize your images** (see `../../IMAGE_CONVERSION_GUIDE.md`)
-   - Icons: 192×192 px
-   - Background: 800×480 px
+   - Icons: 192├ù192 px
+   - Background: 800├ù480 px
    - Logo: ~200px wide
 
 2. **Convert using LVGL Image Converter**: https://lvgl.io/tools/imageconverter
@@ -28,7 +28,7 @@ This folder contains LVGL image assets converted to C arrays.
 
 ## Current Status
 
-⚠️ **No image files yet** - UI uses text placeholders
+ΓÜá∩╕Å **No image files yet** - UI uses text placeholders
 
 Once you add the `.c` files:
 - Uncomment the `#include "assets/images.h"` lines in `main.cpp`
@@ -39,9 +39,9 @@ Once you add the `.c` files:
 
 | Image | Size | Format | Purpose |
 |-------|------|--------|---------|
-| `img_home_icon` | 192×192 | ARGB | Home nav button |
-| `img_windows_icon` | 192×192 | ARGB | Windows nav button |
-| `img_locks_icon` | 192×192 | ARGB | Locks nav button |
-| `img_runningboards_icon` | 192×192 | ARGB | Running boards nav button |
-| `img_background` | 800×480 | RGB | Full-screen background |
-| `img_bronco_logo` | 200×auto | RGB | Header logo |
+| `img_home_icon` | 192├ù192 | ARGB | Home nav button |
+| `img_windows_icon` | 192├ù192 | ARGB | Windows nav button |
+| `img_locks_icon` | 192├ù192 | ARGB | Locks nav button |
+| `img_runningboards_icon` | 192├ù192 | ARGB | Running boards nav button |
+| `img_background` | 800├ù480 | RGB | Full-screen background |
+| `img_bronco_logo` | 200├ùauto | RGB | Header logo |

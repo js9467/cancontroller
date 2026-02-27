@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file img_runningboards_icon.c
  * LVGL image data - auto-generated
  */

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <ArduinoJson.h>
 #include <string>
@@ -12,6 +12,7 @@ public:
     bool begin();
     bool save() const;
     bool resetToDefaults();
+    void factoryReset();  // Nuclear option - wipe config file
 
     DeviceConfig& getConfig() { return config_; }
     const DeviceConfig& getConfig() const { return config_; }
