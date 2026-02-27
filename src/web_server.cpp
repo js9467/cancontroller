@@ -16,6 +16,7 @@
 #include "behavioral_output_integration.h"
 #include "output_frame_synthesizer.h"
 #include "infinitybox_control.h"
+#include "inmotion_can.h"
 
 namespace {
 const IPAddress kApIp(192, 168, 4, 250);
@@ -1035,6 +1036,42 @@ void WebServerManager::setupRoutes() {
             request->send(success ? 200 : 400, "application/json", payload);
         });
     server_.addHandler(ipm1_action);
+
+    // inMOTION NGX window control endpoint
+    // POST /api/inmotion/window  body: {"window_id":0,"action":"up"|"down"|"stop"}
+    // window_id: 0=DriverFront, 1=PassFront, 2=DriverRear, 3=PassRear
+    auto* inmotion_window = new AsyncCallbackJsonWebHandler("/api/inmotion/window",
+        [](AsyncWebServerRequest* request, JsonVariant& json) {
+            int window_id = json["window_id"] | -1;
+            String action = json["action"] | "";
+            if (window_id < 0 || window_id > 3 || action.isEmpty()) {
+                request->send(400, "application/json", "{\"error\":\"window_id 0-3 and action up|down|stop required\"}");
+                return;
+            }
+            if (action == "up")        InMotionNGX::windowUp(window_id);
+            else if (action == "down") InMotionNGX::windowDown(window_id);
+            else if (action == "stop") InMotionNGX::windowStop(window_id);
+            else { request->send(400, "application/json", "{\"error\":\"action must be up|down|stop\"}"); return; }
+            request->send(200, "application/json", "{\"ok\":true}");
+        });
+    server_.addHandler(inmotion_window);
+
+    // inMOTION NGX lock control endpoint
+    // POST /api/inmotion/lock  body: {"door_id":0,"action":"lock"|"unlock"|"lock_all"|"unlock_all","pulse_ms":500}
+    auto* inmotion_lock = new AsyncCallbackJsonWebHandler("/api/inmotion/lock",
+        [](AsyncWebServerRequest* request, JsonVariant& json) {
+            String action = json["action"] | "";
+            uint16_t pulse_ms = json["pulse_ms"] | 500;
+            if (action == "lock_all")        { InMotionNGX::lockAll(pulse_ms);   request->send(200, "application/json", "{\"ok\":true}"); return; }
+            if (action == "unlock_all")      { InMotionNGX::unlockAll(pulse_ms); request->send(200, "application/json", "{\"ok\":true}"); return; }
+            int door_id = json["door_id"] | -1;
+            if (door_id < 0 || door_id > 3)  { request->send(400, "application/json", "{\"error\":\"door_id 0-3 required\"}"); return; }
+            if (action == "lock")             InMotionNGX::lockDoor(door_id, pulse_ms);
+            else if (action == "unlock")      InMotionNGX::unlockDoor(door_id, pulse_ms);
+            else { request->send(400, "application/json", "{\"error\":\"action must be lock|unlock|lock_all|unlock_all\"}"); return; }
+            request->send(200, "application/json", "{\"ok\":true}");
+        });
+    server_.addHandler(inmotion_lock);
 
     // Suspension template preview (static HTML)
     server_.on("/suspension", HTTP_GET, [](AsyncWebServerRequest* request) {

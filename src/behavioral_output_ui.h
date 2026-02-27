@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <Arduino.h>
 
@@ -396,6 +396,55 @@ input[type="range"]::-webkit-slider-thumb {
 	background: var(--surface);
 	border: 1px solid var(--border);
 }
+.output-device-tag {
+	font-size: 0.7rem;
+	color: var(--accent);
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+/* Output editor modal */
+.output-modal-overlay {
+	position: fixed;
+	inset: 0;
+	background: rgba(0,0,0,0.72);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 1000;
+}
+.output-modal-box {
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: 16px;
+	padding: 28px;
+	width: 440px;
+	max-width: 95vw;
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+}
+.output-modal-box h3 { margin: 0 0 4px; font-size: 1.1rem; }
+.output-modal-box .om-field { display: flex; flex-direction: column; gap: 6px; }
+.output-modal-box .om-field label {
+	font-size: 0.75rem;
+	color: var(--muted);
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+}
+.output-modal-box input,
+.output-modal-box select {
+	background: var(--bg);
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	padding: 8px 12px;
+	color: var(--text);
+	font-size: 0.9rem;
+	outline: none;
+}
+.output-modal-box input:focus,
+.output-modal-box select:focus { border-color: var(--accent); }
 
 /* ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ */
 /* SCENE BUILDER */
@@ -588,12 +637,12 @@ input[type="range"]::-webkit-slider-thumb {
 <body>
 
 <div class="header">
-	<h1>≡ƒÄ¢∩╕Å Behavioral Output Designer</h1>
+	<h1>&#9881;&#65039; Behavioral Output Designer</h1>
 	<p>Intent-based output control with outputs and scenes</p>
 	<div class="top-nav">
-		<button class="btn" onclick="location.href='/'">≡ƒÅá Configurator</button>
-		<button class="btn" onclick="location.href='/can-monitor'">≡ƒôí CAN Monitor</button>
-		<button class="btn active" onclick="location.href='/behavioral'">≡ƒÄ¢∩╕Å Behavioral Outputs</button>
+		<button class="btn" onclick="location.href='/'">&#127968; Configurator</button>
+		<button class="btn" onclick="location.href='/can-monitor'">&#128225; CAN Monitor</button>
+		<button class="btn active" onclick="location.href='/behavioral'">&#9881;&#65039; Behavioral Outputs</button>
 	</div>
 </div>
 
@@ -605,11 +654,11 @@ input[type="range"]::-webkit-slider-thumb {
 		<div class="nav-section">
 			<h3>Configuration</h3>
 			<div class="nav-item active" data-view="outputs">
-				<span class="nav-icon">≡ƒôì</span>
+				<span class="nav-icon">&#128290;</span>
 				<span>Outputs</span>
 			</div>
 			<div class="nav-item" data-view="scenes">
-				<span class="nav-icon">≡ƒÄ¼</span>
+				<span class="nav-icon">&#127916;</span>
 				<span>Scenes</span>
 			</div>
 		</div>
@@ -617,11 +666,11 @@ input[type="range"]::-webkit-slider-thumb {
 		<div class="nav-section">
 			<h3>Testing</h3>
 			<div class="nav-item" data-view="preview">
-				<span class="nav-icon">≡ƒæü∩╕Å</span>
+				<span class="nav-icon">&#128065;&#65039;</span>
 				<span>Live Preview</span>
 			</div>
 			<div class="nav-item" data-view="simulator">
-				<span class="nav-icon">≡ƒº¬</span>
+				<span class="nav-icon">&#128269;</span>
 				<span>Simulator</span>
 			</div>
 		</div>
@@ -629,7 +678,7 @@ input[type="range"]::-webkit-slider-thumb {
 		<div class="nav-section">
 			<h3>Advanced</h3>
 			<div class="nav-item" data-view="settings">
-				<span class="nav-icon">ΓÜÖ∩╕Å</span>
+				<span class="nav-icon">&#9881;&#65039;</span>
 				<span>Settings</span>
 			</div>
 		</div>
@@ -649,15 +698,15 @@ input[type="range"]::-webkit-slider-thumb {
 				<p>Define physical outputs and their hardware mapping</p>
 				
 				<div class="alert alert-info">
-					≡ƒÆí <strong>Tip:</strong> Define outputs here, then assign behaviors per button in the main configurator.
+					&#128161; <strong>Tip:</strong> Define outputs here, then assign behaviors per button in the main configurator.
 				</div>
 				
 				<div class="btn-group">
-					<button class="btn btn-primary" onclick="showOutputEditor()">
-						Γ₧ò Add Output
+					<button class="btn btn-primary" onclick="openOutputModal()">
+						+ Add Output
 					</button>
 					<button class="btn" onclick="loadOutputs()">
-						≡ƒöä Refresh
+						&#128260; Refresh
 					</button>
 				</div>
 				
@@ -678,12 +727,12 @@ input[type="range"]::-webkit-slider-thumb {
 				<p>Coordinate multiple outputs with synchronized behaviors</p>
 				
 				<div class="alert alert-info">
-					≡ƒÄ¼ <strong>Scenes</strong> let you activate multiple outputs with predefined behaviors simultaneously.
+					&#127916; <strong>Scenes</strong> let you activate multiple outputs with predefined behaviors simultaneously.
 					Perfect for complex lighting sequences, alerts, or mode changes.
 				</div>
 				
 				<button class="btn btn-primary" onclick="createNewScene()">
-					Γ₧ò Create Scene
+					+ Create Scene
 				</button>
 				
 				<div class="divider"></div>
@@ -724,21 +773,21 @@ input[type="range"]::-webkit-slider-thumb {
 				<div class="section">
 					<div class="section-title">Output Actions</div>
 					<div id="scene-output-list"></div>
-					<button class="btn" onclick="addSceneOutput()">Γ₧ò Add Output Action</button>
+					<button class="btn" onclick="addSceneOutput()">+ Add Output Action</button>
 				</div>
 
 				<div class="divider"></div>
 				<div class="section">
 					<div class="section-title">Custom CAN Frames</div>
 					<div id="scene-can-list"></div>
-					<button class="btn" onclick="addSceneCanFrame()">Γ₧ò Add CAN Frame</button>
+					<button class="btn" onclick="addSceneCanFrame()">+ Add CAN Frame</button>
 				</div>
 
 				<div class="divider"></div>
 				<div class="section">
 					<div class="section-title">Predefined Infinitybox Actions</div>
 					<div id="scene-ibox-list"></div>
-					<button class="btn" onclick="addSceneInfinityboxAction()">Γ₧ò Add Infinitybox Action</button>
+					<button class="btn" onclick="addSceneInfinityboxAction()">+ Add Infinitybox Action</button>
 				</div>
 
 				<div class="divider"></div>
@@ -772,7 +821,7 @@ input[type="range"]::-webkit-slider-thumb {
 
 				<div class="divider"></div>
 				<div class="btn-group">
-					<button class="btn btn-success" onclick="saveSceneEditor()">≡ƒÆ╛ Save Scene</button>
+					<button class="btn btn-success" onclick="saveSceneEditor()">&#128190; Save Scene</button>
 					<button class="btn" onclick="closeSceneEditor()">Cancel</button>
 				</div>
 			</div>
@@ -799,10 +848,10 @@ input[type="range"]::-webkit-slider-thumb {
 				
 				<div class="btn-group">
 					<button class="btn" onclick="togglePreviewUpdates()">
-						<span id="preview-toggle-text">ΓÅ╕ Pause</span>
+						<span id="preview-toggle-text">&#9208; Pause</span>
 					</button>
 					<button class="btn" onclick="clearAllOutputs()">
-						≡ƒö┤ Stop All
+						&#9940; Stop All
 					</button>
 				</div>
 
@@ -869,7 +918,7 @@ input[type="range"]::-webkit-slider-thumb {
 				<p>Test any scene with live output activation</p>
 				
 				<div class="alert alert-info">
-					≡ƒÄ« <strong>How to use:</strong><br>
+					&#128218; <strong>How to use:</strong><br>
 					1. Click any scene button below to activate or deactivate it<br>
 					2. Watch the outputs activate in real-time<br>
 					3. Go to "Live Preview" view to see visual feedback<br>
@@ -911,10 +960,10 @@ input[type="range"]::-webkit-slider-thumb {
 				
 				<div class="btn-group">
 					<button class="btn btn-success" onclick="saveSettings()">
-						≡ƒÆ╛ Save Settings
+						&#128190; Save Settings
 					</button>
 					<button class="btn btn-danger" onclick="factoryReset()">
-						ΓÜá∩╕Å Factory Reset
+						&#9888;&#65039; Factory Reset
 					</button>
 				</div>
 			</div>
@@ -985,52 +1034,88 @@ function switchView(viewName) {
 // OUTPUT MANAGEMENT
 // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
 
-function showOutputEditor(outputId = null) {
-	const name = prompt('Output Name (e.g., "Left Turn Signal"):');
-	if (!name) return;
-	
-	const cellAddr = parseInt(prompt('Cell Address (0-254, 0=Mastercell):', '1'));
-	const outputRange = (cellAddr === 0) ? '1-8' : '1-10';
-	const outputNum = parseInt(prompt(`Output Number (${outputRange}):`, '1'));
-	
-	const output = {
-		id: outputId || `out_${Date.now()}`,
-		name: name,
-		cellAddress: cellAddr,
-		outputNumber: outputNum,
-		description: ''
+// ── inMOTION output label helper ──────────────────────────────────────────
+function inmotionOutputLabel(num) {
+	const labels = {
+		1: 'Relay 1A (H-Bridge 1, Dir A)',
+		2: 'Relay 1B (H-Bridge 1, Dir B)',
+		3: 'Relay 2A (H-Bridge 2, Dir A)',
+		4: 'Relay 2B (H-Bridge 2, Dir B)',
+		5: 'Output 1', 6: 'Output 2', 7: 'Output 3', 8: 'Output 4'
 	};
-	
-	fetch('/api/outputs', {
-		method: 'POST',
-		headers: {'Content-Type': 'application/json'},
-		body: JSON.stringify(output)
-	}).then(() => loadOutputs());
+	return labels[num] || `Output ${num}`;
 }
 
-function editOutput(id) {
-	const output = appState.outputs.find(o => o.id === id);
-	if (!output) return;
-	
-	const name = prompt('Output Name:', output.name);
-	if (!name) return;
-	
-	const cellAddr = parseInt(prompt('Cell Address (0-254, 0=Mastercell):', output.cellAddress));
-	const outputRange = (cellAddr === 0) ? '1-8' : '1-10';
-	const outputNum = parseInt(prompt(`Output Number (${outputRange}):`, output.outputNumber));
-	
-	const updated = {
-		...output,
-		name: name,
-		cellAddress: cellAddr,
-		outputNumber: outputNum
+// ── Output editor modal ───────────────────────────────────────────────────
+let _omEditId = null;
+
+function openOutputModal(id = null) {
+	_omEditId = id;
+	document.getElementById('output-modal-title').textContent = id ? 'Edit Output' : 'Add Output';
+	if (id) {
+		const out = appState.outputs.find(o => o.id === id);
+		if (out) {
+			document.getElementById('om-name').value = out.name || '';
+			document.getElementById('om-description').value = out.description || '';
+			const dt = out.deviceType || 'POWERCELL';
+			document.getElementById('om-device-type').value = dt;
+			if (dt === 'INMOTION') {
+				document.getElementById('om-inmotion-module').value = out.cellAddress || 3;
+				document.getElementById('om-inmotion-output').value = out.outputNumber || 1;
+			} else if (dt === 'MASTERCELL') {
+				document.getElementById('om-mc-output-num').value = out.outputNumber || 1;
+			} else {
+				document.getElementById('om-cell').value = out.cellAddress || 1;
+				document.getElementById('om-output-num').value = out.outputNumber || 1;
+			}
+		}
+	} else {
+		document.getElementById('om-name').value = '';
+		document.getElementById('om-description').value = '';
+		document.getElementById('om-device-type').value = 'POWERCELL';
+		document.getElementById('om-cell').value = '1';
+		document.getElementById('om-output-num').value = '1';
+	}
+	updateOutputModalFields();
+	document.getElementById('output-modal').style.display = 'flex';
+}
+
+function closeOutputModal() {
+	document.getElementById('output-modal').style.display = 'none';
+}
+
+function updateOutputModalFields() {
+	const dt = document.getElementById('om-device-type').value;
+	document.getElementById('om-pc-fields').style.display       = dt === 'POWERCELL'  ? '' : 'none';
+	document.getElementById('om-inmotion-fields').style.display = dt === 'INMOTION'   ? '' : 'none';
+	document.getElementById('om-mc-fields').style.display       = dt === 'MASTERCELL' ? '' : 'none';
+}
+
+function submitOutputModal() {
+	const name = document.getElementById('om-name').value.trim();
+	if (!name) { alert('Name is required'); return; }
+	const dt = document.getElementById('om-device-type').value;
+	let cellAddress, outputNumber;
+	if (dt === 'INMOTION') {
+		cellAddress  = parseInt(document.getElementById('om-inmotion-module').value);
+		outputNumber = parseInt(document.getElementById('om-inmotion-output').value);
+	} else if (dt === 'MASTERCELL') {
+		cellAddress  = 0;
+		outputNumber = parseInt(document.getElementById('om-mc-output-num').value);
+	} else {
+		cellAddress  = parseInt(document.getElementById('om-cell').value);
+		outputNumber = parseInt(document.getElementById('om-output-num').value);
+	}
+	const payload = {
+		id: _omEditId || `out_${Date.now()}`,
+		name, deviceType: dt, cellAddress, outputNumber,
+		description: document.getElementById('om-description').value.trim()
 	};
-	
 	fetch('/api/outputs', {
 		method: 'POST',
 		headers: {'Content-Type': 'application/json'},
-		body: JSON.stringify(updated)
-	}).then(() => loadOutputs());
+		body: JSON.stringify(payload)
+	}).then(() => { closeOutputModal(); loadOutputs(); });
 }
 
 function deleteOutput(id) {
@@ -1056,20 +1141,31 @@ function renderOutputList(outputs) {
 		return;
 	}
 	
-	list.innerHTML = outputs.map(out => `
+	list.innerHTML = outputs.map(out => {
+		const dt = out.deviceType || 'POWERCELL';
+		let metaLine;
+		if (dt === 'INMOTION') {
+			const mod = { 3:'Driver Front', 4:'Passenger Front', 5:'Driver Rear', 6:'Passenger Rear' }[out.cellAddress] || `Module ${out.cellAddress}`;
+			metaLine = `<span class="output-device-tag">inMOTION</span> ${mod} &bull; ${inmotionOutputLabel(out.outputNumber)}`;
+		} else if (dt === 'MASTERCELL') {
+			metaLine = `<span class="output-device-tag">Mastercell</span> Output ${out.outputNumber}`;
+		} else {
+			metaLine = `<span class="output-device-tag">POWERCELL</span> Cell ${out.cellAddress} &bull; Output ${out.outputNumber}`;
+		}
+		return `
 		<div class="output-item">
 			<div class="output-indicator ${out.isActive ? 'active' : ''}"></div>
 			<div class="output-info">
 				<div class="output-name">${out.name}</div>
-				<div class="output-meta">Cell ${out.cellAddress} ΓÇó Output ${out.outputNumber}</div>
+				<div class="output-meta">${metaLine}</div>
 			</div>
 			<div class="output-badge">${out.behavior?.type || 'None'}</div>
 			<div class="btn-group">
-				<button class="btn btn-sm" onclick="editOutput('${out.id}')">Edit</button>
+				<button class="btn btn-sm" onclick="openOutputModal('${out.id}')">Edit</button>
 				<button class="btn btn-sm btn-danger" onclick="deleteOutput('${out.id}')">Delete</button>
 			</div>
-		</div>
-	`).join('');
+		</div>`;
+	}).join('');
 }
 
 // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
@@ -1607,7 +1703,9 @@ function renderBehaviorOptions(selected) {
 		{ value: 'FADE_OUT', label: 'Fade Out' },
 		{ value: 'STROBE', label: 'Strobe' },
 		{ value: 'HOLD_TIMED', label: 'Hold Timed' },
-		{ value: 'RAMP', label: 'Ramp' }
+		{ value: 'RAMP', label: 'Ramp' },
+		{ value: 'EXPRESS', label: 'Express (inMOTION - run until stall)' },
+		{ value: 'TRACK', label: 'Track (inMOTION - follow command)' }
 	];
 	return behaviors.map(b => `<option value="${b.value}" ${b.value === selected ? 'selected' : ''}>${b.label}</option>`).join('');
 }
@@ -1887,8 +1985,8 @@ function renderPreview(states) {
 
 function togglePreviewUpdates() {
 	appState.previewActive = !appState.previewActive;
-	document.getElementById('preview-toggle-text').textContent = 
-		appState.previewActive ? 'ΓÅ╕ Pause' : 'Γû╢∩╕Å Resume';
+	document.getElementById('preview-toggle-text').innerHTML = 
+		appState.previewActive ? '&#9208; Pause' : '&#9654; Resume';
 }
 
 function updatePreviewStatus(text, isError) {
@@ -1965,13 +2063,13 @@ function updateScenePreview() {
 			const active = (scenes || []).filter(scene => scene.isActive);
 			const el = document.getElementById('preview-scenes');
 			if (!el) return;
-			el.textContent = active.length ? 'ΓùÅ' : 'Γùï';
+			el.textContent = active.length ? '\u25cf' : '\u25cb';
 			el.title = active.length ? active.map(s => s.name || s.id).join(', ') : 'Active scenes: none';
 		})
 		.catch(() => {
 			const el = document.getElementById('preview-scenes');
 			if (el) {
-				el.textContent = 'Γùï';
+				el.textContent = '\u25cb';
 				el.title = 'Active scenes: unavailable';
 			}
 		})
@@ -2060,6 +2158,83 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 </script>
+
+<!-- Output Editor Modal -->
+<div id="output-modal" class="output-modal-overlay" style="display:none" onclick="if(event.target===this)closeOutputModal()">
+	<div class="output-modal-box">
+		<h3 id="output-modal-title">Add Output</h3>
+
+		<div class="om-field">
+			<label>Name</label>
+			<input type="text" id="om-name" placeholder='e.g. "Driver Window Up"' />
+		</div>
+
+		<div class="om-field">
+			<label>Device Type</label>
+			<select id="om-device-type" onchange="updateOutputModalFields()">
+				<option value="POWERCELL">POWERCELL NGX</option>
+				<option value="INMOTION">inMOTION NGX (H-Bridge / Relay)</option>
+				<option value="MASTERCELL">Mastercell</option>
+			</select>
+		</div>
+
+		<!-- POWERCELL -->
+		<div id="om-pc-fields">
+			<div class="om-field">
+				<label>Cell Address (1&ndash;16)</label>
+				<input type="number" id="om-cell" min="1" max="16" value="1" />
+			</div>
+			<div class="om-field">
+				<label>Output Number (1&ndash;10)</label>
+				<input type="number" id="om-output-num" min="1" max="10" value="1" />
+			</div>
+		</div>
+
+		<!-- inMOTION NGX -->
+		<div id="om-inmotion-fields" style="display:none">
+			<div class="om-field">
+				<label>Module (door location)</label>
+				<select id="om-inmotion-module">
+					<option value="3">Driver Front &mdash; FF031A / FF331B</option>
+					<option value="4">Passenger Front &mdash; FF041A / FF341B</option>
+					<option value="5">Driver Rear &mdash; FF051A / FF351B</option>
+					<option value="6">Passenger Rear &mdash; FF061A / FF361B</option>
+				</select>
+			</div>
+			<div class="om-field">
+				<label>Output / Relay</label>
+				<select id="om-inmotion-output">
+					<option value="1">Relay 1A &mdash; H-Bridge 1, Direction A (Window Up / Lock)</option>
+					<option value="2">Relay 1B &mdash; H-Bridge 1, Direction B (Window Down / Unlock)</option>
+					<option value="3">Relay 2A &mdash; H-Bridge 2, Direction A</option>
+					<option value="4">Relay 2B &mdash; H-Bridge 2, Direction B</option>
+					<option value="5">Output 1 &mdash; 1A MOSFET</option>
+					<option value="6">Output 2 &mdash; 1A MOSFET</option>
+					<option value="7">Output 3 &mdash; 1A MOSFET</option>
+					<option value="8">Output 4 &mdash; 1A MOSFET</option>
+				</select>
+			</div>
+		</div>
+
+		<!-- Mastercell -->
+		<div id="om-mc-fields" style="display:none">
+			<div class="om-field">
+				<label>Output Number (1&ndash;8)</label>
+				<input type="number" id="om-mc-output-num" min="1" max="8" value="1" />
+			</div>
+		</div>
+
+		<div class="om-field">
+			<label>Description (optional)</label>
+			<input type="text" id="om-description" placeholder="Brief note" />
+		</div>
+
+		<div class="btn-group" style="justify-content:flex-end;margin-top:4px">
+			<button class="btn" onclick="closeOutputModal()">Cancel</button>
+			<button class="btn btn-primary" onclick="submitOutputModal()">Save Output</button>
+		</div>
+	</div>
+</div>
 
 </body>
 </html>

@@ -4,6 +4,7 @@
  */
 
 #include "app_state.h"
+#include "inmotion_can.h"
 #include <Arduino.h>
 
 // Singleton instance
@@ -67,26 +68,16 @@ void AppState::setWindowState(uint8_t window_id, WindowState state) {
 
 void AppState::openWindow(uint8_t window_id) {
     if (window_id >= 4) return;
-
-    // Simulate window opening sequence
-    setWindowState(window_id, WindowState::OPENING);
-
-    // In real implementation, this would interface with CAN/J1939
-    // For now, just simulate with a delay (would be handled async in real app)
-    Serial.printf("Opening window %d...\n", window_id);
-    
-    // After some time, mark as open (this is synchronous for demo)
-    // In production, you'd use a timer or CAN message to update
+    // Send Express command — inMOTION auto-stops when motor stalls at top
+    // AppState transition: OPENING → OPEN arrives via InMotionNGX::parseRxFrame()
+    InMotionNGX::windowUp(window_id);
 }
 
 void AppState::closeWindow(uint8_t window_id) {
     if (window_id >= 4) return;
-
-    // Simulate window closing sequence
-    setWindowState(window_id, WindowState::CLOSING);
-
-    // In real implementation, this would interface with CAN/J1939
-    Serial.printf("Closing window %d...\n", window_id);
+    // Send Express command — inMOTION auto-stops when motor stalls at bottom
+    // AppState transition: CLOSING → CLOSED arrives via InMotionNGX::parseRxFrame()
+    InMotionNGX::windowDown(window_id);
 }
 
 void AppState::notifyWindowStateChange() {
@@ -114,17 +105,13 @@ void AppState::setLockState(uint8_t door_id, LockState state) {
 }
 
 void AppState::lockAll() {
-    Serial.println("Locking all doors...");
-    for (int i = 0; i < 4; i++) {
-        setLockState(i, LockState::LOCKED);
-    }
+    // Send timed pulse to Relay 2A on all four inMOTION modules
+    InMotionNGX::lockAll();
 }
 
 void AppState::unlockAll() {
-    Serial.println("Unlocking all doors...");
-    for (int i = 0; i < 4; i++) {
-        setLockState(i, LockState::UNLOCKED);
-    }
+    // Send timed pulse to Relay 2B on all four inMOTION modules
+    InMotionNGX::unlockAll();
 }
 
 void AppState::notifyLockStateChange() {

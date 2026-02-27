@@ -74,7 +74,7 @@ inline void initBehavioralOutputSystem(AsyncWebServer* webServer) {
         
         // Serve the main UI
         webServer->on("/behavioral", HTTP_GET, [](AsyncWebServerRequest* request) {
-            request->send_P(200, "text/html", BEHAVIORAL_OUTPUT_UI);
+            request->send_P(200, "text/html; charset=utf-8", BEHAVIORAL_OUTPUT_UI);
         });
     }
 

@@ -36,6 +36,7 @@
 #include "hardware_config.h"
 #include "infinitybox_control.h"
 #include "behavioral_output_integration.h"
+#include "inmotion_can.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <freertos/queue.h>
@@ -185,7 +186,9 @@ void can_rx_task(void* param) {
             }
             if (!is_standard && msg.length == 8) {
                 const uint32_t pgn = (msg.identifier >> 8) & 0x3FFFF;
+                const uint8_t  sa  = static_cast<uint8_t>(msg.identifier & 0xFF);
                 CanManager::instance().updatePowercellStatusFromPgn(pgn, msg.data);
+                InMotionNGX::parseRxFrame(pgn, sa, msg.data);
             }
             // Per-button CAN status feedback
             if (!is_standard && msg.length >= 1) {

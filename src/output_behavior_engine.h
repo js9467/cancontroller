@@ -41,7 +41,9 @@ enum class BehaviorType : uint8_t {
     PATTERN,      // Custom timing pattern
     HOLD_TIMED,   // Steady state for a fixed duration
     RAMP,         // Linear transition over time
-    SCENE_REF     // Reference to a scene
+    SCENE_REF,    // Reference to a scene
+    EXPRESS,      // inMOTION NGX: run H-bridge until current limit (auto-stop on stall)
+    TRACK         // inMOTION NGX: output tracks CAN command state (synonym for STEADY)
 };
 
 // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
@@ -107,8 +109,9 @@ struct OutputChannel {
     String description = "";
     
     // Physical mapping
-    uint8_t cellAddress = 1;        // POWERCELL cell address
-    uint8_t outputNumber = 1;       // Output 1-10 on that cell
+    uint8_t cellAddress = 1;        // POWERCELL cell address (3-6 = inMOTION module)
+    uint8_t outputNumber = 1;       // Output 1-10 on cell; for inMOTION: 1=R1A,2=R1B,3=R2A,4=R2B,5-8=Out1-4
+    String deviceType = "POWERCELL"; // "POWERCELL" | "INMOTION" | "MASTERCELL"
     
     // Current behavior
     BehaviorConfig behavior;
@@ -473,6 +476,17 @@ private:
                 output.currentState = _computeRamp(behavior, elapsed);
                 output.softStart = true;  // Enable soft-start for ramp
                 output.pwmEnable = true;
+                break;
+
+            case BehaviorType::EXPRESS:
+                // inMOTION NGX Express: stay ON until current-limit feedback clears it
+                // The CAN feedback handler calls stopBehavior() when current spike detected
+                output.currentState = true;
+                break;
+
+            case BehaviorType::TRACK:
+                // inMOTION NGX Track: output mirrors CAN command state (same as STEADY)
+                output.currentState = (behavior.targetValue > 0);
                 break;
                 
             default:

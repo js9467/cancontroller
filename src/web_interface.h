@@ -1407,6 +1407,69 @@ function applyInfinityboxTemplate(){
 		window_down_driver: {cell:2, output:6, label:'Win Dn Drv', softStart:false},
 		window_up_passenger: {cell:2, output:7, label:'Win Up Pax', softStart:false},
 		window_down_passenger: {cell:2, output:8, label:'Win Dn Pax', softStart:false},
+	};
+
+	// inMOTION NGX templates — H-bridge relay control
+	// Express (0xB0) = run until current-limit stall (end of travel)
+	// Timed 0xA2 = 0.5 s pulse (2 x 0.25 s) for locks
+	// OFF (0x80) = stop / modifier with personality OFF
+	// Byte layout: [Relay1A, Relay1B, Relay2A, Relay2B, Out1, Out2, Out3, Out4]
+	const inMotionTemplates = {
+		window_up_driver:         {pgn:'FF03', sa:'1A', respPgn:'FF33', respSa:'1B', respByte:0, label:'Win Up Drv',
+								   on:[0xB0,0x80,0x00,0x00,0x00,0x00,0x00,0x00], off:[0x80,0x80,0x00,0x00,0x00,0x00,0x00,0x00]},
+		window_down_driver:       {pgn:'FF03', sa:'1A', respPgn:'FF33', respSa:'1B', respByte:1, label:'Win Dn Drv',
+								   on:[0x80,0xB0,0x00,0x00,0x00,0x00,0x00,0x00], off:[0x80,0x80,0x00,0x00,0x00,0x00,0x00,0x00]},
+		window_up_passenger:      {pgn:'FF04', sa:'1A', respPgn:'FF34', respSa:'1B', respByte:0, label:'Win Up Pax',
+								   on:[0xB0,0x80,0x00,0x00,0x00,0x00,0x00,0x00], off:[0x80,0x80,0x00,0x00,0x00,0x00,0x00,0x00]},
+		window_down_passenger:    {pgn:'FF04', sa:'1A', respPgn:'FF34', respSa:'1B', respByte:1, label:'Win Dn Pax',
+								   on:[0x80,0xB0,0x00,0x00,0x00,0x00,0x00,0x00], off:[0x80,0x80,0x00,0x00,0x00,0x00,0x00,0x00]},
+		window_up_driver_rear:    {pgn:'FF05', sa:'1A', respPgn:'FF35', respSa:'1B', respByte:0, label:'Win Up Drv Rr',
+								   on:[0xB0,0x80,0x00,0x00,0x00,0x00,0x00,0x00], off:[0x80,0x80,0x00,0x00,0x00,0x00,0x00,0x00]},
+		window_down_driver_rear:  {pgn:'FF05', sa:'1A', respPgn:'FF35', respSa:'1B', respByte:1, label:'Win Dn Drv Rr',
+								   on:[0x80,0xB0,0x00,0x00,0x00,0x00,0x00,0x00], off:[0x80,0x80,0x00,0x00,0x00,0x00,0x00,0x00]},
+		window_up_passenger_rear: {pgn:'FF06', sa:'1A', respPgn:'FF36', respSa:'1B', respByte:0, label:'Win Up Pax Rr',
+								   on:[0xB0,0x80,0x00,0x00,0x00,0x00,0x00,0x00], off:[0x80,0x80,0x00,0x00,0x00,0x00,0x00,0x00]},
+		window_down_passenger_rear:{pgn:'FF06', sa:'1A', respPgn:'FF36', respSa:'1B', respByte:1, label:'Win Dn Pax Rr',
+								   on:[0x80,0xB0,0x00,0x00,0x00,0x00,0x00,0x00], off:[0x80,0x80,0x00,0x00,0x00,0x00,0x00,0x00]},
+		door_lock_driver:         {pgn:'FF03', sa:'1A', respPgn:'FF33', respSa:'1B', respByte:2, label:'Lock Drv',
+								   on:[0x00,0x00,0xA2,0x80,0x00,0x00,0x00,0x00], off:[0x00,0x00,0x80,0x80,0x00,0x00,0x00,0x00]},
+		door_unlock_driver:       {pgn:'FF03', sa:'1A', respPgn:'FF33', respSa:'1B', respByte:3, label:'Unlock Drv',
+								   on:[0x00,0x00,0x80,0xA2,0x00,0x00,0x00,0x00], off:[0x00,0x00,0x80,0x80,0x00,0x00,0x00,0x00]},
+		door_lock_passenger:      {pgn:'FF04', sa:'1A', respPgn:'FF34', respSa:'1B', respByte:2, label:'Lock Pax',
+								   on:[0x00,0x00,0xA2,0x80,0x00,0x00,0x00,0x00], off:[0x00,0x00,0x80,0x80,0x00,0x00,0x00,0x00]},
+		door_unlock_passenger:    {pgn:'FF04', sa:'1A', respPgn:'FF34', respSa:'1B', respByte:3, label:'Unlock Pax',
+								   on:[0x00,0x00,0x80,0xA2,0x00,0x00,0x00,0x00], off:[0x00,0x00,0x80,0x80,0x00,0x00,0x00,0x00]},
+	};
+
+	if (inMotionTemplates[funcName]) {
+		const t = inMotionTemplates[funcName];
+		const currentLabel = document.getElementById('btn-label').value;
+		if (!currentLabel || currentLabel.match(/^Button \d+$/)) document.getElementById('btn-label').value = t.label;
+		// CAN ON frame
+		document.getElementById('btn-can-enabled').checked = true;
+		document.getElementById('btn-can-pgn').value = t.pgn;
+		document.getElementById('btn-can-priority').value = '6';
+		document.getElementById('btn-can-src').value = t.sa;
+		document.getElementById('btn-can-dest').value = 'FF';
+		document.getElementById('btn-can-data').value = t.on.map(b=>b.toString(16).toUpperCase().padStart(2,'0')).join(' ');
+		// CAN OFF frame
+		document.getElementById('btn-can-off-enabled').checked = true;
+		document.getElementById('btn-can-off-pgn').value = t.pgn;
+		document.getElementById('btn-can-off-priority').value = '6';
+		document.getElementById('btn-can-off-src').value = t.sa;
+		document.getElementById('btn-can-off-dest').value = 'FF';
+		document.getElementById('btn-can-off-data').value = t.off.map(b=>b.toString(16).toUpperCase().padStart(2,'0')).join(' ');
+		// CAN status feedback (button glows green when relay is ON)
+		document.getElementById('btn-can-status-enabled').checked = true;
+		document.getElementById('btn-can-status-pgn').value = t.respPgn;
+		document.getElementById('btn-can-status-sa').value = t.respSa;
+		document.getElementById('btn-can-status-byte').value = t.respByte;
+		document.getElementById('btn-can-status-mask').value = '10'; // bit4 = ON bit per inMOTION spec
+		toggleCanFields();
+		return;
+	}
+
+	const templatesPC = {
 		ignition: {cell:1, output:3, label:'Ignition', softStart:false},
 		starter: {cell:1, output:4, label:'Starter', softStart:false},
 		fuel_pump: {cell:2, output:9, label:'Fuel Pump', softStart:false},
@@ -1417,7 +1480,7 @@ function applyInfinityboxTemplate(){
 		security_disarm: {cell:3, output:4, label:'Sec Disarm', softStart:false}
 	};
 	
-	const tmpl = templates[funcName];
+	const tmpl = templatesPC[funcName];
 	if(!tmpl) return;
 	
 	// Auto-populate label if still default

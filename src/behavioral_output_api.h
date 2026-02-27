@@ -404,11 +404,8 @@ private:
             obj["name"] = output.name;
             obj["cellAddress"] = output.cellAddress;
             obj["outputNumber"] = output.outputNumber;
-            obj["desiredActive"] = output.isActive;
-            obj["desiredValue"] = output.currentState ? 255 : 0;
+            obj["deviceType"] = output.deviceType;
             obj["description"] = output.description;
-            obj["cellAddress"] = output.cellAddress;
-            obj["outputNumber"] = output.outputNumber;
             obj["isActive"] = output.isActive;
             obj["currentValue"] = output.currentState ? 255 : 0;
             
@@ -434,6 +431,7 @@ private:
         obj["description"] = output.description;
         obj["cellAddress"] = output.cellAddress;
         obj["outputNumber"] = output.outputNumber;
+        obj["deviceType"] = output.deviceType;
         obj["isActive"] = output.isActive;
         obj["currentValue"] = output.currentState ? 255 : 0;
         
@@ -666,11 +664,13 @@ private:
         output.description = doc.containsKey("description") ? doc["description"].as<String>() : String("");
         output.cellAddress = doc.containsKey("cellAddress") ? doc["cellAddress"].as<uint8_t>() : 1;
         output.outputNumber = doc.containsKey("outputNumber") ? doc["outputNumber"].as<uint8_t>() : 1;
+        output.deviceType = doc.containsKey("deviceType") ? doc["deviceType"].as<String>() : String("POWERCELL");
 
-        if (output.cellAddress > 254) {
-            output.cellAddress = 254;
-        }
-        if (output.cellAddress == 0) {
+        if (output.cellAddress > 254) output.cellAddress = 254;
+        if (output.deviceType == "INMOTION") {
+            if (output.outputNumber < 1) output.outputNumber = 1;
+            if (output.outputNumber > 8) output.outputNumber = 8;
+        } else if (output.cellAddress == 0) {
             if (output.outputNumber < 1) output.outputNumber = 1;
             if (output.outputNumber > 8) output.outputNumber = 8;
         } else {
@@ -910,6 +910,8 @@ private:
             case BehaviorType::HOLD_TIMED: return "HOLD_TIMED";
             case BehaviorType::RAMP: return "RAMP";
             case BehaviorType::SCENE_REF: return "SCENE_REF";
+            case BehaviorType::EXPRESS: return "EXPRESS";
+            case BehaviorType::TRACK: return "TRACK";
             default: return "UNKNOWN";
         }
     }
@@ -925,6 +927,8 @@ private:
         if (str == "HOLD_TIMED" || str == "hold_timed") return BehaviorType::HOLD_TIMED;
         if (str == "RAMP" || str == "ramp") return BehaviorType::RAMP;
         if (str == "SCENE_REF" || str == "scene_ref") return BehaviorType::SCENE_REF;
+        if (str == "EXPRESS" || str == "express") return BehaviorType::EXPRESS;
+        if (str == "TRACK" || str == "track") return BehaviorType::TRACK;
         return BehaviorType::STEADY;
     }
 };
