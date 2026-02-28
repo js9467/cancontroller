@@ -1,0 +1,11 @@
+{
+  "version": "1.3.82",
+  "channel": "stable",
+  "changelog": "Quick OTA push",
+  "min_version": "1.0.0",
+  "firmware": {
+    "url": "https://image-optimizer-still-flower-1282.fly.dev/ota/releases/1.3.82/firmware.bin",
+    "md5": "f162eda33949e9b388e0256a372c82b9",
+    "size": 2810896
+  }
+}

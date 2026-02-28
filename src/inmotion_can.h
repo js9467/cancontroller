@@ -124,20 +124,21 @@ inline void sendCommand(const Module& m, const uint8_t data[8]) {
 // ── RELAY 1 (H-BRIDGE 1 — WINDOWS) ───────────────────────────────────────
 
 /// Drive Relay 1A in Express mode (window UP, auto-stops at top).
+/// NOTE: Bytes 0 and 1 are swapped in this module — byte 0 is Relay 1B, byte 1 is Relay 1A!
 inline void relay1A_Express(const Module& m) {
-    uint8_t d[8] = { CMD_EXPRESS, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+    uint8_t d[8] = { 0x00, CMD_EXPRESS, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };  // byte 1 = Relay 1A (UP)
     sendCommand(m, d);
 }
 
 /// Drive Relay 1B in Express mode (window DOWN, auto-stops at bottom).
 inline void relay1B_Express(const Module& m) {
-    uint8_t d[8] = { 0x00, CMD_EXPRESS, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+    uint8_t d[8] = { CMD_EXPRESS, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };  // byte 0 = Relay 1B (DOWN)
     sendCommand(m, d);
 }
 
 /// Immediately stop both Relay 1 directions (kill window motor).
 inline void relay1_Stop(const Module& m) {
-    uint8_t d[8] = { CMD_OFF, CMD_OFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+    uint8_t d[8] = { CMD_OFF, CMD_OFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };  // Both bytes = OFF
     sendCommand(m, d);
 }
 
@@ -193,8 +194,8 @@ inline void setOutput(const Module& m, uint8_t output_num, bool on) {
 inline void windowUp(uint8_t window_id) {
     if (window_id >= 4) return;
     AppState::getInstance().setWindowState(window_id, WindowState::OPENING);
-    // Ensure opposite direction is off, then command up
-    uint8_t d[8] = { CMD_EXPRESS, CMD_OFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+    // Bytes 0 and 1 are swapped: byte 1=Relay 1A (UP), byte 0=Relay 1B (DOWN)
+    uint8_t d[8] = { CMD_OFF, CMD_EXPRESS, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
     sendCommand(*kModules[window_id], d);
     Serial.printf("[inMOTION] Window %d UP (Express)\n", window_id);
 }
@@ -206,7 +207,8 @@ inline void windowUp(uint8_t window_id) {
 inline void windowDown(uint8_t window_id) {
     if (window_id >= 4) return;
     AppState::getInstance().setWindowState(window_id, WindowState::CLOSING);
-    uint8_t d[8] = { CMD_OFF, CMD_EXPRESS, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+    // Bytes 0 and 1 are swapped: byte 0=Relay 1B (DOWN), byte 1=Relay 1A (UP)
+    uint8_t d[8] = { CMD_EXPRESS, CMD_OFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
     sendCommand(*kModules[window_id], d);
     Serial.printf("[inMOTION] Window %d DOWN (Express)\n", window_id);
 }

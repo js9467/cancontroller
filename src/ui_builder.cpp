@@ -740,6 +740,10 @@ void UIBuilder::actionButtonEvent(lv_event_t* e) {
         if (!config->output_behavior.output_id.empty()) {
             const std::string& action = config->output_behavior.action;
             const std::string& output_id = config->output_behavior.output_id;
+            
+            Serial.printf("[UI] Button '%s' OUTPUT mode: output_id='%s' behavior='%s' action='%s' code=%d\n",
+                         config->id.c_str(), output_id.c_str(), 
+                         config->output_behavior.behavior_type.c_str(), action.c_str(), code);
 
             const bool trigger_on_press = (action != "toggle");
             const bool trigger_on_click = (action == "toggle");
@@ -818,17 +822,25 @@ void UIBuilder::actionButtonEvent(lv_event_t* e) {
                 // inMOTION outputs: dispatch the correct CAN command directly
                 {
                     auto* imOut = behaviorEngine.getOutput(output_id.c_str());
-                    if (imOut && imOut->deviceType == "INMOTION") {
+                    if (!imOut) {
+                        Serial.printf("[UI] INMOTION dispatch SKIP: output '%s' NOT FOUND in engine\n", output_id.c_str());
+                    } else if (imOut->deviceType != "INMOTION") {
+                        Serial.printf("[UI] INMOTION dispatch SKIP: '%s' deviceType='%s' (expected INMOTION) cell=%d out=%d\n",
+                                     output_id.c_str(), imOut->deviceType.c_str(), imOut->cellAddress, imOut->outputNumber);
+                    } else {
                         const uint8_t mod = (imOut->cellAddress >= 3 && imOut->cellAddress <= 6)
                                           ? static_cast<uint8_t>(imOut->cellAddress - 3) : 0;
+                        Serial.printf("[UI] INMOTION dispatch: '%s' cell=%d mod=%d outNum=%d\n",
+                                     output_id.c_str(), imOut->cellAddress, mod, imOut->outputNumber);
                         switch (imOut->outputNumber) {
                             case 1: InMotionNGX::windowUp(mod);   break;  // Relay 1A → Window Up
                             case 2: InMotionNGX::windowDown(mod); break;  // Relay 1B → Window Down
                             case 3: InMotionNGX::lockDoor(mod);   break;  // Relay 2A → Lock
                             case 4: InMotionNGX::unlockDoor(mod); break;  // Relay 2B → Unlock
-                            default: break;
+                            default:
+                                Serial.printf("[UI] INMOTION dispatch SKIP: unknown outputNumber=%d\n", imOut->outputNumber);
+                                break;
                         }
-                        Serial.printf("[UI] inMOTION mod=%d out=%d dispatched\n", mod, imOut->outputNumber);
                     }
                 }
             }

@@ -309,7 +309,8 @@ void WebServerManager::setupRoutes() {
 
     // Behavioral output/scene lists for button configuration
     server_.on("/api/behavioral/options", HTTP_GET, [](AsyncWebServerRequest* request) {
-        DynamicJsonDocument doc(4096);
+        // 16KB: 44+ outputs × ~200 bytes each + scenes + infinitybox functions
+        DynamicJsonDocument doc(16384);
         
         // Get available outputs
         JsonArray outputs = doc.createNestedArray("outputs");

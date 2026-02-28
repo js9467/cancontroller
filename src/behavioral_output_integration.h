@@ -51,7 +51,6 @@ inline void initBehavioralOutputSystem(AsyncWebServer* webServer) {
     
     // Create frame synthesizer with CAN send callback
     Serial.println("[Behavioral] Creating PowercellSynthesizer...");
-    powercellSynthesizer = new PowercellSynthesizer(
         &behaviorEngine,
         [](uint32_t pgn, uint8_t* data) {
             // Send POWERCELL CAN frame via existing CanManager
@@ -104,31 +103,7 @@ inline void initBehavioralOutputSystem(AsyncWebServer* webServer) {
             loadInfinityBoxDefaults();
             outputCount = behaviorEngine.getOutputs().size();
         } else {
-            // Ensure all 4 inMOTION modules (DF/PF/DR/PR) have outputs.
-            // A saved config may have only some modules, or have wrong deviceType.
-            // loadInmotionDefaults() uses addOutput() which overwrites — fixes both
-            // wrong deviceType AND adds any missing modules in a single pass.
-            bool hasAllModules = true;
-            const uint8_t kIMAddrs[4] = {3, 4, 5, 6};
-            for (uint8_t addr : kIMAddrs) {
-                bool found = false;
-                for (const auto& [id, out] : behaviorEngine.getOutputs()) {
-                    if (out.cellAddress == addr && out.deviceType == "INMOTION") {
-                        found = true;
-                        break;
-                    }
-                }
-                if (!found) {
-                    hasAllModules = false;
-                    Serial.printf("[Behavioral Output] inMOTION module addr=%d missing or wrong type\n", addr);
-                    break;
-                }
-            }
-            if (!hasAllModules) {
-                Serial.println("[Behavioral Output] Backfilling inMOTION outputs (adds missing, fixes wrong deviceType)");
-                loadInmotionDefaults();
-                outputCount = behaviorEngine.getOutputs().size();
-            }
+            // inMOTION outputs are user-managed — no backfill, users add them as needed via UI
         }
         if (sceneCount == 0) {
             Serial.println("[Behavioral Output] Saved config had no scenes. Restoring default scenes...");
@@ -196,33 +171,6 @@ inline void loadInfinityBoxDefaults() {
     
     // =================================================================
     // HEADLIGHTS & PARKING FRONT - PC Front Outputs 5-6
-    // =================================================================
-    OutputChannel headlights;
-    headlights.id = "headlights";
-    headlights.name = "Headlights";
-    headlights.description = "Front headlights";
-    headlights.cellAddress = 1;
-    headlights.outputNumber = 5;
-    behaviorEngine.addOutput(headlights);
-    
-    OutputChannel parkingFront;
-    parkingFront.id = "parking_front";
-    parkingFront.name = "Parking Lights Front";
-    parkingFront.description = "Front parking/marker lights";
-    parkingFront.cellAddress = 1;
-    parkingFront.outputNumber = 6;
-    behaviorEngine.addOutput(parkingFront);
-    
-    // =================================================================
-    // HIGH BEAMS & HORN - PC Front Outputs 7, 9
-    // =================================================================
-    OutputChannel highBeams;
-    highBeams.id = "high_beams";
-    highBeams.name = "High Beams";
-    highBeams.description = "High beam headlights";
-    highBeams.cellAddress = 1;
-    highBeams.outputNumber = 7;
-    behaviorEngine.addOutput(highBeams);
     
     OutputChannel horn;
     horn.id = "horn";
@@ -315,35 +263,8 @@ inline void loadInfinityBoxDefaults() {
     fuelPump.outputNumber = 10;
     behaviorEngine.addOutput(fuelPump);
 
-    // =================================================================
-    // inMOTION NGX MODULES (Cell 3=DF, 4=PF, 5=DR, 6=PR)
-    // outputNumber: 1=Relay1A(Window Up) 2=Relay1B(Window Down)
-    //               3=Relay2A(Lock)      4=Relay2B(Unlock)
-    // =================================================================
-    const struct { const char* prefix; const char* label; uint8_t addr; } kIM[4] = {
-        { "im_df", "Driver Front",    3 },
-        { "im_pf", "Passenger Front", 4 },
-        { "im_dr", "Driver Rear",     5 },
-        { "im_pr", "Passenger Rear",  6 },
-    };
-    const struct { uint8_t num; const char* suffix; const char* desc; } kIMOut[4] = {
-        { 1, "win_up",   "Window Up (Relay 1A)"  },
-        { 2, "win_dn",   "Window Down (Relay 1B)" },
-        { 3, "lock",     "Door Lock (Relay 2A)"   },
-        { 4, "unlock",   "Door Unlock (Relay 2B)" },
-    };
-    for (const auto& m : kIM) {
-        for (const auto& o : kIMOut) {
-            OutputChannel ch;
-            ch.id = String(m.prefix) + "_" + o.suffix;
-            ch.name = String(m.label) + " " + o.desc;
-            ch.description = "inMOTION NGX module " + String(m.label);
-            ch.cellAddress = m.addr;
-            ch.outputNumber = o.num;
-            ch.deviceType = "INMOTION";
-            behaviorEngine.addOutput(ch);
-        }
-    }
+    // inMOTION outputs are now user-managed via Edit Output dialog in web interface
+    // Users add their own window/lock outputs as needed
 
     // =================================================================
     // MASTERCELL OUTPUTS (Cell 0)
