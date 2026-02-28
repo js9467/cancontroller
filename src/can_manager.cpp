@@ -341,6 +341,9 @@ bool CanManager::sendJ1939Pgn(uint8_t priority, uint32_t pgn, uint8_t source_add
         return false;
     }
 
+    // Re-assert CAN mux before TX (required on this hardware — same as sendFrame/sendStandardFrame)
+    forceCanMux();
+
     // Build J1939 29-bit identifier: [Priority(3) | Reserved(1) | DataPage(1) | PDU Format(8) | PDU Specific(8) | Source Address(8)]
     uint32_t identifier = ((uint32_t)(priority & 0x7) << 26) | ((pgn & 0x3FFFF) << 8) | source_addr;
 
