@@ -35,7 +35,6 @@ inline BehavioralOutputAPI* outputAPI = nullptr;
 
 // Forward declarations
 inline void loadInfinityBoxDefaults();
-inline void loadInmotionDefaults();
 inline void loadDefaultScenes();
 inline void applySceneActivationActions(const Scene& scene);
 inline void applySceneDeactivationActions(const Scene& scene);
@@ -51,6 +50,7 @@ inline void initBehavioralOutputSystem(AsyncWebServer* webServer) {
     
     // Create frame synthesizer with CAN send callback
     Serial.println("[Behavioral] Creating PowercellSynthesizer...");
+    powercellSynthesizer = new PowercellSynthesizer(
         &behaviorEngine,
         [](uint32_t pgn, uint8_t* data) {
             // Send POWERCELL CAN frame via existing CanManager
@@ -334,40 +334,6 @@ inline void loadInfinityBoxDefaults() {
     behaviorEngine.addOutput(masterAux4);
     
     Serial.printf("[Behavioral Output] Loaded %d InfinityBox IPM1 standard outputs\n", 41);
-}
-
-// =================================================================
-// inMOTION NGX DEFAULT OUTPUTS (backfill helper)
-// Called when a saved config has no inMOTION outputs so existing
-// POWERCELL outputs are NOT overwritten.
-// =================================================================
-
-inline void loadInmotionDefaults() {
-    const struct { const char* prefix; const char* label; uint8_t addr; } kIM[4] = {
-        { "im_df", "Driver Front",    3 },
-        { "im_pf", "Passenger Front", 4 },
-        { "im_dr", "Driver Rear",     5 },
-        { "im_pr", "Passenger Rear",  6 },
-    };
-    const struct { uint8_t num; const char* suffix; const char* desc; } kIMOut[4] = {
-        { 1, "win_up",  "Window Up (Relay 1A)"  },
-        { 2, "win_dn",  "Window Down (Relay 1B)" },
-        { 3, "lock",    "Door Lock (Relay 2A)"   },
-        { 4, "unlock",  "Door Unlock (Relay 2B)" },
-    };
-    for (const auto& m : kIM) {
-        for (const auto& o : kIMOut) {
-            OutputChannel ch;
-            ch.id = String(m.prefix) + "_" + o.suffix;
-            ch.name = String(m.label) + " " + o.desc;
-            ch.description = "inMOTION NGX module " + String(m.label);
-            ch.cellAddress = m.addr;
-            ch.outputNumber = o.num;
-            ch.deviceType = "INMOTION";
-            behaviorEngine.addOutput(ch);
-        }
-    }
-    Serial.println("[Behavioral Output] Loaded 16 inMOTION NGX default outputs");
 }
 
 // =================================================================
