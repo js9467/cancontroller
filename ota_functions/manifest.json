@@ -1,8 +1,8 @@
 {
-  "version": "3.0.3",
+  "version": "6.3.0",
   "channel": "stable",
-  "released_at": "2026-02-27T19:06:16Z",
-  "md5": "249d7e139e906789c2a63448ec1b4ba8",
-  "url": "https://image-optimizer-still-flower-1282.fly.dev/ota/releases/3.0.3/firmware.bin",
-  "size": 2810896
+  "released_at": "2026-02-27T00:00:00Z",
+  "md5": "3ddb79a51e079da5a45cba537b00e304",
+  "url": "https://image-optimizer-still-flower-1282.fly.dev/ota/releases/6.3.0/firmware.bin",
+  "size": 2264176
 }
