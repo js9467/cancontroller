@@ -161,7 +161,16 @@ inline bool loadBehavioralConfig(BehaviorEngine& engine) {
         output.description = outObj["description"].as<String>();
         output.cellAddress = outObj["cell_address"];
         output.outputNumber = outObj["output_number"];
-        output.deviceType = outObj["device_type"] | "POWERCELL";
+        // Smart-default: configs saved before device_type existed have no field.
+        // If absent, infer from cellAddress: addresses 3-6 are inMOTION modules.
+        {
+            const char* savedDevType = outObj["device_type"] | "";
+            if (savedDevType[0] != '\0') {
+                output.deviceType = savedDevType;
+            } else {
+                output.deviceType = (output.cellAddress >= 3) ? "INMOTION" : "POWERCELL";
+            }
+        }
         
         engine.addOutput(output);
         outputCount++;

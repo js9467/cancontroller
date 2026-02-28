@@ -106,16 +106,32 @@ inline void initBehavioralOutputSystem(AsyncWebServer* webServer) {
         } else {
             // Backfill inMOTION defaults if none exist — handles configs saved before deviceType was persisted
             bool hasInmotion = false;
+            bool needsRepair = false;
             for (const auto& [id, out] : behaviorEngine.getOutputs()) {
-                if (out.deviceType == "INMOTION" || out.cellAddress >= 3) {
+                if (out.deviceType == "INMOTION") {
                     hasInmotion = true;
-                    break;
+                } else if (out.cellAddress >= 3) {
+                    needsRepair = true;
                 }
             }
             if (!hasInmotion) {
-                Serial.println("[Behavioral Output] No inMOTION outputs found in config — backfilling defaults");
-                loadInmotionDefaults();  // Adds only inMOTION outputs; leaves POWERCELL outputs untouched
-                outputCount = behaviorEngine.getOutputs().size();
+                if (needsRepair) {
+                    // Repair: cellAddress >= 3 outputs have wrong deviceType (e.g. saved before device_type field existed)
+                    Serial.println("[Behavioral Output] Repairing inMOTION outputs with wrong deviceType");
+                    for (const auto& [id, out] : behaviorEngine.getOutputs()) {
+                        if (out.cellAddress >= 3 && out.deviceType != "INMOTION") {
+                            if (auto* mOut = behaviorEngine.getOutput(id)) {
+                                mOut->deviceType = "INMOTION";
+                                Serial.printf("[Behavioral Output]   Repaired %s (cellAddress=%d)\n",
+                                              id.c_str(), out.cellAddress);
+                            }
+                        }
+                    }
+                } else {
+                    Serial.println("[Behavioral Output] No inMOTION outputs found in config — backfilling defaults");
+                    loadInmotionDefaults();  // Adds only inMOTION outputs; leaves POWERCELL outputs untouched
+                    outputCount = behaviorEngine.getOutputs().size();
+                }
             }
         }
         if (sceneCount == 0) {
