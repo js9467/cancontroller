@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file main.cpp
  * Bronco Controls - Web-configurable automotive HMI
  *
@@ -409,7 +409,7 @@ void setup() {
         while (true) delay(1000);
     }
     lv_disp_draw_buf_init(&draw_buf, buf1, buf2, buf_sz);
-    Serial.printf("[LVGL] Γ£ô Allocated 2x %lu byte buffers in PSRAM\n", buf_bytes);
+    Serial.printf("[LVGL]  Allocated 2x %lu byte buffers in PSRAM\n", buf_bytes);
     Serial.printf("[LVGL] Free PSRAM after allocation: %lu bytes\n", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
 
     // Register display driver
@@ -431,11 +431,11 @@ void setup() {
 
     Serial.println("[Boot] Calling panel->init()...");
     panel->init();
-    Serial.println("[Boot] Γ£ô panel->init() completed");
+    Serial.println("[Boot] === panel->init() completed");
     
     Serial.println("[Boot] Calling panel->begin()...");
     panel->begin();
-    Serial.println("[Boot] Γ£ô panel->begin() completed");
+    Serial.println("[Boot] === panel->begin() completed");
     
     // NOW create and configure expander AFTER panel owns I2C
     Serial.println("[EXPANDER] Creating CH422G expander...");
@@ -447,9 +447,9 @@ void setup() {
         // Configure expander pins using hardware_config.h constants
         g_expander->multiPinMode(HW_CH422G_SAFE_MASK, OUTPUT);
         g_expander->multiDigitalWrite(HW_CH422G_SAFE_MASK, HIGH);
-        Serial.println("[EXPANDER] Γ£ô CAN mux set to USB_SEL HIGH");
+        Serial.println("[EXPANDER] === CAN mux set to USB_SEL HIGH");
     } else {
-        Serial.println("[EXPANDER] Γ£ù Failed to create expander");
+        Serial.println("[EXPANDER] === Failed to create expander");
     }
     
     // SAFE BOOT CHECK: Hold top-left corner during boot to factory reset
@@ -482,19 +482,19 @@ void setup() {
 
     // Start mux watchdog to keep USB_SEL HIGH
     xTaskCreatePinnedToCore(mux_watchdog_task, "mux_wd", 4096, nullptr, 1, nullptr, 1);
-    Serial.println("[WATCHDOG] Γ£ô Mux watchdog started");
+    Serial.println("[WATCHDOG] === Mux watchdog started");
     
     // Start suspension TX task on core 1 (300ms cadence)
     xTaskCreatePinnedToCore(suspension_tx_task, "susp_tx", 4096, nullptr, 2, nullptr, 1);
-    Serial.println("[SUSPENSION] Γ£ô Suspension TX task started (300ms)");
+    Serial.println("[SUSPENSION] === Suspension TX task started (300ms)");
     
     // Start CAN RX task on core 1 (separate from UI)
     xTaskCreatePinnedToCore(can_rx_task, "can_rx", 4096, nullptr, 3, nullptr, 1);
-    Serial.println("[CAN-TASK] Γ£ô CAN RX task started on core 1");
+    Serial.println("[CAN-TASK] === CAN RX task started on core 1");
     
     // Start health monitor
     xTaskCreatePinnedToCore(health_monitor_task, "health", 3072, nullptr, 1, nullptr, 1);
-    Serial.println("[HEALTH] Γ£ô Health monitor started");
+    Serial.println("[HEALTH] === Health monitor started");
 
     // === CAN INITIALIZATION ===
     Serial.println("\n[CAN] Initializing CAN bus...");
@@ -502,10 +502,10 @@ void setup() {
     CanManager::instance().begin();
     
     if (CanManager::instance().isReady()) {
-        Serial.println("[CAN] Γ£ô TWAI driver initialized successfully!");
+        Serial.println("[CAN] === TWAI driver initialized successfully!");
         Serial.printf("[CAN]   TX=GPIO%d, RX=GPIO%d\n", CanManager::instance().txPin(), CanManager::instance().rxPin());
     } else {
-        Serial.println("[CAN] Γ£ù TWAI driver FAILED - CAN will not work");
+        Serial.println("[CAN] === TWAI driver FAILED - CAN will not work");
     }
     Serial.println();
 
@@ -513,12 +513,12 @@ void setup() {
     Serial.println("[Boot] Getting backlight...");
     auto *backlight = panel->getBacklight();
     if (backlight) {
-        Serial.println("[Boot] Γ£ô Backlight found, turning on...");
+        Serial.println("[Boot] === Backlight found, turning on...");
         backlight->on();
         backlight->setBrightness(255);
-        Serial.println("[Boot] Γ£ô Backlight enabled at 100%");
+        Serial.println("[Boot] === Backlight enabled at 100%");
     } else {
-        Serial.println("[Boot] Γ£ù ERROR: Backlight is NULL!");
+        Serial.println("[Boot] === ERROR: Backlight is NULL!");
     }
 
     // Start LVGL background task (note: lvgl_mux already created at top of setup())
@@ -579,14 +579,14 @@ void setup() {
     // Initialize Behavioral Output System first (provides behavior engine + CAN frame synthesis)
     Serial.println("[BEHAVIORAL] Initializing behavioral output control framework...");
     initBehavioralOutputSystem(&WebServerManager::instance().getServer());
-    Serial.println("[BEHAVIORAL] Γ£ô Behavioral output system ready");
+    Serial.println("[BEHAVIORAL] === Behavioral output system ready");
 
     // Initialize Infinitybox control system with behavior engine linkage
     Serial.println("[IBOX] Initializing Infinitybox IPM1 control system...");
     if (InfinityboxControl::InfinityboxController::instance().begin(&Ipm1CanSystem::instance(), &behaviorEngine)) {
-        Serial.println("[IBOX] Γ£ô Infinitybox system ready");
+        Serial.println("[IBOX] === Infinitybox system ready");
     } else {
-        Serial.println("[IBOX] Γ£ù Failed to initialize Infinitybox system");
+        Serial.println("[IBOX] === Failed to initialize Infinitybox system");
     }
 
     Serial.println("=================================" );
@@ -678,9 +678,9 @@ void loop() {
                 frame.data = {0x11, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
                 
                 if (CanManager::instance().sendFrame(frame)) {
-                    Serial.println("[CAN] Γ£ô Poll sent");
+                    Serial.println("[CAN] === Poll sent");
                 } else {
-                    Serial.println("[CAN] Γ£ù Failed to send poll");
+                    Serial.println("[CAN] === Failed to send poll");
                 }
             } else {
                 Serial.println("[CMD] Usage: canpoll <1-16>");
@@ -811,29 +811,29 @@ void loop() {
                 // Parse action
                 if (action == "on") {
                     if (InfinityboxControl::InfinityboxController::instance().activateFunction(function.c_str(), true)) {
-                        Serial.printf("[IBOX] Γ£ô %s ON\n", function.c_str());
+                        Serial.printf("[IBOX]  %s ON\n", function.c_str());
                     } else {
-                        Serial.printf("[IBOX] Γ£ù Failed to activate %s\n", function.c_str());
+                        Serial.printf("[IBOX]  Failed to activate %s\n", function.c_str());
                     }
                 } else if (action == "off") {
                     if (InfinityboxControl::InfinityboxController::instance().deactivateFunction(function.c_str())) {
-                        Serial.printf("[IBOX] Γ£ô %s OFF\n", function.c_str());
+                        Serial.printf("[IBOX]  %s OFF\n", function.c_str());
                     } else {
-                        Serial.printf("[IBOX] Γ£ù Failed to deactivate %s\n", function.c_str());
+                        Serial.printf("[IBOX]  Failed to deactivate %s\n", function.c_str());
                     }
                 } else if (action == "flash") {
                     if (InfinityboxControl::InfinityboxController::instance().activateFunctionFlash(function.c_str(), 500, 500, 0)) {
-                        Serial.printf("[IBOX] Γ£ô %s FLASHING\n", function.c_str());
+                        Serial.printf("[IBOX]  %s FLASHING\n", function.c_str());
                     } else {
-                        Serial.printf("[IBOX] Γ£ù Failed to flash %s\n", function.c_str());
+                        Serial.printf("[IBOX]  Failed to flash %s\n", function.c_str());
                     }
                 } else if (action.startsWith("fade ")) {
                     int level = action.substring(5).toInt();
                     if (level >= 0 && level <= 100) {
                         if (InfinityboxControl::InfinityboxController::instance().activateFunctionFade(function.c_str(), level, 1000)) {
-                            Serial.printf("[IBOX] Γ£ô %s FADE to %d%%\n", function.c_str(), level);
+                            Serial.printf("[IBOX]  %s FADE to %d%%\n", function.c_str(), level);
                         } else {
-                            Serial.printf("[IBOX] Γ£ù Failed to fade %s\n", function.c_str());
+                            Serial.printf("[IBOX]  Failed to fade %s\n", function.c_str());
                         }
                     } else {
                         Serial.println("[CMD] Usage: ibox <function> fade <0-100>");

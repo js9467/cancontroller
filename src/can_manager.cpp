@@ -1,4 +1,4 @@
-﻿#include "can_manager.h"
+#include "can_manager.h"
 #include "hardware_config.h"
 #include "web_server.h"
 
@@ -227,7 +227,7 @@ bool CanManager::sendFrame(const CanFrameConfig& frame) {
 
     esp_err_t result = twai_transmit(&message, pdMS_TO_TICKS(50));
     if (result != ESP_OK) {
-        Serial.printf("[CanManager] Γ£ù TX FAILED (err=%d)\n", static_cast<int>(result));
+        Serial.printf("[CanManager]  TX FAILED (err=%d)\n", static_cast<int>(result));
         // Log the bus state for debugging
         if (twai_get_status_info(&status) == ESP_OK) {
             Serial.printf("[CanManager]   Bus state: %d, TX errors: %lu, RX errors: %lu\n",
@@ -236,7 +236,7 @@ bool CanManager::sendFrame(const CanFrameConfig& frame) {
         return false;
     }
 
-    Serial.println("[CanManager] Γ£ô TX SUCCESS");
+    Serial.println("[CanManager] === TX SUCCESS");
     return true;
 }
 
@@ -261,7 +261,7 @@ bool CanManager::sendStandardFrame(uint16_t identifier, const uint8_t data[8], u
 
     esp_err_t result = twai_transmit(&msg, pdMS_TO_TICKS(50));
     if (result != ESP_OK) {
-        Serial.printf("[CanManager] Γ£ù STD TX FAILED (err=%d)\n", static_cast<int>(result));
+        Serial.printf("[CanManager]  STD TX FAILED (err=%d)\n", static_cast<int>(result));
         return false;
     }
 
@@ -272,7 +272,7 @@ bool CanManager::sendStandardFrame(uint16_t identifier, const uint8_t data[8], u
     ws_msg.timestamp = millis();
     WebServerManager::instance().broadcastCanFrame(ws_msg, true);
 
-    Serial.printf("[CanManager] Γ£ô STD TX ID=0x%03X Len=%d\n", msg.identifier, msg.data_length_code);
+    Serial.printf("[CanManager]  STD TX ID=0x%03X Len=%d\n", msg.identifier, msg.data_length_code);
     return true;
 }
 

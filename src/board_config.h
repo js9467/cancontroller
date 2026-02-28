@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file board_config.h
  * 
  * HARDWARE CONFIGURATION - Board Support Package

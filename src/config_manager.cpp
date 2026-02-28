@@ -1,4 +1,4 @@
-﻿#include "config_manager.h"
+#include "config_manager.h"
 
 #include <Arduino.h>
 #include <FS.h>

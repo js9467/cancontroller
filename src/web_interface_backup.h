@@ -363,7 +363,7 @@ details summary {
         </div>
         <div class="field">
           <label>Home Password</label>
-          <input id="quick-password" type="password" maxlength="64" placeholder="••••••••" />
+          <input id="quick-password" type="password" maxlength="64" placeholder="" />
         </div>
       </div>
       <div class="actions">

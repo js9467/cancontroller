@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file app_state.cpp
  * Application state management implementation
  */

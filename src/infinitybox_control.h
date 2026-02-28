@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file infinitybox_control.h
  * @brief Infinitybox IPM1 function registry and control system
  * 

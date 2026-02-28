@@ -1,4 +1,4 @@
-﻿#ifndef CAN_DIAG_PAGE_H
+#ifndef CAN_DIAG_PAGE_H
 #define CAN_DIAG_PAGE_H
 
 const char CAN_DIAG_PAGE_HTML[] PROGMEM = R"rawliteral(
@@ -53,31 +53,31 @@ const char CAN_DIAG_PAGE_HTML[] PROGMEM = R"rawliteral(
 </head>
 <body>
     <div class="container">
-        <h1>≡ƒöº CAN Bus Diagnostics & Configuration</h1>
+        <h1> CAN Bus Diagnostics & Configuration</h1>
         <p class="subtitle">Real-time monitoring and hardware troubleshooting</p>
             <div style="color:#666;font-size:12px;margin-top:4px;">CAN_DIAG_VERSION: 2026-02-01-01</div>
 
         <div class="grid">
             <!-- CAN Status Panel -->
             <div class="panel">
-                <h2>≡ƒôè CAN Status</h2>
+                <h2> CAN Status</h2>
                 <div id="can-status">Loading...</div>
                 <div class="btn-group" style="margin-top: 15px;">
-                    <button onclick="refreshStatus()" class="success">≡ƒöä Refresh</button>
-                    <button onclick="restartCAN()" class="danger">≡ƒöü Restart CAN</button>
+                    <button onclick="refreshStatus()" class="success"> Refresh</button>
+                    <button onclick="restartCAN()" class="danger"> Restart CAN</button>
                 </div>
             </div>
 
             <!-- I2C Scanner Panel -->
             <div class="panel">
-                <h2>≡ƒöì I2C Bus Scanner</h2>
+                <h2> I2C Bus Scanner</h2>
                 <div id="i2c-devices">Click Scan to detect devices...</div>
-                <button onclick="scanI2C()" style="margin-top: 15px;">≡ƒöì Scan I2C Bus</button>
+                <button onclick="scanI2C()" style="margin-top: 15px;"> Scan I2C Bus</button>
             </div>
 
             <!-- Quick Metrics -->
             <div class="panel">
-                <h2>≡ƒôê Live Metrics</h2>
+                <h2> Live Metrics</h2>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                     <div class="metric">
                         <div class="metric-value" id="rx-count">0</div>
@@ -94,9 +94,9 @@ const char CAN_DIAG_PAGE_HTML[] PROGMEM = R"rawliteral(
 
         <!-- Configuration Panel -->
         <div class="panel" style="margin-bottom: 20px;">
-            <h2>ΓÜÖ∩╕Å CAN Configuration</h2>
+            <h2> CAN Configuration</h2>
             <div class="alert alert-info">
-                <strong>ΓÜá∩╕Å Advanced Settings:</strong> Changing these values may break CAN communication. Use with caution.
+                <strong> Advanced Settings:</strong> Changing these values may break CAN communication. Use with caution.
             </div>
             
             <div class="inline-group">
@@ -155,19 +155,19 @@ const char CAN_DIAG_PAGE_HTML[] PROGMEM = R"rawliteral(
             </div>
 
             <div class="btn-group">
-                <button onclick="applyConfig()" class="success">≡ƒÆ╛ Apply Configuration</button>
-                <button onclick="testGate(true)">≡ƒƒó Enable Transceiver</button>
-                <button onclick="testGate(false)" class="danger">≡ƒö┤ Disable Transceiver</button>
+                <button onclick="applyConfig()" class="success"> Apply Configuration</button>
+                <button onclick="testGate(true)"> Enable Transceiver</button>
+                <button onclick="testGate(false)" class="danger"> Disable Transceiver</button>
             </div>
         </div>
 
         <!-- CAN Frame Monitor -->
         <div class="panel">
-            <h2>≡ƒôí CAN Frame Monitor</h2>
+            <h2> CAN Frame Monitor</h2>
             <div class="btn-group">
-                <button id="monitor-btn" onclick="toggleMonitor()" class="success">Γû╢∩╕Å Start Monitor</button>
-                <button onclick="clearMonitor()">≡ƒùæ∩╕Å Clear</button>
-                <button onclick="sendTestFrame()">≡ƒôñ Send Test Frame</button>
+                <button id="monitor-btn" onclick="toggleMonitor()" class="success"> Start Monitor</button>
+                <button onclick="clearMonitor()"> Clear</button>
+                <button onclick="sendTestFrame()"> Send Test Frame</button>
             </div>
             <div id="monitor" class="monitor" style="margin-top: 15px;">
 Monitor stopped. Click "Start Monitor" to begin receiving frames...
@@ -176,11 +176,11 @@ Monitor stopped. Click "Start Monitor" to begin receiving frames...
 
         <!-- Test Tools -->
         <div class="panel">
-            <h2>≡ƒº¬ Test Tools</h2>
+            <h2> Test Tools</h2>
             <div class="btn-group">
-                <button onclick="runDiagnostic()">≡ƒöì Run Full Diagnostic</button>
-                <button onclick="testReceive()">≡ƒôÑ Test Receive (5s)</button>
-                <button onclick="dumpHardware()">≡ƒÆ╛ Dump Hardware Status</button>
+                <button onclick="runDiagnostic()"> Run Full Diagnostic</button>
+                <button onclick="testReceive()"> Test Receive (5s)</button>
+                <button onclick="dumpHardware()"> Dump Hardware Status</button>
             </div>
             <div id="test-output" style="margin-top: 15px; background: #1f1f1f; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 12px; max-height: 200px; overflow-y: auto;">
 Test results will appear here...
@@ -270,11 +270,11 @@ Test results will appear here...
             const btn = document.getElementById('monitor-btn');
             if (!btn) return;
             if (monitorActive) {
-                btn.textContent = 'ΓÅ╕∩╕Å Stop';
+                btn.textContent = ' Stop';
                 btn.className = 'danger';
                 monitorLoop();
             } else {
-                btn.textContent = 'Γû╢∩╕Å Start';
+                btn.textContent = ' Start';
                 btn.className = 'success';
             }
         }

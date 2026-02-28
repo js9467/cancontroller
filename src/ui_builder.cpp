@@ -1,4 +1,4 @@
-﻿// Reconstructed after clock removal; this implementation focuses on building
+// Reconstructed after clock removal; this implementation focuses on building
 // the navigation UI, header branding, and device info modal without time/clock logic.
 
 #include "ui_builder.h"
@@ -288,7 +288,7 @@ void UIBuilder::createBaseScreen() {
     status_ap_label_ = lv_label_create(status_ap_chip_);
     lv_obj_set_style_text_font(status_ap_label_, UITheme::FONT_BODY, 0);
     lv_obj_set_style_text_color(status_ap_label_, config_ ? colorFromHex(config_->theme.text_primary, UITheme::COLOR_TEXT_PRIMARY) : UITheme::COLOR_TEXT_PRIMARY, 0);
-    lv_label_set_text(status_ap_label_, "AP ΓÇö");
+    lv_label_set_text(status_ap_label_, "AP ");
 
     status_sta_chip_ = create_chip(status_panel_, UITheme::COLOR_SURFACE);
     status_sta_label_ = lv_label_create(status_sta_chip_);
@@ -680,17 +680,17 @@ void UIBuilder::actionButtonEvent(lv_event_t* e) {
     const lv_event_code_t code = lv_event_get_code(e);
     auto* config = static_cast<const ButtonConfig*>(lv_event_get_user_data(e));
     if (!config) {
-        Serial.println("[UI] Γ£ù Button event with null config!");
+        Serial.println("[UI] === Button event with null config!");
         return;
     }
 
     // DEBUG: Always log ALL button events
-    Serial.printf("[UI] ΓÜí BUTTON EVENT: mode='%s', code=%d, label='%s'\n", 
+    Serial.printf("[UI]  BUTTON EVENT: mode='%s', code=%d, label='%s'\n", 
         config->mode.c_str(), code, config->label.c_str());
 
-    // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+    // =================================================================
     // NEW MODE-BASED BUTTON HANDLING
-    // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+    // =================================================================
     
     if (config->mode == "scene") {
         // SCENE MODE: Activate a complex multi-output scene
@@ -702,7 +702,7 @@ void UIBuilder::actionButtonEvent(lv_event_t* e) {
             if ((trigger_on_press && code == LV_EVENT_PRESSED) ||
                 (trigger_on_click && code == LV_EVENT_CLICKED)) {
                 if (action == "off") {
-                    Serial.printf("[UI] Scene %s ΓåÆ OFF\n", config->scene_id.c_str());
+                    Serial.printf("[UI] Scene %s  OFF\n", config->scene_id.c_str());
                     behaviorEngine.deactivateScene(config->scene_id.c_str());
                     return;
                 }
@@ -710,7 +710,7 @@ void UIBuilder::actionButtonEvent(lv_event_t* e) {
                 if (action == "toggle") {
                     auto* scene = behaviorEngine.getScene(config->scene_id.c_str());
                     if (scene && scene->isActive) {
-                        Serial.printf("[UI] Scene %s ΓåÆ TOGGLE OFF\n", config->scene_id.c_str());
+                        Serial.printf("[UI] Scene %s  TOGGLE OFF\n", config->scene_id.c_str());
                         behaviorEngine.deactivateScene(config->scene_id.c_str());
                         return;
                     }
@@ -720,7 +720,7 @@ void UIBuilder::actionButtonEvent(lv_event_t* e) {
                     scene->duration_ms = config->scene_duration_ms;
                 }
 
-                Serial.printf("[UI] Scene %s ΓåÆ ON\n", config->scene_id.c_str());
+                Serial.printf("[UI] Scene %s  ON\n", config->scene_id.c_str());
                 behaviorEngine.activateScene(config->scene_id.c_str());
             }
 
@@ -746,7 +746,7 @@ void UIBuilder::actionButtonEvent(lv_event_t* e) {
             if ((trigger_on_press && code == LV_EVENT_PRESSED) ||
                 (trigger_on_click && code == LV_EVENT_CLICKED)) {
                 if (action == "off") {
-                    Serial.printf("[UI] Output %s ΓåÆ OFF\n", output_id.c_str());
+                    Serial.printf("[UI] Output %s  OFF\n", output_id.c_str());
                     behaviorEngine.deactivateOutput(output_id.c_str());
                     return;
                 }
@@ -754,13 +754,13 @@ void UIBuilder::actionButtonEvent(lv_event_t* e) {
                 if (action == "toggle") {
                     auto* out = behaviorEngine.getOutput(output_id.c_str());
                     if (out && out->isActive) {
-                        Serial.printf("[UI] Output %s ΓåÆ TOGGLE OFF\n", output_id.c_str());
+                        Serial.printf("[UI] Output %s  TOGGLE OFF\n", output_id.c_str());
                         behaviorEngine.deactivateOutput(output_id.c_str());
                         return;
                     }
                 }
 
-                Serial.printf("[UI] Output %s ΓåÆ %s behavior\n", 
+                Serial.printf("[UI] Output %s  %s behavior\n", 
                     output_id.c_str(),
                     config->output_behavior.behavior_type.c_str());
                 
@@ -823,9 +823,9 @@ void UIBuilder::actionButtonEvent(lv_event_t* e) {
         return;
     }
     
-    // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+    // =================================================================
     // LEGACY CAN MODE (backward compatibility)
-    // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+    // =================================================================
     
     // Check for legacy behavioral_scene field (backward compatibility)
     if (!config->behavioral_scene.empty()) {

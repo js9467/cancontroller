@@ -1,4 +1,4 @@
-﻿#include "icon_library.h"
+#include "icon_library.h"
 #include "ui_theme.h"
 #include <algorithm>
 #include <array>

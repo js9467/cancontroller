@@ -1,4 +1,4 @@
-﻿#include "ota_manager.h"
+#include "ota_manager.h"
 
 #include <Arduino.h>
 #include <ArduinoJson.h>
@@ -469,9 +469,9 @@ bool OTAUpdateManager::downloadAndInstall(const ManifestInfo& manifest) {
         return false;
     }
 
-    Serial.println("[OTA] Γ£ô Firmware update finalized SUCCESSFULLY");
-    Serial.printf("[OTA] Γ£ô Boot partition will switch on restart\n");
-    Serial.printf("[OTA] Γ£ô Update MD5: %s\n", Update.md5String().c_str());
+    Serial.println("[OTA] === Firmware update finalized SUCCESSFULLY");
+    Serial.printf("[OTA]  Boot partition will switch on restart\n");
+    Serial.printf("[OTA]  Update MD5: %s\n", Update.md5String().c_str());
     Serial.printf("[OTA] Boot partition will switch on restart\n");
     Serial.printf("[OTA] Current MD5: %s\n", Update.md5String().c_str());
     updateOtaProgress(99);
@@ -880,7 +880,7 @@ bool OTAUpdateManager::installVersionFromGitHub(const std::string& version) {
         return false;
     }
     
-    Serial.println("[OTA] Γ£ô Update successful! Rebooting in 3 seconds...");
+    Serial.println("[OTA] === Update successful! Rebooting in 3 seconds...");
     setStatus("update-successful");
     updateOtaProgress(100);
     updateOtaStatusMessage("Success! Rebooting...");

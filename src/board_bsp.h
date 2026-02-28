@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file board_bsp.h
  * 
  * BOARD SUPPORT PACKAGE - Minimal API Header

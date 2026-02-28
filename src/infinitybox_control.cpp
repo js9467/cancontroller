@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file infinitybox_control.cpp
  * @brief Implementation of Infinitybox IPM1 control system
  */

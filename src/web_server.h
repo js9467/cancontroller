@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <ESPAsyncWebServer.h>
 #include <WiFi.h>

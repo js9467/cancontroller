@@ -1,8 +1,8 @@
-﻿/**
+/**
  * @file hardware_config.h
  * @brief Hardware Configuration for Waveshare ESP32-S3-Touch-LCD-7
  * 
- * ΓÜá∩╕Å  SINGLE SOURCE OF TRUTH FOR ALL HARDWARE CONFIGURATION ΓÜá∩╕Å
+  * ==================================================================
  * 
  * Last validated: 2026-02-02 with firmware v2.1.3
  * If you modify ANY value in this file, document the change with date and reason.
@@ -92,19 +92,19 @@ constexpr uint8_t HW_CAN_GATE_MAX_RETRIES = 3;      // Max retries for gate writ
 // These assertions will FAIL the build if critical values are changed
 
 static_assert(HW_I2C_BUS_NUM == 0,
-              "ΓÜá∩╕Å  HARDWARE VIOLATION: I2C bus MUST be 0 to match ESP_Panel library");
+              "  HARDWARE VIOLATION: I2C bus MUST be 0 to match ESP_Panel library");
 
 static_assert(HW_TWAI_TX_PIN == 20 && HW_TWAI_RX_PIN == 19,
-              "ΓÜá∩╕Å  HARDWARE VIOLATION: TWAI pins MUST be TX=20, RX=19 for Waveshare ESP32-S3");
+              "  HARDWARE VIOLATION: TWAI pins MUST be TX=20, RX=19 for Waveshare ESP32-S3");
 
 static_assert(HW_I2C_SDA_PIN == 8 && HW_I2C_SCL_PIN == 9,
-              "ΓÜá∩╕Å  HARDWARE VIOLATION: I2C pins MUST be SDA=8, SCL=9 for Waveshare ESP32-S3");
+              "  HARDWARE VIOLATION: I2C pins MUST be SDA=8, SCL=9 for Waveshare ESP32-S3");
 
 static_assert(HW_CH422G_I2C_ADDR == 0x00,
-              "ΓÜá∩╕Å  HARDWARE VIOLATION: CH422G I2C address MUST be 0x00");
+              "  HARDWARE VIOLATION: CH422G I2C address MUST be 0x00");
 
 static_assert(HW_CH422G_PIN_USB_SEL == 5,
-              "ΓÜá∩╕Å  HARDWARE VIOLATION: USB_SEL bit MUST be 5");
+              "  HARDWARE VIOLATION: USB_SEL bit MUST be 5");
 
 // ============================================================================
 // CHANGE LOG

@@ -1,4 +1,4 @@
-﻿#include "ipm1_can_system.h"
+#include "ipm1_can_system.h"
 
 #include <Arduino.h>
 #include <LittleFS.h>

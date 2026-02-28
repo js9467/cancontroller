@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 // Prefabricated suspension control page template
 // Customize the CAN frame configurations and button labels as needed
@@ -16,7 +16,7 @@ const char SUSPENSION_PAGE_HTML[] PROGMEM = R"rawliteral(
 					<button class="damper-btn decrease" onclick="adjustDamper('front_left', -1)" 
 						data-pgn="737h" data-priority="6" data-src="F9" data-dest="FF"
 						data-data-decrease="00 00 00 00 00 00 00 00"
-						title="Decrease damping">ΓêÆ</button>
+						title="Decrease damping"></button>
 					
 					<div class="damper-display">
 						<span class="damper-value" id="fl-value">0</span>
@@ -29,7 +29,7 @@ const char SUSPENSION_PAGE_HTML[] PROGMEM = R"rawliteral(
 						title="Increase damping">+</button>
 				</div>
 				<div class="damper-status">
-					<span class="status-indicator" id="fl-status">ΓùÅ</span>
+					<span class="status-indicator" id="fl-status"></span>
 					<span class="status-text">Ready</span>
 				</div>
 			</div>
@@ -40,7 +40,7 @@ const char SUSPENSION_PAGE_HTML[] PROGMEM = R"rawliteral(
 				<div class="damper-controls">
 					<button class="damper-btn decrease" onclick="adjustDamper('front_right', -1)"
 						data-pgn="737h" data-priority="6" data-src="F9" data-dest="FF"
-						data-data-decrease="00 00 00 00 00 00 00 00">ΓêÆ</button>
+						data-data-decrease="00 00 00 00 00 00 00 00"></button>
 					
 					<div class="damper-display">
 						<span class="damper-value" id="fr-value">0</span>
@@ -52,7 +52,7 @@ const char SUSPENSION_PAGE_HTML[] PROGMEM = R"rawliteral(
 						data-data-increase="02 00 00 00 00 00 00 00">+</button>
 				</div>
 				<div class="damper-status">
-					<span class="status-indicator" id="fr-status">ΓùÅ</span>
+					<span class="status-indicator" id="fr-status"></span>
 					<span class="status-text">Ready</span>
 				</div>
 			</div>
@@ -69,7 +69,7 @@ const char SUSPENSION_PAGE_HTML[] PROGMEM = R"rawliteral(
 				<div class="damper-controls">
 					<button class="damper-btn decrease" onclick="adjustDamper('rear_left', -1)"
 						data-pgn="738h" data-priority="6" data-src="F9" data-dest="FF"
-						data-data-decrease="00 00 00 00 00 00 00 00">ΓêÆ</button>
+						data-data-decrease="00 00 00 00 00 00 00 00"></button>
 					
 					<div class="damper-display">
 						<span class="damper-value" id="rl-value">0</span>
@@ -81,7 +81,7 @@ const char SUSPENSION_PAGE_HTML[] PROGMEM = R"rawliteral(
 						data-data-increase="03 00 00 00 00 00 00 00">+</button>
 				</div>
 				<div class="damper-status">
-					<span class="status-indicator" id="rl-status">ΓùÅ</span>
+					<span class="status-indicator" id="rl-status"></span>
 					<span class="status-text">Ready</span>
 				</div>
 			</div>
@@ -92,7 +92,7 @@ const char SUSPENSION_PAGE_HTML[] PROGMEM = R"rawliteral(
 				<div class="damper-controls">
 					<button class="damper-btn decrease" onclick="adjustDamper('rear_right', -1)"
 						data-pgn="738h" data-priority="6" data-src="F9" data-dest="FF"
-						data-data-decrease="00 00 00 00 00 00 00 00">ΓêÆ</button>
+						data-data-decrease="00 00 00 00 00 00 00 00"></button>
 					
 					<div class="damper-display">
 						<span class="damper-value" id="rr-value">0</span>
@@ -104,7 +104,7 @@ const char SUSPENSION_PAGE_HTML[] PROGMEM = R"rawliteral(
 						data-data-increase="04 00 00 00 00 00 00 00">+</button>
 				</div>
 				<div class="damper-status">
-					<span class="status-indicator" id="rr-status">ΓùÅ</span>
+					<span class="status-indicator" id="rr-status"></span>
 					<span class="status-text">Ready</span>
 				</div>
 			</div>
@@ -529,10 +529,10 @@ function sendSuspensionCommand(location, value) {
 		const statusEl = document.getElementById(locKey + '-status');
 		if (statusEl) {
 			statusEl.style.color = '#7ad7f0';
-			statusEl.textContent = 'ΓùÉ';
+			statusEl.textContent = '';
 			setTimeout(() => {
 				statusEl.style.color = '#3dd598';
-				statusEl.textContent = 'ΓùÅ';
+				statusEl.textContent = '';
 			}, 300);
 		}
 	});

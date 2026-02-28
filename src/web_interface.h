@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 const char WEB_INTERFACE_HTML[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
@@ -279,10 +279,10 @@ function switchTab(tabName){
 			<div class="status-grid" id="status" data-version="{{VERSION}}">
 				<div class="status-chip"><span>Firmware</span>v{{VERSION}}</div>
 				<div class="status-chip"><span>Available Update</span><span id="update-available">Tap check</span></div>
-				<div class="status-chip"><span>Device IP</span>ΓÇö</div>
-				<div class="status-chip"><span>Connected Network</span>ΓÇö</div>
-				<div class="status-chip"><span>AP IP</span>ΓÇö</div>
-				<div class="status-chip"><span>Station IP</span>ΓÇö</div>
+				<div class="status-chip"><span>Device IP</span></div>
+				<div class="status-chip"><span>Connected Network</span></div>
+				<div class="status-chip"><span>AP IP</span></div>
+				<div class="status-chip"><span>Station IP</span></div>
 			</div>
 			<div class="row" style="margin-top: 12px; gap: 8px;">
 				<button class="btn" onclick="checkForUpdates()">Check Updates</button>
@@ -340,7 +340,7 @@ function switchTab(tabName){
 						<label><input id="header-logo-keep-aspect" type="checkbox" checked onchange="updateHeaderFromInputs()" /> Maintain proportions</label>
 					</div>
 					<div class="row align-center">
-						<label>Header Γåö Nav Gap</label>
+						<label>Header  Nav Gap</label>
 						<input id="header-nav-spacing" type="range" min="0" max="48" value="12" oninput="handleNavSpacingInput(this.value)" />
 						<span class="muted" id="header-nav-spacing-label">12px</span>
 					</div>
@@ -418,7 +418,7 @@ function switchTab(tabName){
 
 		<div class="layout" style="margin-top:16px;">
 			<div class="card">
-				<h3>≡ƒû╝∩╕Å Image Assets</h3>
+				<h3> Image Assets</h3>
 				
 				<h4>Header Logo</h4>
 				<div class="grid">
@@ -538,13 +538,13 @@ function switchTab(tabName){
 		<div id="behavioral-output-config" style="display:none;">
 			<h4>Output Configuration</h4>
 			<div class="grid two-col">
-				<div style="grid-column:1/-1;"><label>Output</label><select id="btn-output-id"><option value="">Select output...</option></select></div>
+				<div style="grid-column:1/-1;"><label>Output <a href="/behavioral-outputs" target="_blank" style="font-size:0.8em;color:var(--accent);float:right;text-decoration:none">+ Manage outputs</a></label><select id="btn-output-id"><option value="">Select output...</option></select></div>
 				<div style="grid-column:1/-1;"><label>Action</label><select id="btn-output-action">
 					<option value="on">On (apply behavior)</option>
 					<option value="off">Off</option>
 					<option value="toggle">Toggle</option>
 				</select></div>
-				<div style="grid-column:1/-1;"><label>Behavior</label><select id="btn-behavior-type">
+				<div style="grid-column:1/-1;"><label>Behavior</label><select id="btn-behavior-type" onchange="updateBtnBehaviorFields()">
 					<option value="steady">Steady</option>
 					<option value="flash">Flash</option>
 					<option value="pulse">Pulse</option>
@@ -553,6 +553,8 @@ function switchTab(tabName){
 					<option value="strobe">Strobe</option>
 					<option value="hold_timed">Hold Timed</option>
 					<option value="ramp">Ramp</option>
+					<option value="express">Express (inMOTION - run until stall)</option>
+					<option value="track">Track (inMOTION - follow command)</option>
 				</select></div>
 				<div><label>Target Value (0-255)</label><input id="btn-target-value" type="number" min="0" max="255" value="255" /></div>
 				<div><label>Period (ms)</label><input id="btn-period-ms" type="number" min="50" max="10000" value="1000" /></div>
@@ -1339,6 +1341,11 @@ function toggleBehavioralFields(){
 	if(mode === 'can') toggleCanFields(); // Update CAN sub-sections
 }
 
+function inmotionRelayTag(num) {
+	const map = {1:'Relay 1A',2:'Relay 1B',3:'Relay 2A',4:'Relay 2B',5:'Out 1',6:'Out 2',7:'Out 3',8:'Out 4'};
+	return map[parseInt(num)] || ('R'+num);
+}
+
 function loadBehavioralOptions(){
 	return fetch('/api/behavioral/options')
 		.then(r => r.json())
@@ -1348,7 +1355,13 @@ function loadBehavioralOptions(){
 			(data.outputs || []).forEach(out => {
 				const opt = document.createElement('option');
 				opt.value = out.id;
-				opt.textContent = out.name;
+				let label = out.name;
+				if (out.deviceType === 'INMOTION') {
+					label += '  [inMOTION ' + inmotionRelayTag(out.outputNumber) + ']';
+				} else if (out.deviceType === 'MASTERCELL') {
+					label += '  [Mastercell]';
+				}
+				opt.textContent = label;
 				outputSel.appendChild(opt);
 			});
 			
@@ -1361,6 +1374,18 @@ function loadBehavioralOptions(){
 				sceneSel.appendChild(opt);
 			});
 		});
+}
+
+function updateBtnBehaviorFields() {
+	const bt = document.getElementById('btn-behavior-type').value;
+	const isInMotion = (bt === 'express' || bt === 'track');
+	const isSteady = (bt === 'steady');
+	// Hide wave-shape params for inMOTION behaviors (no PWM signal, just relay)
+	const waveFields = ['btn-period-ms','btn-duty-cycle','btn-fade-time-ms','btn-hold-duration-ms'];
+	waveFields.forEach(id => {
+		const el = document.getElementById(id);
+		if (el) el.closest('div').style.display = (isInMotion || isSteady) ? 'none' : '';
+	});
 }
 
 function toggleCanFields(){
@@ -1778,7 +1803,7 @@ function createDamperCardHTML(label){
 		<div style="background:#12141c;border:1px solid #20232f;border-radius:14px;padding:12px;width:160px;display:flex;flex-direction:column;align-items:center;gap:8px;">
 			<div style="font-size:11px;font-weight:700;color:#7ad7f0;text-transform:uppercase;letter-spacing:0.5px;">${label}</div>
 			<div style="display:flex;align-items:center;gap:8px;width:100%;justify-content:center;">
-				<button style="width:32px;height:32px;border-radius:8px;border:1px solid #3a3a4a;background:#1a1d28;color:#f2f4f8;font-size:16px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;" onmouseover="this.style.background='#ff6b6b';this.style.borderColor='#ff6b6b';" onmouseout="this.style.background='#1a1d28';this.style.borderColor='#3a3a4a';">ΓêÆ</button>
+				<button style="width:32px;height:32px;border-radius:8px;border:1px solid #3a3a4a;background:#1a1d28;color:#f2f4f8;font-size:16px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;" onmouseover="this.style.background='#ff6b6b';this.style.borderColor='#ff6b6b';" onmouseout="this.style.background='#1a1d28';this.style.borderColor='#3a3a4a';"></button>
 				<div style="display:flex;flex-direction:column;align-items:center;min-width:40px;">
 					<span style="font-size:18px;font-weight:700;color:#ff9d2e;">0</span>
 					<span style="font-size:9px;color:#8d92a3;">%</span>
@@ -1786,7 +1811,7 @@ function createDamperCardHTML(label){
 				<button style="width:32px;height:32px;border-radius:8px;border:1px solid #3a3a4a;background:#1a1d28;color:#f2f4f8;font-size:16px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;" onmouseover="this.style.background='#3dd598';this.style.borderColor='#3dd598';" onmouseout="this.style.background='#1a1d28';this.style.borderColor='#3a3a4a';">+</button>
 			</div>
 			<div style="display:flex;align-items:center;gap:6px;font-size:10px;color:#8d92a3;">
-				<span style="color:#3dd598;font-size:11px;">ΓùÅ</span>
+				<span style="color:#3dd598;font-size:11px;"></span>
 				<span>Ready</span>
 			</div>
 		</div>
@@ -2238,20 +2263,20 @@ async function refreshStatus(){
 	try{
 		const res = await fetch('/api/status');
 		const status = await res.json();
-		const firmwareVersion = status.firmware_version || statusContainer.dataset.version || 'ΓÇö';
-		const deviceIp = status.device_ip || status.sta_ip || status.ap_ip || 'ΓÇö';
-		const connectedNetwork = status.connected_network || (status.sta_connected ? 'Hidden network' : 'ΓÇö');
+		const firmwareVersion = status.firmware_version || statusContainer.dataset.version || '';
+		const deviceIp = status.device_ip || status.sta_ip || status.ap_ip || '';
+		const connectedNetwork = status.connected_network || (status.sta_connected ? 'Hidden network' : '');
 		statusContainer.innerHTML = `
 			<div class="status-chip"><span>Firmware</span>v${firmwareVersion}</div>
-			<div class="status-chip"><span>Device IP</span>${deviceIp || 'ΓÇö'}</div>
-			<div class="status-chip"><span>Connected Network</span>${connectedNetwork || 'ΓÇö'}</div>
+			<div class="status-chip"><span>Device IP</span>${deviceIp || ''}</div>
+			<div class="status-chip"><span>Connected Network</span>${connectedNetwork || ''}</div>
 			<div class="status-chip"><span>AP IP</span>${status.ap_ip || 'N/A'}</div>
-			<div class="status-chip"><span>Station IP</span>${status.sta_ip || 'ΓÇö'}</div>
+			<div class="status-chip"><span>Station IP</span>${status.sta_ip || ''}</div>
 		`;
 	}catch(err){
 		// Silently fail if status element doesn't exist
 		if(!statusContainer) return;
-		const firmwareVersion = statusContainer.dataset.version || 'ΓÇö';
+		const firmwareVersion = statusContainer.dataset.version || '';
 		statusContainer.innerHTML = `
 			<div class="status-chip"><span>Firmware</span>v${firmwareVersion}</div>
 			<div class="status-chip"><span>Device IP</span>Unavailable</div>
@@ -2733,7 +2758,7 @@ async function handleImageUpload(evt, imageType) {
 		}
 
 		renderPreview();
-		showBanner(`Γ£à ${imageType} image optimized & uploaded! Check device display.`, 'success');
+		showBanner(` ${imageType} image optimized & uploaded! Check device display.`, 'success');
 		evt.target.value = '';
 	} catch (error) {
 		console.error('Image upload error:', error);
@@ -2950,7 +2975,7 @@ async function checkForUpdates(){
 						</div>
 						<button id="update-btn" onclick="triggerOTAUpdate()" style="padding:10px 20px;background:var(--accent);color:#000;border:none;border-radius:4px;cursor:pointer;font-weight:600;">Install Selected Version</button>
 						<div style="font-size:0.85em;color:var(--text-secondary);line-height:1.4;">
-							<strong>Current:</strong> ${currentVersion} ΓÇó <strong>Available:</strong> ${data.versions.length} version(s)<br/>
+							<strong>Current:</strong> ${currentVersion}  <strong>Available:</strong> ${data.versions.length} version(s)<br/>
 							<em>OTA updates use .bin firmware files for fast wireless installation</em>
 						</div>
 					</div>

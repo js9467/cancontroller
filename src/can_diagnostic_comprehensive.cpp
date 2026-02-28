@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file can_diagnostic_comprehensive.cpp
  * @brief Comprehensive CAN Bus Diagnostic Tool for Waveshare ESP32-S3-Touch-LCD-7
  * 
@@ -71,9 +71,9 @@ bool ch422g_read_direct(uint8_t addr, uint8_t &value) {
 //=============================================================================
 
 void test_01_i2c_bus() {
-    Serial.println("\nΓòöΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòù");
-    Serial.println("Γòæ TEST 1: I2C Bus Initialization                                Γòæ");
-    Serial.println("ΓòÜΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓò¥");
+    Serial.println("\n======================================================================================================================================================================================================");
+    Serial.println("=== TEST 1: I2C Bus Initialization                                ===");
+    Serial.println("======================================================================================================================================================================================================");
     
     Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
     Wire.setClock(100000);  // 100kHz for stability
@@ -97,26 +97,26 @@ void test_01_i2c_bus() {
     }
     
     if (device_count == 0) {
-        Serial.println("    Γ£ù NO I2C DEVICES FOUND!");
-        Serial.println("    ΓåÆ Check SDA/SCL wiring and pull-ups");
+        Serial.println("    === NO I2C DEVICES FOUND!");
+        Serial.println("    === Check SDA/SCL wiring and pull-ups");
         i2c_ok = false;
     } else {
-        Serial.printf("    Γ£ô Found %d I2C device(s)\n", device_count);
+        Serial.printf("     Found %d I2C device(s)\n", device_count);
         i2c_ok = true;
     }
     
     if (ch422g_detected) {
-        Serial.println("    Γ£ô CH422G I/O expander detected");
+        Serial.println("    === CH422G I/O expander detected");
     } else {
-        Serial.println("    Γ£ù CH422G NOT detected (critical!)");
-        Serial.println("    ΓåÆ CAN transceiver gate control unavailable");
+        Serial.println("    === CH422G NOT detected (critical!)");
+        Serial.println("    === CAN transceiver gate control unavailable");
     }
 }
 
 void test_02_gpio_pins() {
-    Serial.println("\nΓòöΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòù");
-    Serial.println("Γòæ TEST 2: GPIO Pin State (before TWAI init)                     Γòæ");
-    Serial.println("ΓòÜΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓò¥");
+    Serial.println("\n======================================================================================================================================================================================================");
+    Serial.println("=== TEST 2: GPIO Pin State (before TWAI init)                     ===");
+    Serial.println("======================================================================================================================================================================================================");
     
     pinMode(CAN_TX_PIN, INPUT);
     pinMode(CAN_RX_PIN, INPUT);
@@ -148,23 +148,23 @@ void test_02_gpio_pins() {
     Serial.printf("    Transitions: %d\n", transitions);
     
     if (high_count == 0) {
-        Serial.println("    Γ£ù RX pin STUCK LOW - transceiver likely disabled!");
+        Serial.println("    === RX pin STUCK LOW - transceiver likely disabled!");
     } else if (high_count == 100 && transitions == 0) {
-        Serial.println("    ΓÜá RX pin stuck HIGH - bus might be quiet or disconnected");
+        Serial.println("    === RX pin stuck HIGH - bus might be quiet or disconnected");
     } else if (transitions > 0) {
-        Serial.println("    Γ£ô RX pin shows activity - good sign!");
+        Serial.println("    === RX pin shows activity - good sign!");
     } else {
         Serial.println("    ? RX pin state unclear");
     }
 }
 
 void test_03_ch422g_gate_config() {
-    Serial.println("\nΓòöΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòù");
-    Serial.println("Γòæ TEST 3: CH422G Gate Configuration                             Γòæ");
-    Serial.println("ΓòÜΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓò¥");
+    Serial.println("\n======================================================================================================================================================================================================");
+    Serial.println("=== TEST 3: CH422G Gate Configuration                             ===");
+    Serial.println("======================================================================================================================================================================================================");
     
     if (!ch422g_detected) {
-        Serial.println("  Γ£ù SKIPPED - CH422G not detected");
+        Serial.println("  === SKIPPED - CH422G not detected");
         return;
     }
     
@@ -210,7 +210,7 @@ void test_03_ch422g_gate_config() {
     if (read_24) {
         bool usb_sel_24 = (val_24 & (1 << USB_SEL_BIT)) != 0;
         Serial.printf("    0x24 = 0x%02X, USB_SEL (bit %d) = %s\n", 
-                      val_24, USB_SEL_BIT, usb_sel_24 ? "HIGH Γ£ô" : "LOW Γ£ù");
+                      val_24, USB_SEL_BIT, usb_sel_24 ? "HIGH " : "LOW ");
     } else {
         Serial.println("    0x24 = READ FAILED");
     }
@@ -218,7 +218,7 @@ void test_03_ch422g_gate_config() {
     if (read_38) {
         bool usb_sel_38 = (val_38 & (1 << USB_SEL_BIT)) != 0;
         Serial.printf("    0x38 = 0x%02X, USB_SEL (bit %d) = %s\n", 
-                      val_38, USB_SEL_BIT, usb_sel_38 ? "HIGH Γ£ô" : "LOW Γ£ù");
+                      val_38, USB_SEL_BIT, usb_sel_38 ? "HIGH " : "LOW ");
     } else {
         Serial.println("    0x38 = READ FAILED");
     }
@@ -227,9 +227,9 @@ void test_03_ch422g_gate_config() {
 }
 
 void test_04_twai_init() {
-    Serial.println("\nΓòöΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòù");
-    Serial.println("Γòæ TEST 4: TWAI Driver Initialization                            Γòæ");
-    Serial.println("ΓòÜΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓò¥");
+    Serial.println("\n======================================================================================================================================================================================================");
+    Serial.println("=== TEST 4: TWAI Driver Initialization                            ===");
+    Serial.println("======================================================================================================================================================================================================");
     
     twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT(
         (gpio_num_t)CAN_TX_PIN, 
@@ -258,11 +258,11 @@ void test_04_twai_init() {
         esp_err_t err = twai_driver_install(&g_config, &t_config, &f_config);
         
         if (err == ESP_OK) {
-            Serial.printf("    Γ£ô Driver installed successfully at %s\n", names[i]);
+            Serial.printf("     Driver installed successfully at %s\n", names[i]);
             
             err = twai_start();
             if (err == ESP_OK) {
-                Serial.println("    Γ£ô TWAI started successfully");
+                Serial.println("    === TWAI started successfully");
                 twai_initialized = true;
                 
                 // Get bus status
@@ -279,24 +279,24 @@ void test_04_twai_init() {
                 
                 return;  // Success!
             } else {
-                Serial.printf("    Γ£ù TWAI start failed: %d\n", err);
+                Serial.printf("     TWAI start failed: %d\n", err);
                 twai_driver_uninstall();
             }
         } else {
-            Serial.printf("    Γ£ù Driver install failed: %d\n", err);
+            Serial.printf("     Driver install failed: %d\n", err);
         }
     }
     
-    Serial.println("\n  Γ£ù All bitrate attempts FAILED");
+    Serial.println("\n  === All bitrate attempts FAILED");
 }
 
 void test_05_receive_frames() {
-    Serial.println("\nΓòöΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòù");
-    Serial.println("Γòæ TEST 5: Live CAN Frame Reception (10 second test)             Γòæ");
-    Serial.println("ΓòÜΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓò¥");
+    Serial.println("\n======================================================================================================================================================================================================");
+    Serial.println("=== TEST 5: Live CAN Frame Reception (10 second test)             ===");
+    Serial.println("======================================================================================================================================================================================================");
     
     if (!twai_initialized) {
-        Serial.println("  Γ£ù SKIPPED - TWAI not initialized");
+        Serial.println("  === SKIPPED - TWAI not initialized");
         return;
     }
     
@@ -337,15 +337,15 @@ void test_05_receive_frames() {
     Serial.printf("\n  Result: %lu frames received in 10 seconds\n", frames_received);
     
     if (frames_received == 0) {
-        Serial.println("  Γ£ù NO FRAMES RECEIVED!");
-        Serial.println("  ΓåÆ Possible causes:");
+        Serial.println("  === NO FRAMES RECEIVED!");
+        Serial.println("  === Possible causes:");
         Serial.println("    1. CH422G gate not enabled (USB_SEL bit 5 LOW)");
         Serial.println("    2. Wrong bitrate (try 500 kbps if your bus uses it)");
         Serial.println("    3. CAN bus has no active traffic");
         Serial.println("    4. CANH/CANL wiring issue");
         Serial.println("    5. TX/RX pins swapped");
     } else {
-        Serial.println("  Γ£ô SUCCESS! CAN bus is receiving frames");
+        Serial.println("  === SUCCESS! CAN bus is receiving frames");
     }
 }
 
@@ -360,12 +360,12 @@ void setup() {
     delay(3000);  // Longer delay for USB-Serial chip initialization
     
     Serial.println("\n\n\n\n\n");
-    Serial.println("ΓòöΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòù");
-    Serial.println("Γòæ                                                                Γòæ");
-    Serial.println("Γòæ   CAN BUS COMPREHENSIVE DIAGNOSTIC TOOL                        Γòæ");
-    Serial.println("Γòæ   Waveshare ESP32-S3-Touch-LCD-7                               Γòæ");
-    Serial.println("Γòæ                                                                Γòæ");
-    Serial.println("ΓòÜΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓò¥");
+    Serial.println("======================================================================================================================================================================================================");
+    Serial.println("===                                                                ===");
+    Serial.println("===   CAN BUS COMPREHENSIVE DIAGNOSTIC TOOL                        ===");
+    Serial.println("===   Waveshare ESP32-S3-Touch-LCD-7                               ===");
+    Serial.println("===                                                                ===");
+    Serial.println("======================================================================================================================================================================================================");
     Serial.flush();
     delay(500);
     
@@ -378,29 +378,29 @@ void setup() {
     test_05_receive_frames();
     
     // Final summary
-    Serial.println("\n\nΓòöΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòù");
-    Serial.println("Γòæ DIAGNOSTIC SUMMARY                                             Γòæ");
-    Serial.println("ΓòÜΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓò¥");
+    Serial.println("\n\n======================================================================================================================================================================================================");
+    Serial.println("=== DIAGNOSTIC SUMMARY                                             ===");
+    Serial.println("======================================================================================================================================================================================================");
     
-    Serial.printf("  I2C Bus:           %s\n", i2c_ok ? "Γ£ô OK" : "Γ£ù FAIL");
-    Serial.printf("  CH422G Detected:   %s\n", ch422g_detected ? "Γ£ô YES" : "Γ£ù NO");
-    Serial.printf("  TWAI Initialized:  %s\n", twai_initialized ? "Γ£ô YES" : "Γ£ù NO");
+    Serial.printf("  I2C Bus:           %s\n", i2c_ok ? " OK" : " FAIL");
+    Serial.printf("  CH422G Detected:   %s\n", ch422g_detected ? " YES" : " NO");
+    Serial.printf("  TWAI Initialized:  %s\n", twai_initialized ? " YES" : " NO");
     Serial.printf("  Frames Received:   %lu\n", frames_received);
     
-    Serial.println("\nΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ");
+    Serial.println("\n================================================================================================================================================================================================");
     
     if (frames_received > 0) {
-        Serial.println("Γ£ôΓ£ôΓ£ô CAN BUS IS WORKING! Γ£ôΓ£ôΓ£ô");
+        Serial.println("========= CAN BUS IS WORKING! =========");
     } else if (!ch422g_detected) {
-        Serial.println("Γ£ù CRITICAL: CH422G not found - check I2C wiring");
+        Serial.println("=== CRITICAL: CH422G not found - check I2C wiring");
     } else if (!twai_initialized) {
-        Serial.println("Γ£ù CRITICAL: TWAI driver failed to initialize");
+        Serial.println("=== CRITICAL: TWAI driver failed to initialize");
     } else {
-        Serial.println("Γ£ù CAN transceiver gate may not be enabled");
-        Serial.println("  ΓåÆ Review CH422G gate configuration results above");
+        Serial.println("=== CAN transceiver gate may not be enabled");
+        Serial.println("  === Review CH422G gate configuration results above");
     }
     
-    Serial.println("ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ\n");
+    Serial.println("================================================================================================================================================================================================\n");
 }
 
 void loop() {

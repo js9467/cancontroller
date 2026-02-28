@@ -1,4 +1,4 @@
-﻿#include "web_server.h"
+#include "web_server.h"
 
 #include <Arduino.h>
 #include <ArduinoJson.h>
@@ -323,6 +323,7 @@ void WebServerManager::setupRoutes() {
                 obj["description"] = output->description;
                 obj["cellAddress"] = output->cellAddress;
                 obj["outputNumber"] = output->outputNumber;
+                obj["deviceType"] = output->deviceType;
             }
         }
         
@@ -350,6 +351,8 @@ void WebServerManager::setupRoutes() {
         behaviors.add("strobe");
         behaviors.add("hold_timed");
         behaviors.add("ramp");
+        behaviors.add("express");
+        behaviors.add("track");
 
         JsonArray iboxFunctions = doc.createNestedArray("infinitybox_functions");
         auto names = InfinityboxControl::InfinityboxController::instance().getAllFunctionNames();
@@ -1254,19 +1257,19 @@ void WebServerManager::setupRoutes() {
 </head>
 <body>
     <div class="header">
-        <h1>≡ƒÜù CAN Bus Monitor</h1>
+        <h1> CAN Bus Monitor</h1>
         <p style="margin-top:8px; opacity:0.9;">Real-time POWERCELL NGX Frame Analysis</p>
         <div class="top-nav">
-            <button onclick="location.href='/'">≡ƒÅá Configurator</button>
-            <button class="active" onclick="location.href='/can-monitor'">≡ƒôí CAN Monitor</button>
-            <button onclick="location.href='/behavioral'">≡ƒÄ¢∩╕Å Behavioral Outputs</button>
+            <button onclick="location.href='/'"> Configurator</button>
+            <button class="active" onclick="location.href='/can-monitor'"> CAN Monitor</button>
+            <button onclick="location.href='/behavioral'"> Behavioral Outputs</button>
         </div>
     </div>
     
     <div class="status">
         <div class="status-card">
             <div class="status-label">WebSocket</div>
-            <div class="status-value" id="ws-status">ΓÅ│ Connecting...</div>
+            <div class="status-value" id="ws-status"> Connecting...</div>
         </div>
         <div class="status-card">
             <div class="status-label">Frames Received</div>
@@ -1279,9 +1282,9 @@ void WebServerManager::setupRoutes() {
     </div>
     
     <div class="controls">
-        <button onclick="clearFrames()">≡ƒùæ∩╕Å Clear</button>
-        <button onclick="pauseToggle()" id="pause-btn">ΓÅ╕∩╕Å Pause</button>
-        <button onclick="location.href='/'" class="danger">≡ƒÅá Back to Home</button>
+        <button onclick="clearFrames()"> Clear</button>
+        <button onclick="pauseToggle()" id="pause-btn"> Pause</button>
+        <button onclick="location.href='/'" class="danger"> Back to Home</button>
         <label>
             <input type="checkbox" id="auto-scroll" checked>
             Auto-scroll
@@ -1326,7 +1329,7 @@ void WebServerManager::setupRoutes() {
             ws = new WebSocket(wsUrl);
             
             ws.onopen = () => {
-                document.getElementById('ws-status').innerHTML = '<span class="connected">Γ£ô Connected</span>';
+                document.getElementById('ws-status').innerHTML = '<span class="connected"> Connected</span>';
                 console.log('[WS] Connected to CAN monitor');
             };
             
@@ -1349,11 +1352,11 @@ void WebServerManager::setupRoutes() {
             
             ws.onerror = (error) => {
                 console.error('[WS] Error:', error);
-                document.getElementById('ws-status').innerHTML = '<span class="disconnected">Γ£ù Error</span>';
+                document.getElementById('ws-status').innerHTML = '<span class="disconnected"> Error</span>';
             };
             
             ws.onclose = () => {
-                document.getElementById('ws-status').innerHTML = '<span class="disconnected">Γ£ù Disconnected</span>';
+                document.getElementById('ws-status').innerHTML = '<span class="disconnected"> Disconnected</span>';
                 console.log('[WS] Disconnected, reconnecting in 3s...');
                 setTimeout(connect, 3000);
             };
@@ -1449,7 +1452,7 @@ void WebServerManager::setupRoutes() {
         function pauseToggle() {
             paused = !paused;
             const btn = document.getElementById('pause-btn');
-            btn.textContent = paused ? 'Γû╢∩╕Å Resume' : 'ΓÅ╕∩╕Å Pause';
+            btn.textContent = paused ? ' Resume' : ' Pause';
         }
         
         // Start connection

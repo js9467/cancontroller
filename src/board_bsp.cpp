@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file board_bsp.cpp
  * 
  * BOARD SUPPORT PACKAGE - Minimal Implementation

@@ -1,11 +1,11 @@
-﻿#pragma once
+#pragma once
 
 /**
- * ΓòöΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòù
- * Γòæ  BEHAVIORAL OUTPUT - TOUCHSCREEN UI INTEGRATION                           Γòæ
- * Γòæ                                                                           Γòæ
- * Γòæ  Integrates behavioral output system with the LVGL touchscreen interface Γòæ
- * ΓòÜΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓò¥
+  * ==================================================================
+  *  BEHAVIORAL OUTPUT - TOUCHSCREEN UI INTEGRATION
+  *
+  *  Integrates behavioral output system with the LVGL touchscreen interface
+  * ==================================================================
  */
 
 #include <lvgl.h>
@@ -16,9 +16,9 @@ namespace BehavioralUI {
 
 using namespace BehavioralOutput;
 
-// ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+// =================================================================
 // TOUCHSCREEN UI HELPERS
-// ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+// =================================================================
 
 /**
  * Create a button that activates a scene when pressed
@@ -142,15 +142,15 @@ inline void buildBehavioralPage(lv_obj_t* parent, BehaviorEngine* engine) {
     lv_label_set_text(turn_label, "Turn Signals:");
     lv_obj_set_style_text_font(turn_label, &lv_font_montserrat_16, LV_PART_MAIN);
     
-    lv_obj_t* left_btn = createSceneButton(parent, "ΓùÇ∩╕Å Left Turn", "left_turn", 
+    lv_obj_t* left_btn = createSceneButton(parent, " Left Turn", "left_turn", 
                                            lv_color_hex(0xFF9D2E));
     lv_obj_add_event_cb(left_btn, sceneButtonEvent, LV_EVENT_CLICKED, engine);
     
-    lv_obj_t* right_btn = createSceneButton(parent, "Γû╢∩╕Å Right Turn", "right_turn",
+    lv_obj_t* right_btn = createSceneButton(parent, " Right Turn", "right_turn",
                                             lv_color_hex(0xFF9D2E));
     lv_obj_add_event_cb(right_btn, sceneButtonEvent, LV_EVENT_CLICKED, engine);
     
-    lv_obj_t* hazard_btn = createSceneButton(parent, "ΓÜá∩╕Å Hazards (4-Way)", "four_way",
+    lv_obj_t* hazard_btn = createSceneButton(parent, " Hazards (4-Way)", "four_way",
                                              lv_color_hex(0xFFD93D));
     lv_obj_add_event_cb(hazard_btn, sceneButtonEvent, LV_EVENT_CLICKED, engine);
     
@@ -159,12 +159,12 @@ inline void buildBehavioralPage(lv_obj_t* parent, BehaviorEngine* engine) {
     lv_label_set_text(emergency_label, "Emergency:");
     lv_obj_set_style_text_font(emergency_label, &lv_font_montserrat_16, LV_PART_MAIN);
     
-    lv_obj_t* beacon_btn = createSceneButton(parent, "≡ƒÜ¿ Emergency Beacon", "beacon",
+    lv_obj_t* beacon_btn = createSceneButton(parent, " Emergency Beacon", "beacon",
                                              lv_color_hex(0xFF6B6B));
     lv_obj_add_event_cb(beacon_btn, sceneButtonEvent, LV_EVENT_CLICKED, engine);
     
     // Stop All
-    lv_obj_t* stop_btn = createSceneButton(parent, "ΓÅ╣∩╕Å Stop All Outputs", "",
+    lv_obj_t* stop_btn = createSceneButton(parent, " Stop All Outputs", "",
                                            lv_color_hex(0x444444));
     lv_obj_add_event_cb(stop_btn, [](lv_event_t* e) {
         BehaviorEngine* engine = (BehaviorEngine*)lv_event_get_user_data(e);
