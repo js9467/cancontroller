@@ -37,6 +37,7 @@ inline bool saveBehavioralConfig(BehaviorEngine& engine) {
         outObj["description"] = output.description;
         outObj["cell_address"] = output.cellAddress;
         outObj["output_number"] = output.outputNumber;
+        outObj["device_type"] = output.deviceType;
     }
     
     // Save scenes
@@ -160,6 +161,7 @@ inline bool loadBehavioralConfig(BehaviorEngine& engine) {
         output.description = outObj["description"].as<String>();
         output.cellAddress = outObj["cell_address"];
         output.outputNumber = outObj["output_number"];
+        output.deviceType = outObj["device_type"] | "POWERCELL";
         
         engine.addOutput(output);
         outputCount++;
