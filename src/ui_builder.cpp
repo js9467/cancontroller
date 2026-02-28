@@ -20,6 +20,7 @@
 #include "version_auto.h"
 #include "infinitybox_control.h"
 #include "behavioral_output_integration.h"
+#include "inmotion_can.h"
 
 extern ESP_Panel* panel;
 
@@ -803,10 +804,33 @@ void UIBuilder::actionButtonEvent(lv_event_t* e) {
                     behavior.type = BehavioralOutput::BehaviorType::RAMP;
                     behavior.targetValue = (config->output_behavior.target_value * 255) / 100;
                     behavior.fadeTime_ms = config->output_behavior.fade_time_ms;
+                } else if (config->output_behavior.behavior_type == "express") {
+                    behavior.type = BehavioralOutput::BehaviorType::EXPRESS;
+                    behavior.targetValue = 255;
+                } else if (config->output_behavior.behavior_type == "track") {
+                    behavior.type = BehavioralOutput::BehaviorType::TRACK;
+                    behavior.targetValue = 255;
                 }
                 
                 // Activate the behavior on the output
                 behaviorEngine.setBehavior(output_id.c_str(), behavior);
+
+                // inMOTION outputs: dispatch the correct CAN command directly
+                {
+                    auto* imOut = behaviorEngine.getOutput(output_id.c_str());
+                    if (imOut && imOut->deviceType == "INMOTION") {
+                        const uint8_t mod = (imOut->cellAddress >= 3 && imOut->cellAddress <= 6)
+                                          ? static_cast<uint8_t>(imOut->cellAddress - 3) : 0;
+                        switch (imOut->outputNumber) {
+                            case 1: InMotionNGX::windowUp(mod);   break;  // Relay 1A → Window Up
+                            case 2: InMotionNGX::windowDown(mod); break;  // Relay 1B → Window Down
+                            case 3: InMotionNGX::lockDoor(mod);   break;  // Relay 2A → Lock
+                            case 4: InMotionNGX::unlockDoor(mod); break;  // Relay 2B → Unlock
+                            default: break;
+                        }
+                        Serial.printf("[UI] inMOTION mod=%d out=%d dispatched\n", mod, imOut->outputNumber);
+                    }
+                }
             }
             
             // Handle release - check auto_off regardless of momentary mode
@@ -814,6 +838,17 @@ void UIBuilder::actionButtonEvent(lv_event_t* e) {
                 const bool release_to_off = config->momentary ||
                     config->output_behavior.auto_off;
                 if (action == "on" && release_to_off) {
+                    // inMOTION window outputs: stop motor on release
+                    {
+                        auto* imOut = behaviorEngine.getOutput(config->output_behavior.output_id.c_str());
+                        if (imOut && imOut->deviceType == "INMOTION") {
+                            const uint8_t mod = (imOut->cellAddress >= 3 && imOut->cellAddress <= 6)
+                                              ? static_cast<uint8_t>(imOut->cellAddress - 3) : 0;
+                            if (imOut->outputNumber == 1 || imOut->outputNumber == 2) {
+                                InMotionNGX::windowStop(mod);  // Cut H-bridge; lock pulses are self-timed
+                            }
+                        }
+                    }
                     Serial.printf("[UI] Release OFF for output: %s\n", 
                         config->output_behavior.output_id.c_str());
                     behaviorEngine.deactivateOutput(config->output_behavior.output_id.c_str());

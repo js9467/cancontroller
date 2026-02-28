@@ -84,6 +84,9 @@ public:
         
         // Build complete desired state per cell
         for (const auto& [id, output] : outputs) {
+            // Skip non-POWERCELL devices — inMOTION & MASTERCELL have dedicated drivers
+            if (output.deviceType != "POWERCELL") continue;
+
             uint8_t cellAddr = output.cellAddress;
             uint8_t outNum = output.outputNumber;
             
