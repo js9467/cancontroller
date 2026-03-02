@@ -1,4 +1,4 @@
-# Bronco Controls Deployment Tools
+﻿# Bronco Controls Deployment Tools
 
 This directory contains tools for flashing firmware to ESP32-S3-Box devices and managing firmware releases.
 
@@ -9,7 +9,7 @@ This directory contains tools for flashing firmware to ESP32-S3-Box devices and 
 **Open PowerShell and paste this:**
 
 ```powershell
-irm https://raw.githubusercontent.com/js9467/autotouchscreen/main/tools/deploy/BroncoFlasher.ps1 | iex
+irm https://raw.githubusercontent.com/js9467/cancontroller/master/tools/deploy/BroncoFlasher.ps1 | iex
 ```
 
 Press Enter - your device gets flashed with the latest firmware automatically!
@@ -24,7 +24,7 @@ Press Enter - your device gets flashed with the latest firmware automatically!
 
 **For users who prefer a file to download:**
 
-1. **Download:** [Install.zip](https://github.com/js9467/autotouchscreen/raw/main/tools/deploy/Install.zip) (tiny 1KB file)
+1. **Download:** [Install.zip](https://github.com/js9467/cancontroller/raw/main/tools/deploy/Install.zip) (tiny 1KB file)
 2. **Extract** the ZIP - you'll get `Install.bat`
 3. **Double-click Install.bat**
 
@@ -38,7 +38,7 @@ If you need offline flashing or the above methods don't work:
 
 1. **Download BroncoFlasher package:**
    ```
-   https://github.com/js9467/autotouchscreen/raw/main/tools/deploy/BroncoFlasher.zip
+   https://github.com/js9467/cancontroller/raw/main/tools/deploy/BroncoFlasher.zip
    ```
 
 2. **Extract the ZIP file** to a folder on your computer
@@ -304,4 +304,4 @@ Firmware is distributed in two ways:
 
 - **GitHub Repository:** https://github.com/js9467/cancontroller
 - **OTA Versions:** https://github.com/js9467/cancontroller/tree/master/versions
-- **BroncoFlasher Download:** https://github.com/js9467/autotouchscreen/raw/main/tools/deploy/BroncoFlasher.zip
+- **BroncoFlasher Download:** https://github.com/js9467/cancontroller/raw/main/tools/deploy/BroncoFlasher.zip

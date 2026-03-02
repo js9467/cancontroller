@@ -1,4 +1,4 @@
-# Bronco Controls - Customer Installation Guide
+﻿# Bronco Controls - Customer Installation Guide
 
 ## One-Click Installation
 
@@ -8,7 +8,7 @@ We've made installation as simple as possible. Just follow these steps:
 
 Click this link to download and run the installer:
 
-**[Download Bronco Controls Installer](https://raw.githubusercontent.com/js9467/autotouchscreen/main/tools/deploy/Install.bat)**
+**[Download Bronco Controls Installer](https://raw.githubusercontent.com/js9467/cancontroller/master/tools/deploy/Install.bat)**
 
 - Right-click the link and choose "Save link as..."
 - Save the `Install.bat` file to your Downloads folder
@@ -149,7 +149,7 @@ You can safely delete this folder at any time to clear the cache.
 
 Just send your customer this link:
 ```
-https://raw.githubusercontent.com/js9467/autotouchscreen/main/tools/deploy/Install.bat
+https://raw.githubusercontent.com/js9467/cancontroller/master/tools/deploy/Install.bat
 ```
 
 Or provide these simple instructions:

@@ -1,8 +1,8 @@
-# Bronco Controls - Automotive HMI for Waveshare ESP32-S3 Touch LCD
+﻿# Bronco Controls - Automotive HMI for Waveshare ESP32-S3 Touch LCD
 
 A polished, rugged automotive HMI (Human-Machine Interface) with a Bronco-themed design for Waveshare ESP32-S3 Touch LCD boards.
 
-> Repository mirror: https://github.com/js9467/autotouchscreen
+> Repository mirror: https://github.com/js9467/cancontroller
 
 ## ⚠️ IMPORTANT: Release Process
 

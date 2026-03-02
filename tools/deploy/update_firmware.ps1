@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
 Downloads the latest firmware from GitHub and optionally rebuilds BroncoFlasher package.
 
@@ -157,5 +157,5 @@ Write-Info "Next steps:"
 Write-Info "  1. Test the firmware with: .\flash_device.cmd"
 if ($RebuildZip) {
     Write-Info "  2. Upload BroncoFlasher.zip to GitHub releases"
-    Write-Info "  3. Users can download from: https://github.com/js9467/autotouchscreen/raw/main/tools/deploy/BroncoFlasher.zip"
+    Write-Info "  3. Users can download from: https://github.com/js9467/cancontroller/raw/main/tools/deploy/BroncoFlasher.zip"
 }

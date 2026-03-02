@@ -1,4 +1,4 @@
-# 🎯 FINAL SOLUTION - Customer Installation
+﻿# 🎯 FINAL SOLUTION - Customer Installation
 
 ## ✅ FIXED ISSUES
 
@@ -13,7 +13,7 @@
 
 **Send customers this URL:**
 ```
-https://js9467.github.io/autotouchscreen/tools/deploy/index.html
+https://js9467.github.io/cancontroller/tools/deploy/index.html
 ```
 
 **Or create a short URL:**
@@ -36,7 +36,7 @@ https://js9467.github.io/autotouchscreen/tools/deploy/index.html
 
 Customer runs this in PowerShell:
 ```powershell
-iex (irm https://raw.githubusercontent.com/js9467/autotouchscreen/main/tools/deploy/BroncoFlasher.ps1)
+iex (irm https://raw.githubusercontent.com/js9467/cancontroller/master/tools/deploy/BroncoFlasher.ps1)
 ```
 
 ---
@@ -157,7 +157,7 @@ cd D:\Software\Bronco-Controls-4\tools\deploy
 
 Make your landing page live:
 
-1. Go to: https://github.com/js9467/autotouchscreen/settings/pages
+1. Go to: https://github.com/js9467/cancontroller/settings/pages
 2. Source: Deploy from branch
 3. Branch: main
 4. Folder: /tools/deploy
@@ -165,7 +165,7 @@ Make your landing page live:
 
 Your page will be at:
 ```
-https://js9467.github.io/autotouchscreen/tools/deploy/index.html
+https://js9467.github.io/cancontroller/tools/deploy/index.html
 ```
 
 Then shorten it with bit.ly!
@@ -176,10 +176,10 @@ Then shorten it with bit.ly!
 
 | File | Purpose | URL |
 |------|---------|-----|
-| **index.html** | Download page with button | [View](https://github.com/js9467/autotouchscreen/blob/main/tools/deploy/index.html) |
-| **BroncoFlasher.ps1** | Main installer script | [View](https://github.com/js9467/autotouchscreen/blob/main/tools/deploy/BroncoFlasher.ps1) |
-| **QuickSetup.bat** | Alternative launcher | [View](https://github.com/js9467/autotouchscreen/blob/main/tools/deploy/QuickSetup.bat) |
-| **printable-card.html** | 4x6" instruction card | [View](https://github.com/js9467/autotouchscreen/blob/main/tools/deploy/printable-card.html) |
+| **index.html** | Download page with button | [View](https://github.com/js9467/cancontroller/blob/main/tools/deploy/index.html) |
+| **BroncoFlasher.ps1** | Main installer script | [View](https://github.com/js9467/cancontroller/blob/main/tools/deploy/BroncoFlasher.ps1) |
+| **QuickSetup.bat** | Alternative launcher | [View](https://github.com/js9467/cancontroller/blob/main/tools/deploy/QuickSetup.bat) |
+| **printable-card.html** | 4x6" instruction card | [View](https://github.com/js9467/cancontroller/blob/main/tools/deploy/printable-card.html) |
 
 ---
 

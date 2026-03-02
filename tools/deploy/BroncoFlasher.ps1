@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
 Bronco Controls - One-Click ESP32 Flasher
 
@@ -35,8 +35,8 @@ param(
     [switch]$OfflineMode,
     [ValidateSet('4.3','7.0')]
     [string]$PanelVariant = '4.3',
-    [string]$GitHubRepo = "js9467/autotouchscreen",
-    [string]$GitHubBranch = "main",
+    [string]$GitHubRepo = "js9467/cancontroller",
+    [string]$GitHubBranch = "master",
     [string]$EsptoolVersion = "v4.7.0"
 )
 

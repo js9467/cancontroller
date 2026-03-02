@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 :: Bronco Controls - One-Click ESP32 Flasher
 :: Double-click to flash your device with the latest firmware
 setlocal EnableDelayedExpansion
@@ -37,8 +37,8 @@ Write-Header \"Bronco Controls ESP32 Flasher\"
 Write-Host \"  Workspace: $WorkDir`n\" -ForegroundColor DarkGray
 
 # Config
-$GitHubRepo = \"js9467/autotouchscreen\"
-$GitHubBranch = \"main\"
+$GitHubRepo = \"js9467/cancontroller\"
+$GitHubBranch = \"master\"
 $GitHubOtaApiUrl = "https://api.github.com/repos/js9467/cancontroller/contents/versions"
 $GitHubOtaRawBase = "https://raw.githubusercontent.com/js9467/cancontroller/master/versions"
 $EsptoolVersion = \"v4.7.0\"

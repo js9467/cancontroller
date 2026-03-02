@@ -1,18 +1,18 @@
-# 🎯 Bronco Controls - Shipping & Customer Setup Summary
+﻿# ðŸŽ¯ Bronco Controls - Shipping & Customer Setup Summary
 
-## ✅ What's Ready
+## âœ… What's Ready
 
 Your software is now **100% ready for shipping** to customers. Everything is automated and customer-friendly.
 
 ---
 
-## 📦 How to Ship to Customers
+## ðŸ“¦ How to Ship to Customers
 
 ### Option 1: Send Direct Download Link (Recommended)
 
 Send customers this link via email/text:
 ```
-https://raw.githubusercontent.com/js9467/autotouchscreen/main/tools/deploy/QuickSetup.bat
+https://raw.githubusercontent.com/js9467/cancontroller/master/tools/deploy/QuickSetup.bat
 ```
 
 **Email Template:**
@@ -50,7 +50,7 @@ Use a URL shortener to make it easier:
 1. Go to **bit.ly** or **tinyurl.com**
 2. Shorten this URL:
    ```
-   https://raw.githubusercontent.com/js9467/autotouchscreen/main/tools/deploy/QuickSetup.bat
+   https://raw.githubusercontent.com/js9467/cancontroller/master/tools/deploy/QuickSetup.bat
    ```
 3. Create something like: **bit.ly/bronco-install**
 
@@ -66,7 +66,7 @@ Then you can print it on:
 
 You now have a professional HTML landing page at:
 ```
-https://raw.githubusercontent.com/js9467/autotouchscreen/main/tools/deploy/install.html
+https://raw.githubusercontent.com/js9467/cancontroller/master/tools/deploy/install.html
 ```
 
 **To use it:**
@@ -79,22 +79,22 @@ https://raw.githubusercontent.com/js9467/autotouchscreen/main/tools/deploy/insta
 
 2. Your landing page will be at:
    ```
-   https://js9467.github.io/autotouchscreen/tools/deploy/install.html
+   https://js9467.github.io/cancontroller/tools/deploy/install.html
    ```
 
 This gives customers a beautiful, professional installation page!
 
 ---
 
-## 🔧 What the Installer Does (Automatically)
+## ðŸ”§ What the Installer Does (Automatically)
 
-1. ✅ **Detects ESP32 Device** - Finds the connected hardware
-2. ✅ **Checks for Drivers** - Determines if USB drivers are needed
-3. ✅ **Installs Drivers** - If needed, guides user through Zadig (simple clicks)
-4. ✅ **Downloads Latest Firmware** - Always gets the newest version from your OTA server
-5. ✅ **Flashes Device** - Writes firmware to ESP32
-6. ✅ **Monitors Startup** - Detects WiFi connection
-7. ✅ **Opens Web Interface** - Launches browser automatically
+1. âœ… **Detects ESP32 Device** - Finds the connected hardware
+2. âœ… **Checks for Drivers** - Determines if USB drivers are needed
+3. âœ… **Installs Drivers** - If needed, guides user through Zadig (simple clicks)
+4. âœ… **Downloads Latest Firmware** - Always gets the newest version from your OTA server
+5. âœ… **Flashes Device** - Writes firmware to ESP32
+6. âœ… **Monitors Startup** - Detects WiFi connection
+7. âœ… **Opens Web Interface** - Launches browser automatically
 
 **Total Time:**
 - First time (with drivers): 3-5 minutes
@@ -102,7 +102,7 @@ This gives customers a beautiful, professional installation page!
 
 ---
 
-## 🛠️ Your COM Port Issue - SOLVED
+## ðŸ› ï¸ Your COM Port Issue - SOLVED
 
 ### What Was Wrong
 
@@ -122,7 +122,7 @@ To test/fix your current setup:
 
 1. Run: `D:\Software\Bronco-Controls-4\tools\deploy\QuickSetup.bat`
 2. When Zadig opens:
-   - Options → List All Devices
+   - Options â†’ List All Devices
    - Select "USB JTAG/serial debug unit" or "USB Composite Device (303A:1001)"
    - Click "Install Driver"
 3. Unplug and replug device
@@ -130,21 +130,21 @@ To test/fix your current setup:
 
 ---
 
-## 📝 Files Available for Customers
+## ðŸ“ Files Available for Customers
 
 All these files are now in your GitHub repo and ready to share:
 
 | File | Purpose | Link |
 |------|---------|------|
-| **QuickSetup.bat** | Main installer (this is what customers download) | [Link](https://raw.githubusercontent.com/js9467/autotouchscreen/main/tools/deploy/QuickSetup.bat) |
-| **install.html** | Beautiful landing page | [Link](https://raw.githubusercontent.com/js9467/autotouchscreen/main/tools/deploy/install.html) |
-| **README_INSTALLATION.md** | Detailed instructions | [Link](https://github.com/js9467/autotouchscreen/blob/main/tools/deploy/README_INSTALLATION.md) |
+| **QuickSetup.bat** | Main installer (this is what customers download) | [Link](https://raw.githubusercontent.com/js9467/cancontroller/master/tools/deploy/QuickSetup.bat) |
+| **install.html** | Beautiful landing page | [Link](https://raw.githubusercontent.com/js9467/cancontroller/master/tools/deploy/install.html) |
+| **README_INSTALLATION.md** | Detailed instructions | [Link](https://github.com/js9467/cancontroller/blob/master/tools/deploy/README_INSTALLATION.md) |
 | **BroncoFlasher.ps1** | Core installation script | Auto-downloaded |
 | **zadig.exe** | USB driver installer | Auto-downloaded |
 
 ---
 
-## 🎓 Customer Support Quick Reference
+## ðŸŽ“ Customer Support Quick Reference
 
 ### Most Common Issues
 
@@ -166,7 +166,7 @@ All these files are now in your GitHub repo and ready to share:
 
 ---
 
-## 🚀 Testing Your Setup
+## ðŸš€ Testing Your Setup
 
 To verify everything works:
 
@@ -189,7 +189,7 @@ To verify everything works:
 
 ---
 
-## 📊 Installation Analytics (Optional)
+## ðŸ“Š Installation Analytics (Optional)
 
 Want to track how many people install? Add Google Analytics to install.html or use:
 
@@ -199,7 +199,7 @@ Want to track how many people install? Add Google Analytics to install.html or u
 
 ---
 
-## 🔄 Updating Firmware Later
+## ðŸ”„ Updating Firmware Later
 
 Customers use the **same QuickSetup.bat file** for updates:
 - Downloads latest firmware automatically
@@ -208,54 +208,54 @@ Customers use the **same QuickSetup.bat file** for updates:
 
 ---
 
-## 📞 Printable Customer Instructions
+## ðŸ“ž Printable Customer Instructions
 
 ```
-╔══════════════════════════════════════════════════════╗
-║         BRONCO CONTROLS - QUICK SETUP                ║
-╠══════════════════════════════════════════════════════╣
-║                                                      ║
-║  1. DOWNLOAD                                         ║
-║     Visit: bit.ly/bronco-install                     ║
-║     (Or scan QR code)                                ║
-║                                                      ║
-║  2. CONNECT                                          ║
-║     Plug device into computer via USB                ║
-║                                                      ║
-║  3. INSTALL                                          ║
-║     Run downloaded file                              ║
-║     Follow on-screen instructions                    ║
-║                                                      ║
-║  ⏱️  Takes 3-5 minutes first time                    ║
-║     Updates take 30 seconds                          ║
-║                                                      ║
-║  ❓ Need help? support@broncocontrols.com            ║
-║                                                      ║
-╚══════════════════════════════════════════════════════╝
+â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—
+â•‘         BRONCO CONTROLS - QUICK SETUP                â•‘
+â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£
+â•‘                                                      â•‘
+â•‘  1. DOWNLOAD                                         â•‘
+â•‘     Visit: bit.ly/bronco-install                     â•‘
+â•‘     (Or scan QR code)                                â•‘
+â•‘                                                      â•‘
+â•‘  2. CONNECT                                          â•‘
+â•‘     Plug device into computer via USB                â•‘
+â•‘                                                      â•‘
+â•‘  3. INSTALL                                          â•‘
+â•‘     Run downloaded file                              â•‘
+â•‘     Follow on-screen instructions                    â•‘
+â•‘                                                      â•‘
+â•‘  â±ï¸  Takes 3-5 minutes first time                    â•‘
+â•‘     Updates take 30 seconds                          â•‘
+â•‘                                                      â•‘
+â•‘  â“ Need help? support@broncocontrols.com            â•‘
+â•‘                                                      â•‘
+â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 ```
 
 ---
 
-## ✨ What Makes This Great
+## âœ¨ What Makes This Great
 
-✅ **Zero Technical Knowledge Required** - Anyone can do it
-✅ **Always Latest Firmware** - Pulls from OTA server
-✅ **Automatic Driver Installation** - Guided process
-✅ **Error Recovery** - Helpful troubleshooting messages
-✅ **Professional Appearance** - Clean, branded interface
-✅ **Version Tracking** - Shows what version is being installed
-✅ **Web Interface Auto-Open** - Seamless user experience
+âœ… **Zero Technical Knowledge Required** - Anyone can do it
+âœ… **Always Latest Firmware** - Pulls from OTA server
+âœ… **Automatic Driver Installation** - Guided process
+âœ… **Error Recovery** - Helpful troubleshooting messages
+âœ… **Professional Appearance** - Clean, branded interface
+âœ… **Version Tracking** - Shows what version is being installed
+âœ… **Web Interface Auto-Open** - Seamless user experience
 
 ---
 
-## 🎉 You're Ready to Ship!
+## ðŸŽ‰ You're Ready to Ship!
 
 Your setup is now:
-- ✅ Tested and working
-- ✅ Customer-friendly
-- ✅ Professionally presented
-- ✅ Easy to support
-- ✅ Automatically updated
+- âœ… Tested and working
+- âœ… Customer-friendly
+- âœ… Professionally presented
+- âœ… Easy to support
+- âœ… Automatically updated
 
 **Just send customers the link and they're good to go!**
 
