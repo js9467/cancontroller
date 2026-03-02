@@ -56,7 +56,7 @@ Devices will pick up the new version the next time they check GitHub.
 
 **The Solution (After Fix):**
 - `.version_state.json` is the single source of truth
-- `deploy.ps1` increments it BEFORE building
+- `tools/versioning.py` reads it and embeds the version at build time
 - Firmware gets new version baked in
 - OTA comparison works correctly
 - No more loops!
@@ -79,10 +79,7 @@ If you need to manually set a version:
    pio run -e waveshare_7in
    ```
 
-3. Deploy if needed:
-   ```powershell
-   .\deploy.ps1 -VersionBump patch
-   ```
+3. Follow the release process in [OTA_PUBLISHING.md](OTA_PUBLISHING.md).
 
 ## Files in the System
 
@@ -98,7 +95,7 @@ If you need to manually set a version:
 ### "Version stuck, not incrementing"
 
 1. Check `.version_state.json` - is it the version you expect?
-2. Use `deploy.ps1` to bump version (don't edit files directly)
+2. Edit `.version_state.json` and increment the build/minor/major number
 3. Verify build output shows new version
 
 ### "OTA update loop"
@@ -115,22 +112,15 @@ Always pull before deploying. If conflicts occur:
 2. Discard changes to `src/version_auto.h` (it's auto-generated)
 3. Run build to regenerate header
 
-## Verification & Safety
+## Verification
 
-Before deploying, always run the verification script:
+Before publishing, verify:
+1. `.version_state.json` has the correct version
+2. Build output shows `[Versioning] Building version X.Y.Z`
+3. `src/version_auto.h` contains the expected `APP_VERSION`
+4. Binary exists at `master-wt/versions/bronco_vX.Y.Z.bin`
 
-```powershell
-.\verify_ota_package.ps1 -Version "1.3.68"
-```
-
-This checks:
-1. ✓ `.version_state.json` has correct version
-2. ✓ `version_auto.h` matches state file
-3. ✓ Firmware binary exists
-4. ✓ OTA package directory is complete
-5. ✓ All manifests are consistent with correct MD5
-
-The `deploy.ps1` script now runs this automatically before deploying to Fly.io.
+See [OTA_PUBLISHING.md](OTA_PUBLISHING.md) for the complete release checklist.
 
 ## Best Practices
 

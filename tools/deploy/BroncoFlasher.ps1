@@ -37,7 +37,6 @@ param(
     [string]$PanelVariant = '4.3',
     [string]$GitHubRepo = "js9467/autotouchscreen",
     [string]$GitHubBranch = "main",
-    [string]$OtaServer = "https://image-optimizer-still-flower-1282.fly.dev",
     [string]$EsptoolVersion = "v4.7.0"
 )
 
@@ -264,69 +263,55 @@ Copied: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
         return $firmwarePath
     }
 
-    Write-Step "Packaged firmware not found for panel $PanelVariant; falling back to OTA download"
+    Write-Step "Packaged firmware not found for panel $PanelVariant; falling back to GitHub download"
     
     if ($OfflineMode -and (Test-Path $firmwarePath)) {
         Write-Step "Using cached firmware (offline mode)"
         return $firmwarePath
     }
     
-    Write-Step "Fetching latest firmware from OTA server..."
+    Write-Step "Fetching latest firmware from GitHub..."
     
-    # Force download flag - delete cached firmware
+    # Force download flag
     $forceDownload = $env:BRONCO_FORCE_DOWNLOAD -eq 'true'
     if ($forceDownload) {
         if (Test-Path $firmwarePath) {
             Remove-Item $firmwarePath -Force
             Write-Step "Cleared cached firmware (force download enabled)"
         }
-        if (Test-Path $versionPath) {
-            Remove-Item $versionPath -Force
-        }
+        if (Test-Path $versionPath) { Remove-Item $versionPath -Force }
     }
     
     try {
-        $manifest = Invoke-RestMethod -Uri "$OtaServer/ota/manifest" -Method Get
-        $version = $manifest.version
-        $firmwareUrl = $manifest.firmware.url
-        $expectedMd5 = $manifest.firmware.md5.ToLower()
+        $headers = @{ "User-Agent" = "BroncoControls-Flasher" }
+        $items = Invoke-RestMethod -Uri "https://api.github.com/repos/js9467/cancontroller/contents/versions" -Headers $headers -Method Get
+        $bins = $items | Where-Object { $_.name -match '^bronco_v[\d.]+\.bin$' }
+        if (-not $bins) { throw "No firmware binaries found in GitHub versions folder" }
+
+        $latest = $bins | Sort-Object { [Version](($_.name -replace 'bronco_v','') -replace '\.bin$','') } | Select-Object -Last 1
+        $version = ($latest.name -replace 'bronco_v','') -replace '\.bin$',''
+        $firmwareUrl = "https://raw.githubusercontent.com/js9467/cancontroller/master/versions/$($latest.name)"
         
-        # Check if we have the latest version cached
+        # Check cache
         $needsDownload = $true
-        
-        if ((Test-Path $versionPath)) {
+        if (Test-Path $versionPath) {
             $cachedInfo = Get-Content $versionPath -Raw
-            if ($cachedInfo -match "Firmware Version: (.+)") {
-                $cachedVersion = $matches[1]
-                if ($cachedVersion -eq $version -and (Test-Path $firmwarePath)) {
-                    Write-Step "Latest firmware v$version already cached"
-                    $needsDownload = $false
-                }
+            if ($cachedInfo -match "Firmware Version: (.+)" -and $matches[1].Trim() -eq $version -and (Test-Path $firmwarePath)) {
+                Write-Step "Latest firmware v$version already cached"
+                $needsDownload = $false
             }
         }
         
         if ($needsDownload) {
             Write-Header "Latest Firmware: v$version"
-            Write-Step "Downloading firmware.bin ($(($manifest.firmware.size / 1MB).ToString('0.0')) MB)..."
-            
+            Write-Step "Downloading from GitHub..."
             Invoke-WebRequest -Uri $firmwareUrl -OutFile $firmwarePath -UseBasicParsing
-            
-            # Verify MD5
-            $actualMd5 = (Get-FileHash -Path $firmwarePath -Algorithm MD5).Hash.ToLower()
-            if ($actualMd5 -ne $expectedMd5) {
-                throw "MD5 mismatch! Expected: $expectedMd5, Got: $actualMd5"
-            }
-            
-            # Save version info
             @"
 Firmware Version: $version
 Downloaded: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
-Source: $OtaServer
-MD5: $expectedMd5
-Size: $($manifest.firmware.size) bytes
+Source: $firmwareUrl
 "@ | Set-Content -Path $versionPath
-            
-            Write-Success "Firmware v$version downloaded and verified"
+            Write-Success "Firmware v$version downloaded"
         }
         
         return $firmwarePath

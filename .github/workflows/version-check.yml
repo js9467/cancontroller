@@ -5,13 +5,11 @@ on:
     paths:
       - 'src/version_auto.h'
       - '.version_state.json'
-      - 'ota_functions/manifest.json'
   push:
     branches: [main]
     paths:
       - 'src/version_auto.h'
       - '.version_state.json'
-      - 'ota_functions/manifest.json'
 
 jobs:
   check-version-consistency:
@@ -22,20 +20,17 @@ jobs:
 
       - name: Check version consistency
         run: |
-          # Extract versions from different files
+          # Extract versions from state file and generated header
           STATE_VERSION=$(jq -r '"\(.major).\(.minor).\(.build)"' .version_state.json)
           HEADER_VERSION=$(grep -oP 'APP_VERSION = "\K[^"]+' src/version_auto.h)
-          MANIFEST_VERSION=$(jq -r '.version' ota_functions/manifest.json)
           
-          echo "Version State:    $STATE_VERSION"
-          echo "Version Header:   $HEADER_VERSION"
-          echo "Manifest Version: $MANIFEST_VERSION"
+          echo "Version State:  $STATE_VERSION"
+          echo "Version Header: $HEADER_VERSION"
           
-          # Check if version_auto.h matches .version_state.json
           if [ "$HEADER_VERSION" != "$STATE_VERSION" ]; then
-            echo "❌ ERROR: version_auto.h ($HEADER_VERSION) does not match .version_state.json ($STATE_VERSION)"
+            echo "ERROR: version_auto.h ($HEADER_VERSION) does not match .version_state.json ($STATE_VERSION)"
             echo "Run: pio run -e waveshare_7in to regenerate version_auto.h"
             exit 1
           fi
           
-          echo "✅ All versions consistent!"
+          echo "All versions consistent!"

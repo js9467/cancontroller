@@ -1,9 +1,0 @@
-{
-  "version": "1.3.65",
-  "firmware": {
-    "url": "firmware.bin",
-    "size": 2773072,
-    "md5": "9334d73880e9506ccdf5aae2d91a22a2"
-  },
-  "releaseNotes": "Fixed CAN bus GPIO pins - TX:GPIO20, RX:GPIO19 from Waveshare demo"
-}

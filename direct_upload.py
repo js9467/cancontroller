@@ -8,8 +8,8 @@ import subprocess
 import sys
 import time
 
-# Firmware paths
-FW_PATH = "ota_functions/releases/1.3.79/firmware.bin"
+# Firmware path - PlatformIO build output
+FW_PATH = ".pio/build/waveshare_7in/firmware.bin"
 COM_PORT = "COM5"
 
 def check_bootloader_mode():

@@ -1,9 +1,0 @@
-{
-  "version": "1.3.67",
-  "firmware": {
-    "url": "firmware.bin",
-    "size": 2773568,
-    "md5": "8c950331b46c6d2e9735b8b780a538e1"
-  },
-  "releaseNotes": "CAN error recovery - CLEAN BUILD"
-}

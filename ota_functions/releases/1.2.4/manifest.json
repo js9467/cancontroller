@@ -1,9 +1,0 @@
-{
-  "version": "1.2.4",
-  "channel": "stable",
-  "firmware": {
-    "url": "firmware.bin",
-    "size": 2726016,
-    "md5": "5f49652e84fc513637d689db8f2d58af"
-  }
-}

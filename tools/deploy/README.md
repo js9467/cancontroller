@@ -253,8 +253,8 @@ This downloads the latest `bronco_vX.Y.Z.bin` from GitHub and replaces `firmware
 ### OTA (Over-The-Air) Updates
 - **Use when:** Device is already running Bronco Controls firmware
 - **Advantages:** Wireless, no USB cable needed, can update multiple devices remotely
-- **How:** Device checks OTA server, downloads firmware, installs automatically
-- **URL:** https://image-optimizer-still-flower-1282.fly.dev/ota/manifest
+- **How:** Device checks GitHub for the latest `bronco_vX.Y.Z.bin`, downloads and installs automatically
+- **Source:** `https://github.com/js9467/cancontroller/tree/master/versions`
 
 ### USB Flashing
 - **Use when:** 
@@ -265,18 +265,12 @@ This downloads the latest `bronco_vX.Y.Z.bin` from GitHub and replaces `firmware
 - **Advantages:** Always works, doesn't require existing firmware
 - **How:** Connect USB cable, run flash_device script
 
-## Firmware Distribution Strategy
+## Firmware Distribution
 
-The firmware is distributed in multiple ways:
+Firmware is distributed in two ways:
 
-1. **Git Repository** - Source code and firmware binaries in `ota_functions/releases/`
-2. **OTA Server** - Live firmware hosted on Fly.io for wireless updates
-3. **BroncoFlasher.zip** - Downloadable package with offline flashing tools
-
-This ensures users can always get firmware even if:
-- OTA server is down → Use BroncoFlasher.zip from GitHub
-- GitHub is inaccessible → Use OTA server directly
-- No internet → Use firmware.bin already in git repository
+1. **GitHub `versions/` folder** (`js9467/cancontroller`) — primary OTA source; devices download directly
+2. **BroncoFlasher.zip** — downloadable package for USB flashing (offline or first-install)
 
 ## Troubleshooting
 
@@ -308,7 +302,6 @@ This ensures users can always get firmware even if:
 
 ## Links
 
-- **OTA Server:** https://image-optimizer-still-flower-1282.fly.dev
-- **GitHub Repository:** https://github.com/js9467/autotouchscreen
+- **GitHub Repository:** https://github.com/js9467/cancontroller
+- **OTA Versions:** https://github.com/js9467/cancontroller/tree/master/versions
 - **BroncoFlasher Download:** https://github.com/js9467/autotouchscreen/raw/main/tools/deploy/BroncoFlasher.zip
-- **OTA Manifest:** https://image-optimizer-still-flower-1282.fly.dev/ota/manifest

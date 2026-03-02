@@ -1,8 +1,0 @@
-{
-  "version": "1.3.72",
-  "url": "https://image-optimizer-still-flower-1282.fly.dev/releases/1.3.72/firmware.bin",
-  "size": 2781328,
-  "md5": "c0c96e8b9dad06232e74c87e829e8212",
-  "releaseDate": "2026-01-25",
-  "changelog": "CAN: Swapped TX/RX pins per testing results (TX=19, RX=20)"
-}

@@ -2,6 +2,4 @@
 **
 !ota_functions
 !ota_functions/**
-!ota_functions/releases
-!ota_functions/releases/**
 !fly.toml

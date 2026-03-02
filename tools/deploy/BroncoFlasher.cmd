@@ -39,7 +39,8 @@ Write-Host \"  Workspace: $WorkDir`n\" -ForegroundColor DarkGray
 # Config
 $GitHubRepo = \"js9467/autotouchscreen\"
 $GitHubBranch = \"main\"
-$OtaServer = \"https://image-optimizer-still-flower-1282.fly.dev\"
+$GitHubOtaApiUrl = "https://api.github.com/repos/js9467/cancontroller/contents/versions"
+$GitHubOtaRawBase = "https://raw.githubusercontent.com/js9467/cancontroller/master/versions"
 $EsptoolVersion = \"v4.7.0\"
 
 # Detect serial ports
@@ -101,27 +102,24 @@ function Get-StaticBinary {
     return `$localPath
 }
 
-# Download latest firmware from OTA server
+# Download latest firmware from GitHub
 function Get-LatestFirmware {
     `$firmwarePath = Join-Path `$WorkDir \"firmware.bin\"
-    Write-Step \"Fetching latest firmware from OTA server...\"
+    Write-Step \"Fetching latest firmware from GitHub...\"
     
-    `$manifest = Invoke-RestMethod -Uri \"`$OtaServer/ota/manifest\" -Method Get
-    `$version = `$manifest.version
-    `$firmwareUrl = `$manifest.firmware.url
-    `$expectedMd5 = `$manifest.firmware.md5.ToLower()
+    `$headers = @{ \"User-Agent\" = \"BroncoControls-Flasher\" }
+    `$items = Invoke-RestMethod -Uri `$GitHubOtaApiUrl -Headers `$headers -Method Get
+    `$bins = `$items | Where-Object { `$_.name -match '^bronco_v[\d.]+\.bin$' }
+    if (-not `$bins) { throw \"No firmware binaries found in GitHub versions folder\" }
+
+    `$latest = `$bins | Sort-Object { [Version]((`$_.name -replace 'bronco_v','') -replace '\.bin$','') } | Select-Object -Last 1
+    `$version = (`$latest.name -replace 'bronco_v','') -replace '\.bin$',''
+    `$firmwareUrl = \"`$GitHubOtaRawBase/`$(`$latest.name)\"
     
-    Write-Header "Latest Firmware: v`$version"
-    Write-Step "Downloading firmware.bin ($(((`$manifest.firmware.size / 1MB).ToString('0.0'))) MB)..."
-    
+    Write-Header \"Latest Firmware: v`$version\"
+    Write-Step \"Downloading from GitHub...\"
     Invoke-WebRequest -Uri `$firmwareUrl -OutFile `$firmwarePath -UseBasicParsing
-    
-    `$actualMd5 = (Get-FileHash -Path `$firmwarePath -Algorithm MD5).Hash.ToLower()
-    if (`$actualMd5 -ne `$expectedMd5) {
-        throw \"MD5 mismatch! Expected: `$expectedMd5, Got: `$actualMd5\"
-    }
-    
-    Write-Success \"Firmware v`$version verified (MD5: `$actualMd5)\"
+    Write-Success \"Firmware v`$version downloaded\"
     return `$firmwarePath
 }
 
