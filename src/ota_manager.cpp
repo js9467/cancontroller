@@ -19,7 +19,7 @@ namespace {
 constexpr const char* kUserAgent = "BroncoControls/OTA";
 constexpr const char* kGitHubToken = "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";
 constexpr const char* kGitHubApiUrl = "https://api.github.com/repos/js9467/cancontroller/contents/versions";
-constexpr const char* kGitHubRawBase = "https://raw.githubusercontent.com/js9467/cancontroller/master/versions/";
+constexpr const char* kGitHubRawBase = "https://raw.githubusercontent.com/js9467/cancontroller/main/versions/";
 const char* kAuthHeader = "Authorization";
 const char* kAuthValue = "token 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";
 constexpr std::uint32_t kMinIntervalMinutes = 5;

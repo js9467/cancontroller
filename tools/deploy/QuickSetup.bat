@@ -21,7 +21,7 @@ echo.
 PowerShell -NoProfile -ExecutionPolicy Bypass -Command ^
 "try { ^
     $timestamp = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds(); ^
-    $url = 'https://raw.githubusercontent.com/js9467/cancontroller/master/tools/deploy/BroncoFlasher.ps1?nocache=' + $timestamp; ^
+    $url = 'https://raw.githubusercontent.com/js9467/cancontroller/main/tools/deploy/BroncoFlasher.ps1?nocache=' + $timestamp; ^
     Write-Host 'Downloading installer...' -ForegroundColor Cyan; ^
     $script = Invoke-RestMethod -Uri $url -UseBasicParsing; ^
     Write-Host 'Running installer...' -ForegroundColor Green; ^

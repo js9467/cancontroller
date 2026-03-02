@@ -36,7 +36,7 @@ https://js9467.github.io/cancontroller/tools/deploy/index.html
 
 Customer runs this in PowerShell:
 ```powershell
-iex (irm https://raw.githubusercontent.com/js9467/cancontroller/master/tools/deploy/BroncoFlasher.ps1)
+iex (irm https://raw.githubusercontent.com/js9467/cancontroller/main/tools/deploy/BroncoFlasher.ps1)
 ```
 
 ---

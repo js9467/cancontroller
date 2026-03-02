@@ -12,7 +12,7 @@ Your software is now **100% ready for shipping** to customers. Everything is aut
 
 Send customers this link via email/text:
 ```
-https://raw.githubusercontent.com/js9467/cancontroller/master/tools/deploy/QuickSetup.bat
+https://raw.githubusercontent.com/js9467/cancontroller/main/tools/deploy/QuickSetup.bat
 ```
 
 **Email Template:**
@@ -50,7 +50,7 @@ Use a URL shortener to make it easier:
 1. Go to **bit.ly** or **tinyurl.com**
 2. Shorten this URL:
    ```
-   https://raw.githubusercontent.com/js9467/cancontroller/master/tools/deploy/QuickSetup.bat
+   https://raw.githubusercontent.com/js9467/cancontroller/main/tools/deploy/QuickSetup.bat
    ```
 3. Create something like: **bit.ly/bronco-install**
 
@@ -66,7 +66,7 @@ Then you can print it on:
 
 You now have a professional HTML landing page at:
 ```
-https://raw.githubusercontent.com/js9467/cancontroller/master/tools/deploy/install.html
+https://raw.githubusercontent.com/js9467/cancontroller/main/tools/deploy/install.html
 ```
 
 **To use it:**
@@ -136,8 +136,8 @@ All these files are now in your GitHub repo and ready to share:
 
 | File | Purpose | Link |
 |------|---------|------|
-| **QuickSetup.bat** | Main installer (this is what customers download) | [Link](https://raw.githubusercontent.com/js9467/cancontroller/master/tools/deploy/QuickSetup.bat) |
-| **install.html** | Beautiful landing page | [Link](https://raw.githubusercontent.com/js9467/cancontroller/master/tools/deploy/install.html) |
+| **QuickSetup.bat** | Main installer (this is what customers download) | [Link](https://raw.githubusercontent.com/js9467/cancontroller/main/tools/deploy/QuickSetup.bat) |
+| **install.html** | Beautiful landing page | [Link](https://raw.githubusercontent.com/js9467/cancontroller/main/tools/deploy/install.html) |
 | **README_INSTALLATION.md** | Detailed instructions | [Link](https://github.com/js9467/cancontroller/blob/master/tools/deploy/README_INSTALLATION.md) |
 | **BroncoFlasher.ps1** | Core installation script | Auto-downloaded |
 | **zadig.exe** | USB driver installer | Auto-downloaded |

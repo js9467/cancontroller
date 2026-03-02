@@ -36,7 +36,7 @@ param(
     [ValidateSet('4.3','7.0')]
     [string]$PanelVariant = '4.3',
     [string]$GitHubRepo = "js9467/cancontroller",
-    [string]$GitHubBranch = "master",
+    [string]$GitHubBranch = "main",
     [string]$EsptoolVersion = "v4.7.0"
 )
 
@@ -290,7 +290,7 @@ Copied: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
 
         $latest = $bins | Sort-Object { [Version](($_.name -replace 'bronco_v','') -replace '\.bin$','') } | Select-Object -Last 1
         $version = ($latest.name -replace 'bronco_v','') -replace '\.bin$',''
-        $firmwareUrl = "https://raw.githubusercontent.com/js9467/cancontroller/master/versions/$($latest.name)"
+        $firmwareUrl = "https://raw.githubusercontent.com/js9467/cancontroller/main/versions/$($latest.name)"
         
         # Check cache
         $needsDownload = $true

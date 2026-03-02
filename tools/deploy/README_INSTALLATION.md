@@ -6,7 +6,7 @@
 
 **Right-click** this link and choose **"Save link as..."**:
 
-👉 **[QuickSetup.bat](https://raw.githubusercontent.com/js9467/cancontroller/master/tools/deploy/QuickSetup.bat)**
+👉 **[QuickSetup.bat](https://raw.githubusercontent.com/js9467/cancontroller/main/tools/deploy/QuickSetup.bat)**
 
 Save it to your **Downloads** folder.
 
@@ -89,7 +89,7 @@ The installer will continue automatically!
 
 Send them this link:
 ```
-https://raw.githubusercontent.com/js9467/cancontroller/master/tools/deploy/QuickSetup.bat
+https://raw.githubusercontent.com/js9467/cancontroller/main/tools/deploy/QuickSetup.bat
 ```
 
 Or create a short link (e.g., bit.ly/bronco-install)

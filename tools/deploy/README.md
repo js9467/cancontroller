@@ -9,7 +9,7 @@ This directory contains tools for flashing firmware to ESP32-S3-Box devices and 
 **Open PowerShell and paste this:**
 
 ```powershell
-irm https://raw.githubusercontent.com/js9467/cancontroller/master/tools/deploy/BroncoFlasher.ps1 | iex
+irm https://raw.githubusercontent.com/js9467/cancontroller/main/tools/deploy/BroncoFlasher.ps1 | iex
 ```
 
 Press Enter - your device gets flashed with the latest firmware automatically!

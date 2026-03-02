@@ -1,8 +1,26 @@
-# OTA Publishing Guide
+﻿# OTA Publishing Guide
 
-How to release a new firmware version so devices can update themselves over-the-air.
+How to release a new firmware version so devices update themselves over-the-air.
 
-## How OTA Works
+---
+
+## Branch Layout
+
+| Branch | Purpose | Who writes to it? |
+|--------|---------|-------------------|
+| `main` | Source code **+** `versions/*.bin` (OTA store) | `publish.ps1` only |
+| `master` | **Frozen bridge shim** — contains only `bronco_v6.4.7.bin` | Nobody — do not touch |
+
+### Why master exists
+
+Devices shipped before v6.4.7 had `kGitHubRawBase` hard-coded to `master/versions/`.
+`v6.4.7` is the bridge release: old devices fetch it from `master`, install it, and
+from that point on their OTA path points at `main`. Once you are confident no pre-6.4.7
+devices remain in the field, you can delete `master`.
+
+---
+
+## How OTA Works (v6.4.7+)
 
 The device fetches the list of `.bin` files at:
 
@@ -15,7 +33,7 @@ highest one, and compares it to its own `APP_VERSION`.  If GitHub has a newer ve
 the device downloads and installs it directly from:
 
 ```
-https://raw.githubusercontent.com/js9467/cancontroller/master/versions/bronco_vX.Y.Z.bin
+https://raw.githubusercontent.com/js9467/cancontroller/main/versions/bronco_vX.Y.Z.bin
 ```
 
 No intermediate server is involved.  Fly.dev is used only for image optimization.

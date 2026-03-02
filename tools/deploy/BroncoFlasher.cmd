@@ -38,9 +38,9 @@ Write-Host \"  Workspace: $WorkDir`n\" -ForegroundColor DarkGray
 
 # Config
 $GitHubRepo = \"js9467/cancontroller\"
-$GitHubBranch = \"master\"
+$GitHubBranch = \"main\"
 $GitHubOtaApiUrl = "https://api.github.com/repos/js9467/cancontroller/contents/versions"
-$GitHubOtaRawBase = "https://raw.githubusercontent.com/js9467/cancontroller/master/versions"
+$GitHubOtaRawBase = "https://raw.githubusercontent.com/js9467/cancontroller/main/versions"
 $EsptoolVersion = \"v4.7.0\"
 
 # Detect serial ports

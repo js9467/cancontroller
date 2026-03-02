@@ -18,7 +18,7 @@ function Write-Info {
 }
 
 $GitHubApiUrl  = "https://api.github.com/repos/js9467/cancontroller/contents/versions"
-$GitHubRawBase = "https://raw.githubusercontent.com/js9467/cancontroller/master/versions"
+$GitHubRawBase = "https://raw.githubusercontent.com/js9467/cancontroller/main/versions"
 
 function Download-LatestFirmware {
     Write-Info "Fetching latest firmware from GitHub..."

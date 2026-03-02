@@ -28,7 +28,7 @@ param(
 )
 
 $GitHubApiUrl  = "https://api.github.com/repos/js9467/cancontroller/contents/versions"
-$GitHubRawBase = "https://raw.githubusercontent.com/js9467/cancontroller/master/versions"
+$GitHubRawBase = "https://raw.githubusercontent.com/js9467/cancontroller/main/versions"
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
