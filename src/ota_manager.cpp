@@ -130,108 +130,36 @@ OTAUpdateManager& OTAUpdateManager::instance() {
 }
 
 void OTAUpdateManager::begin() {
-    const auto& ota_cfg = ConfigManager::instance().getConfig().ota;
-    enabled_ = ota_cfg.enabled;
-    manifest_url_ = ota_cfg.manifest_url;
-    expected_channel_ = ota_cfg.channel.empty() ? "stable" : ota_cfg.channel;
+    // Manifest-based OTA (fly.dev) removed — GitHub OTA is the only update path.
+    enabled_ = false;
+    manifest_url_ = "";
     wifi_ready_ = false;
-    pending_manual_check_ = false;
-    last_status_ = enabled_ ? "manual-only" : "disabled";
-
-    if (manifest_url_.empty()) {
-        enabled_ = false;
-        last_status_ = "missing-manifest-url";
-        Serial.println("[OTA] Disabled: manifest URL not configured");
-    }
-    
-    Serial.println("[OTA] Initialized in manual-only mode");
+    last_status_ = "github-ready";
+    Serial.println("[OTA] Initialized — GitHub OTA ready");
 }
 
 void OTAUpdateManager::loop(const WifiStatusSnapshot& wifi_status) {
-    // Manual-only updates: no automatic polling
-    if (!enabled_) {
-        return;
-    }
-
+    // Track WiFi readiness for GitHub OTA
     if (!wifi_status.sta_connected) {
         wifi_ready_ = false;
-        if (pending_manual_check_ || manual_install_requested_) {
-            Serial.printf("[OTA] Manual check blocked: WiFi STA not connected\n");
-            pending_manual_check_ = false;
-            manual_install_requested_ = false;
-            setStatus("waiting-for-wifi");
-        }
-        return;
-    }
-
-    if (!wifi_ready_) {
+    } else if (!wifi_ready_) {
         wifi_ready_ = true;
-        setStatus("wifi-ready");
-        Serial.printf("[OTA] WiFi now ready\n");
+        Serial.println("[OTA] WiFi ready — GitHub OTA available");
     }
-
-    // Only process manual check requests
-    if (!pending_manual_check_) {
-        return;
-    }
-
-    Serial.printf("[OTA] Processing manual check/install request\n");
-    pending_manual_check_ = false;
-
-    ManifestInfo manifest;
-    if (!fetchManifest(manifest)) {
-        manual_install_requested_ = false;
-        return;
-    }
-
-    applyManifest(manifest, manual_install_requested_);
-    manual_install_requested_ = false;
 }
 
-void OTAUpdateManager::triggerImmediateCheck(bool install_now) {
-    Serial.printf("[OTA] triggerImmediateCheck called, install_now=%d, enabled=%d, wifi_ready=%d\n", 
-                  install_now, enabled_, wifi_ready_);
-    if (!enabled_) {
-        setStatus("disabled");
-        manual_install_requested_ = false;
-        return;
-    }
-    pending_manual_check_ = true;
-    if (install_now) {
-        manual_install_requested_ = true;
-    }
-    if (wifi_ready_) {
-        setStatus("manual-check-requested");
-    } else {
-        setStatus("waiting-for-wifi");
-    }
+void OTAUpdateManager::triggerImmediateCheck(bool /*install_now*/) {
+    // Manifest-based OTA removed — this is a no-op stub.
+    // Use POST /api/ota/github/install with a version to trigger GitHub OTA.
+    Serial.println("[OTA] triggerImmediateCheck: manifest OTA removed, use GitHub OTA");
+    setStatus("github-ready");
 }
 
 void OTAUpdateManager::checkForUpdatesNow() {
-    if (!enabled_) {
-        setStatus("disabled");
-        return;
-    }
-
-    if (WiFi.status() != WL_CONNECTED) {
-        wifi_ready_ = false;
-        setStatus("waiting-for-wifi");
-        return;
-    }
-
-    wifi_ready_ = true;
-    ManifestInfo manifest;
-    if (!fetchManifest(manifest)) {
-        return;
-    }
-
-    if (!expected_channel_.empty() && !manifest.channel.empty() && manifest.channel != expected_channel_) {
-        setStatus("manifest-channel-mismatch");
-        return;
-    }
-
-    if (isNewerVersion(manifest.version)) {
-        setStatus(std::string("update-available-") + manifest.version);
+    // Delegates to GitHub version check (manifest OTA removed)
+    std::vector<std::string> versions;
+    if (checkGitHubVersions(versions) && !versions.empty()) {
+        setStatus(std::string("update-available-") + versions.back());
     } else {
         setStatus("up-to-date");
     }

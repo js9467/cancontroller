@@ -5,8 +5,7 @@ param(
     [switch]$ListPorts,
     [string]$EsptoolVersion = "v4.7.0",
     [switch]$DownloadLatest = $true,  # Default to downloading latest
-    [switch]$SkipDownload,  # Skip OTA download and use local files only
-    [string]$OtaServer = "https://image-optimizer-still-flower-1282.fly.dev"
+    [switch]$SkipDownload   # Skip download and use local files only
 )
 
 Set-StrictMode -Version Latest
@@ -18,29 +17,29 @@ function Write-Info {
     Write-Host "[flash] $Message"
 }
 
+$GitHubApiUrl  = "https://api.github.com/repos/js9467/cancontroller/contents/versions"
+$GitHubRawBase = "https://raw.githubusercontent.com/js9467/cancontroller/master/versions"
+
 function Download-LatestFirmware {
-    param([string]$Server)
-    
-    Write-Info "Downloading latest firmware from OTA server..."
+    Write-Info "Fetching latest firmware from GitHub..."
     try {
-        $manifest = Invoke-RestMethod -Uri "$Server/ota/manifest" -Method Get
-        Write-Info "Found firmware version: $($manifest.version)"
-        
-        $firmwareUrl = $manifest.firmware.url
+        $headers = @{ "User-Agent" = "BroncoControls-Flasher" }
+        $items = Invoke-RestMethod -Uri $GitHubApiUrl -Headers $headers -Method Get
+        $bins = $items | Where-Object { $_.name -match '^bronco_v[\d.]+\.bin$' }
+        if (-not $bins) { throw "No firmware bins found in GitHub versions folder" }
+
+        $latest = $bins | Sort-Object {
+            [Version](($_.name -replace 'bronco_v','') -replace '\.bin$','')
+        } | Select-Object -Last 1
+        $latestVersion = ($latest.name -replace 'bronco_v','') -replace '\.bin$',''
+
+        $firmwareUrl = "$GitHubRawBase/$($latest.name)"
         $firmwarePath = Join-Path $PSScriptRoot "firmware.bin"
-        
         Invoke-WebRequest -Uri $firmwareUrl -OutFile $firmwarePath -UseBasicParsing
-        
-        # Verify MD5
-        $downloadedHash = (Get-FileHash -Path $firmwarePath -Algorithm MD5).Hash.ToLower()
-        if ($downloadedHash -ne $manifest.firmware.md5.ToLower()) {
-            throw "MD5 mismatch! Expected: $($manifest.firmware.md5), Got: $downloadedHash"
-        }
-        
-        Write-Info "Firmware v$($manifest.version) downloaded and verified"
+        Write-Info "Downloaded firmware v$latestVersion"
         return $PSScriptRoot
     } catch {
-        throw "Failed to download firmware from OTA server: $_"
+        throw "Failed to download firmware from GitHub: $_"
     }
 }
 
@@ -156,12 +155,12 @@ if ($ListPorts) {
     return
 }
 
-# Always try to download latest firmware from OTA server first
-# Fall back to local files if download fails or user explicitly disables
+# Try to download latest firmware from GitHub first
+# Fall back to local files if download fails or -SkipDownload is set
 if (-not $SkipDownload) {
     try {
-        Write-Info "Checking for latest firmware from OTA server..."
-        $resolvedPackage = Download-LatestFirmware -Server $OtaServer
+        Write-Info "Checking for latest firmware from GitHub..."
+        $resolvedPackage = Download-LatestFirmware
     } catch {
         Write-Warning "Could not download latest firmware: $_"
         Write-Info "Falling back to local firmware files..."

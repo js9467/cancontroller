@@ -706,45 +706,54 @@ void WebServerManager::setupRoutes() {
         request->send(200, "application/json", payload);
     });
 
-    // OTA Update Endpoints
+    // OTA Update Endpoints — GitHub-based only (manifest/fly.dev OTA removed)
     server_.on("/api/ota/check", HTTP_GET, [](AsyncWebServerRequest* request) {
-        DynamicJsonDocument doc(256);
-        OTAUpdateManager& ota = OTAUpdateManager::instance();
-        ota.checkForUpdatesNow();
-
-        const std::string status = ota.lastStatus();
-        bool update_available = false;
-        std::string available_version;
-
-        const std::string kUpdatePrefix = "update-available-";
-        const std::string kDownloadingPrefix = "downloading-";
-        if (status.rfind(kUpdatePrefix, 0) == 0) {
-            update_available = true;
-            available_version = status.substr(kUpdatePrefix.size());
-        } else if (status.rfind(kDownloadingPrefix, 0) == 0) {
-            available_version = status.substr(kDownloadingPrefix.size());
-        } else if (status == "up-to-date") {
-            available_version = APP_VERSION;
-        }
-
-        doc["status"] = status.c_str();
-        doc["update_available"] = update_available;
+        // Check GitHub for the latest available version
+        DynamicJsonDocument doc(512);
+        std::vector<std::string> versions;
+        const bool success = OTAUpdateManager::instance().checkGitHubVersions(versions);
         doc["current_version"] = APP_VERSION;
-        doc["available_version"] = available_version.c_str();
-
+        if (!success || versions.empty()) {
+            doc["status"] = success ? "up-to-date" : "check-failed";
+            doc["update_available"] = false;
+            doc["available_version"] = "";
+        } else {
+            // Find highest version using version comparator
+            std::string latest = versions.front();
+            for (const auto& v : versions) {
+                if (OTAUpdateManager::compareVersions(v, latest) > 0) {
+                    latest = v;
+                }
+            }
+            const bool newer = OTAUpdateManager::compareVersions(latest, std::string(APP_VERSION)) > 0;
+            doc["status"] = newer ? (std::string("update-available-") + latest).c_str() : "up-to-date";
+            doc["update_available"] = newer;
+            doc["available_version"] = latest.c_str();
+        }
         String payload;
         serializeJson(doc, payload);
         request->send(200, "application/json", payload);
     });
 
     server_.on("/api/ota/update", HTTP_POST, [](AsyncWebServerRequest* request) {
-        OTAUpdateManager::instance().triggerImmediateCheck(true);
+        // Install the latest available version from GitHub
+        std::vector<std::string> versions;
+        if (!OTAUpdateManager::instance().checkGitHubVersions(versions) || versions.empty()) {
+            request->send(503, "application/json", "{\"status\":\"error\",\"message\":\"No firmware versions found on GitHub\"}");
+            return;
+        }
+        std::string latest = versions.front();
+        for (const auto& v : versions) {
+            if (OTAUpdateManager::compareVersions(v, latest) > 0) { latest = v; }
+        }
         DynamicJsonDocument doc(128);
         doc["status"] = "ok";
-        doc["message"] = "Update triggered";
+        doc["message"] = "Installing latest GitHub release";
+        doc["version"] = latest.c_str();
         String payload;
         serializeJson(doc, payload);
         request->send(200, "application/json", payload);
+        OTAUpdateManager::instance().installVersionFromGitHubAsync(latest);
     });
 
     // GitHub version listing endpoint

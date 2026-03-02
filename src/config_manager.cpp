@@ -121,13 +121,6 @@ bool ConfigManager::begin() {
         Serial.printf("[ConfigManager] Version: %s\n", APP_VERSION);
     }
 
-    // Always force OTA URL to the managed Fly.io endpoint
-    if (config_.ota.manifest_url != kOtaManifestUrl) {
-        Serial.println("[ConfigManager] Forcing OTA manifest URL to Fly.io endpoint");
-        config_.ota.manifest_url = kOtaManifestUrl;
-        needs_save = true;
-    }
-
     if (needs_save) {
         return save();
     }
@@ -289,10 +282,7 @@ DeviceConfig ConfigManager::buildDefaultConfig() const {
     cfg.wifi.sta.enabled = false;
 
     cfg.ota.enabled = true;
-    // cfg.ota.auto_apply = true;  // Removed - manual-only
-    cfg.ota.manifest_url = kOtaManifestUrl;
     cfg.ota.channel = "stable";
-    // cfg.ota.check_interval_minutes = 60;  // Removed - manual-only
 
     // Initialize available fonts
     cfg.available_fonts.clear();
@@ -443,10 +433,7 @@ void ConfigManager::encodeConfig(const DeviceConfig& source, DynamicJsonDocument
 
     JsonObject ota = doc["ota"].to<JsonObject>();
     ota["enabled"] = source.ota.enabled;
-    // ota["auto_apply"] = source.ota.auto_apply;  // Removed - manual-only
-    ota["manifest_url"] = source.ota.manifest_url.c_str();
     ota["channel"] = source.ota.channel.c_str();
-    // ota["check_interval_minutes"] = source.ota.check_interval_minutes;  // Removed - manual-only
 
     JsonArray pages = doc["pages"].to<JsonArray>();
     for (const auto& page : source.pages) {
@@ -657,7 +644,6 @@ bool ConfigManager::decodeConfig(JsonVariantConst json, DeviceConfig& target, st
         }
     }
 
-    target.ota.manifest_url = kOtaManifestUrl;  // OTA endpoint is centrally managed
     JsonObjectConst ota = json["ota"];
     if (!ota.isNull()) {
         target.ota.enabled = ota["enabled"] | target.ota.enabled;

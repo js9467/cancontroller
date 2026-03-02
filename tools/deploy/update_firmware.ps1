@@ -1,17 +1,13 @@
 <#
 .SYNOPSIS
-Downloads the latest firmware from the OTA server and updates BroncoFlasher package.
+Downloads the latest firmware from GitHub and optionally rebuilds BroncoFlasher package.
 
 .DESCRIPTION
-This script fetches the latest firmware version from the OTA manifest server,
-downloads the firmware binary, and updates the local BroncoFlasher deployment package.
-It can also rebuild the BroncoFlasher.zip with the latest firmware included.
-
-.PARAMETER OtaServer
-The OTA server URL. Defaults to https://image-optimizer-still-flower-1282.fly.dev
+Fetches the latest bronco_vX.Y.Z.bin from the GitHub repository (js9467/cancontroller)
+and saves it locally. Optionally rebuilds BroncoFlasher.zip with updated firmware.
 
 .PARAMETER OutputPath
-Where to save the updated firmware. Defaults to the current script directory.
+Where to save the downloaded firmware. Defaults to the current script directory.
 
 .PARAMETER RebuildZip
 If specified, rebuilds BroncoFlasher.zip with the updated firmware.
@@ -27,11 +23,12 @@ Downloads latest firmware and rebuilds BroncoFlasher.zip
 
 [CmdletBinding()]
 param(
-    [string]$OtaServer = "https://image-optimizer-still-flower-1282.fly.dev",
     [string]$OutputPath = $PSScriptRoot,
-    [switch]$RebuildZip,
-    [string]$Channel = "stable"
+    [switch]$RebuildZip
 )
+
+$GitHubApiUrl  = "https://api.github.com/repos/js9467/cancontroller/contents/versions"
+$GitHubRawBase = "https://raw.githubusercontent.com/js9467/cancontroller/master/versions"
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
@@ -51,28 +48,34 @@ function Write-Error-Custom {
     Write-Host "[update] $Message" -ForegroundColor Red
 }
 
-# Fetch latest firmware manifest
-Write-Info "Fetching latest firmware manifest from $OtaServer..."
+# Fetch version list from GitHub
+Write-Info "Fetching firmware list from GitHub..."
 try {
-    $manifestUrl = "$OtaServer/ota/manifest"
-    if ($Channel -and $Channel -ne "stable") {
-        $manifestUrl += "?channel=$Channel"
-    }
-    
-    $manifest = Invoke-RestMethod -Uri $manifestUrl -Method Get
-    Write-Success "Found firmware version: $($manifest.version)"
-    Write-Info "  Size: $($manifest.firmware.size) bytes"
-    Write-Info "  MD5: $($manifest.firmware.md5)"
+    $headers = @{ "User-Agent" = "BroncoControls-Updater" }
+    $items = Invoke-RestMethod -Uri $GitHubApiUrl -Headers $headers -Method Get
 } catch {
-    Write-Error-Custom "Failed to fetch manifest: $_"
+    Write-Error-Custom "Failed to fetch version list from GitHub: $_"
     exit 1
 }
 
-# Download firmware binary
-$firmwareUrl = $manifest.firmware.url
+# Find latest bronco_vX.Y.Z.bin
+$bins = $items | Where-Object { $_.name -match '^bronco_v[\d.]+\.bin$' }
+if (-not $bins) {
+    Write-Error-Custom "No bronco_vX.Y.Z.bin files found in GitHub versions folder."
+    exit 1
+}
+
+$latest = $bins | Sort-Object {
+    [Version](($_.name -replace 'bronco_v','') -replace '\.bin$','')
+} | Select-Object -Last 1
+$latestVersion = ($latest.name -replace 'bronco_v','') -replace '\.bin$',''
+Write-Success "Latest version on GitHub: $latestVersion"
+
+# Download the binary
+$firmwareUrl = "$GitHubRawBase/$($latest.name)"
 $firmwarePath = Join-Path $OutputPath "firmware.bin"
 
-Write-Info "Downloading firmware from $firmwareUrl..."
+Write-Info "Downloading $($latest.name) from GitHub..."
 try {
     Invoke-WebRequest -Uri $firmwareUrl -OutFile $firmwarePath -UseBasicParsing
     Write-Success "Firmware downloaded to: $firmwarePath"
@@ -81,26 +84,12 @@ try {
     exit 1
 }
 
-# Verify MD5 hash
-Write-Info "Verifying firmware integrity..."
-$downloadedHash = (Get-FileHash -Path $firmwarePath -Algorithm MD5).Hash.ToLower()
-$expectedHash = $manifest.firmware.md5.ToLower()
-if ($downloadedHash -ne $expectedHash) {
-    Write-Error-Custom "MD5 mismatch!"
-    Write-Error-Custom "  Expected: $expectedHash"
-    Write-Error-Custom "  Got:      $downloadedHash"
-    exit 1
-}
-Write-Success "Firmware integrity verified (MD5: $downloadedHash)"
-
 # Save version info
 $versionFile = Join-Path $OutputPath "firmware_version.txt"
 $versionInfo = @"
-Firmware Version: $($manifest.version)
+Firmware Version: $latestVersion
 Downloaded: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
-Source: $OtaServer
-MD5: $($manifest.firmware.md5)
-Size: $($manifest.firmware.size) bytes
+Source: $firmwareUrl
 "@
 Set-Content -Path $versionFile -Value $versionInfo
 Write-Success "Version info saved to: $versionFile"

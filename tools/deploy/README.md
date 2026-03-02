@@ -120,9 +120,6 @@ The script will:
 
 # Force specific panel (4.3" default)
 .\BroncoFlasher.ps1 -PanelVariant '7.0'
-
-# Use custom OTA server
-.\BroncoFlasher.ps1 -OtaServer "https://custom-server.com"
 ```
 
 The standalone script caches downloaded files in `%LOCALAPPDATA%\BroncoControls\flash-temp\` for 7 days, so subsequent flashes are faster.
@@ -132,86 +129,49 @@ The standalone script caches downloaded files in `%LOCALAPPDATA%\BroncoControls\
 ### ⚡ Quick Reference: Version Update Checklist
 
 ```
-□ Update src/version_auto.h with new version
-□ Run: pio run
-□ Create: ota_functions/releases/1.2.X/
-□ Copy: firmware.bin to releases/1.2.X/
-□ Generate: manifest.json with MD5 hash
-□ Commit: git add . && git commit -m "vX.X.X: Description"
-□ Deploy: cd ota_functions && flyctl deploy --remote-only --no-cache
-□ Push: git push
-□ Test: $env:BRONCO_FORCE_DOWNLOAD='true'; .\BroncoFlasher.ps1
+□ Increment .version_state.json (major/minor/patch)
+□ Run: pio run -e waveshare_7in
+□ Copy: .pio\build\waveshare_7in\firmware.bin → ..\master-wt\versions\bronco_vX.Y.Z.bin
+□ Commit Bronco-Controls-4: git add . && git commit -m "vX.Y.Z: Description"
+□ Commit master-wt:          git add . && git commit -m "vX.Y.Z: binary"
+□ Push both repos: git push
 ```
+
+Devices poll GitHub for the highest `bronco_vX.Y.Z.bin` and download it automatically.
+
+See [OTA_PUBLISHING.md](../../OTA_PUBLISHING.md) for the full step-by-step guide.
 
 ### 🚀 Creating and Deploying New Firmware Versions
 
-Follow this complete workflow when creating a new firmware version:
-
-#### 1. **Update Version Number**
-Edit [src/version_auto.h](../../src/version_auto.h):
-```cpp
-#pragma once
-// Version 1.2.X - Brief description of changes
-constexpr const char* APP_VERSION = "1.2.X";
-```
+#### 1. **Bump Version**
+Edit `.version_state.json` in the repo root and increment the version number.
 
 #### 2. **Build Firmware**
 ```powershell
-pio run
+pio run -e waveshare_7in
 ```
-Verify build succeeds and note the firmware size.
+Verify build succeeds and note the version logged by the pre-build script.
 
-#### 3. **Create Release Directory**
+#### 3. **Copy Binary to master-wt**
 ```powershell
-# Create version folder
-New-Item -ItemType Directory -Path "ota_functions\releases\1.2.X"
-
-# Copy firmware
-Copy-Item .pio\build\esp32s3box\firmware.bin ota_functions\releases\1.2.X\
+Copy-Item .pio\build\waveshare_7in\firmware.bin ..\master-wt\versions\bronco_vX.Y.Z.bin
 ```
 
-#### 4. **Generate Manifest with MD5 Hash**
+#### 4. **Commit and Push Both Repos**
 ```powershell
-cd ota_functions\releases\1.2.X
-
-# Calculate MD5
-$hash = (Get-FileHash firmware.bin -Algorithm MD5).Hash.ToLower()
-
-# Create manifest.json
-@"
-{
-  "version": "1.2.X",
-  "url": "https://image-optimizer-still-flower-1282.fly.dev/firmware/1.2.X/firmware.bin",
-  "size": $($(Get-Item firmware.bin).Length),
-  "md5": "$hash"
-}
-"@ | Out-File manifest.json -Encoding UTF8
-```
-
-#### 5. **Commit to Git**
-```powershell
+# Bronco-Controls-4
 git add .
-git commit -m "v1.2.X: Description of changes"
-```
+git commit -m "vX.Y.Z: Description of changes"
+git push
 
-#### 6. **Deploy to Fly.io OTA Server**
-```powershell
-cd ota_functions
-flyctl deploy --remote-only --no-cache
-```
-The `--no-cache` flag ensures fresh firmware is deployed, not cached versions.
-
-#### 7. **Push to GitHub**
-```powershell
+# master-wt
+cd ..\master-wt
+git add versions\bronco_vX.Y.Z.bin
+git commit -m "vX.Y.Z: binary"
 git push
 ```
 
-#### 8. **Test the Update**
-```powershell
-# Force download latest firmware and flash
-$env:BRONCO_FORCE_DOWNLOAD='true'
-.\tools\deploy\BroncoFlasher.ps1
-```
+Devices will detect the new version on their next OTA check and update automatically.
 
 ### 📦 Distribution Files Explained
 
@@ -264,9 +224,6 @@ This directory provides **three different ways** to install firmware:
 # Offline mode (use cached files only, no downloads)
 .\BroncoFlasher.ps1 -OfflineMode
 
-# Use custom OTA server
-.\BroncoFlasher.ps1 -OtaServer "https://custom-server.com"
-
 # Force specific panel (4.3" default)
 .\BroncoFlasher.ps1 -PanelVariant '7.0'
 
@@ -282,17 +239,14 @@ The script caches downloaded files in `%LOCALAPPDATA%\BroncoControls\flash-temp\
 Use the `update_firmware.ps1` script to update the offline package:
 
 ```powershell
-# Download latest firmware from OTA server
+# Download latest firmware from GitHub
 .\update_firmware.ps1
 
 # Download and rebuild BroncoFlasher.zip
 .\update_firmware.ps1 -RebuildZip
-
-# Use a different OTA server
-.\update_firmware.ps1 -OtaServer "https://your-server.com" -RebuildZip
 ```
 
-This updates the bundled firmware.bin in BroncoFlasher.zip with the latest from the OTA server.
+This downloads the latest `bronco_vX.Y.Z.bin` from GitHub and replaces `firmware.bin` in BroncoFlasher.zip.
 
 ## OTA vs USB Flashing
 

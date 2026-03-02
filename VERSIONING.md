@@ -25,37 +25,26 @@ This file contains the current version and is the ONLY file you should manually 
 3. **Generates** `src/version_auto.h` with the version string
 4. **Firmware** is compiled with this version embedded
 
-### Deployment Process
+## Deployment Process
 
-Use `deploy.ps1` for all deployments:
+See [OTA_PUBLISHING.md](OTA_PUBLISHING.md) for the complete step-by-step process.
 
-```powershell
-# Patch version (1.3.66 -> 1.3.67)
-.\deploy.ps1 -VersionBump patch
+In short:
+1. Increment `.version_state.json`
+2. `pio run -e waveshare_7in`
+3. Copy `firmware.bin` to `..\master-wt\versions\bronco_vX.Y.Z.bin`
+4. Commit and push both repos
 
-# Minor version (1.3.66 -> 1.4.0)
-.\deploy.ps1 -VersionBump minor
+Devices will pick up the new version the next time they check GitHub.
 
-# Major version (1.3.66 -> 2.0.0)
-.\deploy.ps1 -VersionBump major
-```
-
-The script:
-1. Reads current version from `.version_state.json`
-2. Increments the version
-3. Updates `.version_state.json` (source of truth)
-4. Updates `src/version_auto.h` (for consistency)
-5. Builds firmware with new version
-6. Creates OTA release package
-7. Commits and pushes to git
-8. Deploys to Fly.io
 
 ## OTA Update Flow
 
-1. Device compares `APP_VERSION` (from firmware) with remote manifest version
-2. If remote is newer, offers/applies update
-3. After update, device boots with new firmware
-4. `main.cpp` auto-detects version change and updates `config.version`
+1. Device queries GitHub API for `bronco_vX.Y.Z.bin` files in the `versions/` folder
+2. Finds the highest available version and compares it to its own `APP_VERSION`
+3. If GitHub has a newer version the device downloads and installs it directly from GitHub raw
+4. After update, device reboots with new firmware
+
 
 ## Why This Prevents Loops
 
@@ -99,10 +88,10 @@ If you need to manually set a version:
 
 | File | Purpose | Edit? |
 |------|---------|-------|
-| `.version_state.json` | Single source of truth for version | ✅ Manually or via deploy.ps1 |
+| `.version_state.json` | Single source of truth for version | ✅ Manually before each release |
 | `src/version_auto.h` | Generated header file | ❌ Auto-generated |
 | `tools/versioning.py` | Reads state, generates header | ❌ Don't modify |
-| `deploy.ps1` | Deployment script | ⚠️ Only for workflow changes |
+| `OTA_PUBLISHING.md` | Complete release process | ✅ Reference only |
 
 ## Troubleshooting
 
@@ -115,9 +104,9 @@ If you need to manually set a version:
 ### "OTA update loop"
 
 1. Check device version: Settings → About
-2. Check manifest: https://image-optimizer-still-flower-1282.fly.dev/ota/manifest
-3. Ensure manifest version > device version
-4. If stuck, deploy a new version with `deploy.ps1`
+2. Check that GitHub has a newer binary: `Invoke-RestMethod "https://api.github.com/repos/js9467/cancontroller/contents/versions" | Select -ExpandProperty name`
+3. Ensure listed version > device version
+4. If stuck, publish a new version following OTA_PUBLISHING.md
 
 ### "Git conflicts on version files"
 
@@ -146,27 +135,20 @@ The `deploy.ps1` script now runs this automatically before deploying to Fly.io.
 ## Best Practices
 
 ✅ **DO:**
-- Use `deploy.ps1` for all deployments
+- Increment `.version_state.json` before every release build
 - Commit `.version_state.json` to git
 - Let the system auto-generate `version_auto.h`
-- Run verification before manual deployments
-- Check GitHub Actions for version consistency warnings
+- Copy the built `firmware.bin` to `master-wt/versions/bronco_vX.Y.Z.bin` and push
+- See [OTA_PUBLISHING.md](OTA_PUBLISHING.md) for the full checklist
 
 ❌ **DON'T:**
 - Manually edit `src/version_auto.h`
 - Modify `tools/versioning.py` without understanding the system
 - Deploy without incrementing version
 - Skip git commits when deploying
-- Deploy without running verification first
 
 ## Summary
 
-**Old way (broken):**
-- Manual edits to `version_auto.h`
-- Inconsistent versioning
-- OTA loops
-
-**New way (fixed):**
-- `.version_state.json` = single source of truth
-- `deploy.ps1` = single deployment method
-- Automatic, consistent, loop-free versioning
+**Single source of truth:** `.version_state.json`  
+**OTA source:** `master-wt/versions/bronco_vX.Y.Z.bin` (GitHub raw)  
+**Full process:** [OTA_PUBLISHING.md](OTA_PUBLISHING.md)

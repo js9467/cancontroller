@@ -17,6 +17,7 @@ public:
     bool checkGitHubVersions(std::vector<std::string>& versions);
     bool installVersionFromGitHub(const std::string& version);
     void installVersionFromGitHubAsync(const std::string& version);
+    static int compareVersions(const std::string& lhs, const std::string& rhs);
     const std::string& lastStatus() const { return last_status_; }
 
 private:
@@ -34,19 +35,16 @@ private:
     bool applyManifest(const ManifestInfo& manifest, bool force_install);
     bool downloadAndInstall(const ManifestInfo& manifest);
     bool isNewerVersion(const std::string& remote_version) const;
-    static int compareVersions(const std::string& lhs, const std::string& rhs);
     void setStatus(const std::string& status);
     void showOtaScreen(const std::string& version);
     void updateOtaProgress(uint8_t percent);
     void hideOtaScreen();
 
-    bool enabled_ = false;
-    std::string manifest_url_;
-    std::string expected_channel_ = "stable";
+    bool enabled_ = false;  // manifest-based path always disabled
+    std::string manifest_url_;  // always empty — manifest OTA removed
+    std::string expected_channel_ = "stable";  // retained for dead-code compatibility
     bool wifi_ready_ = false;
-    bool pending_manual_check_ = false;
-    bool manual_install_requested_ = false;
-    std::string last_status_ = "idle";
+    std::string last_status_ = "github-ready";
     std::string last_status_message_ = "Ready";
     uint8_t last_progress_ = 0;
 
