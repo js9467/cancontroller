@@ -407,7 +407,6 @@ private:
             obj["cellAddress"] = output.cellAddress;
             obj["outputNumber"] = output.outputNumber;
             obj["deviceType"] = output.deviceType;
-            obj["protectedOutput"] = output.protected_output;
             obj["description"] = output.description;
             obj["isActive"] = output.isActive;
             obj["currentValue"] = output.currentState ? 255 : 0;
@@ -435,7 +434,6 @@ private:
         obj["cellAddress"] = output.cellAddress;
         obj["outputNumber"] = output.outputNumber;
         obj["deviceType"] = output.deviceType;
-        obj["protectedOutput"] = output.protected_output;
         obj["isActive"] = output.isActive;
         obj["currentValue"] = output.currentState ? 255 : 0;
         
@@ -670,7 +668,6 @@ private:
         output.cellAddress = doc.containsKey("cellAddress") ? doc["cellAddress"].as<uint8_t>() : 1;
         output.outputNumber = doc.containsKey("outputNumber") ? doc["outputNumber"].as<uint8_t>() : 1;
         output.deviceType = doc.containsKey("deviceType") ? doc["deviceType"].as<String>() : String("POWERCELL");
-        output.protected_output = doc["protectedOutput"] | false;
 
         if (output.cellAddress > 254) output.cellAddress = 254;
         if (output.deviceType == "INMOTION") {

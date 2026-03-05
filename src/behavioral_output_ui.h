@@ -1057,7 +1057,6 @@ function openOutputModal(id = null) {
 		if (out) {
 			document.getElementById('om-name').value = out.name || '';
 			document.getElementById('om-description').value = out.description || '';
-			document.getElementById('om-protected').checked = !!out.protectedOutput;
 			const dt = out.deviceType || 'POWERCELL';
 			document.getElementById('om-device-type').value = dt;
 			if (dt === 'INMOTION') {
@@ -1073,7 +1072,6 @@ function openOutputModal(id = null) {
 	} else {
 		document.getElementById('om-name').value = '';
 		document.getElementById('om-description').value = '';
-		document.getElementById('om-protected').checked = false;
 		document.getElementById('om-device-type').value = 'POWERCELL';
 		document.getElementById('om-cell').value = '1';
 		document.getElementById('om-output-num').value = '1';
@@ -1097,7 +1095,6 @@ function submitOutputModal() {
 	const name = document.getElementById('om-name').value.trim();
 	if (!name) { alert('Name is required'); return; }
 	const dt = document.getElementById('om-device-type').value;
-	const protectedOutput = document.getElementById('om-protected').checked;
 	let cellAddress, outputNumber;
 	if (dt === 'INMOTION') {
 		cellAddress  = parseInt(document.getElementById('om-inmotion-addr').value);
@@ -1112,7 +1109,6 @@ function submitOutputModal() {
 	const payload = {
 		id: _omEditId || `out_${Date.now()}`,
 		name, deviceType: dt, cellAddress, outputNumber,
-		protectedOutput,
 		description: document.getElementById('om-description').value.trim()
 	};
 	fetch('/api/outputs', {
@@ -1155,14 +1151,11 @@ function renderOutputList(outputs) {
 		} else {
 			metaLine = `<span class="output-device-tag">POWERCELL</span> Cell ${out.cellAddress} &bull; Output ${out.outputNumber}`;
 		}
-		const protectedBadge = out.protectedOutput
-			? '<span class="output-device-tag" style="background:rgba(255,160,0,0.2);color:#ffa000;border-color:#ffa000;margin-left:6px" title="Protected: this output bit is always kept ON in POWERCELL frames">&#128274; Protected</span>'
-			: '';
 		return `
 		<div class="output-item">
 			<div class="output-indicator ${out.isActive ? 'active' : ''}"></div>
 			<div class="output-info">
-				<div class="output-name">${out.name}${protectedBadge}</div>
+				<div class="output-name">${out.name}</div>
 				<div class="output-meta">${metaLine}</div>
 			</div>
 			<div class="output-badge">${out.behavior?.type || 'None'}</div>
@@ -2229,16 +2222,6 @@ document.addEventListener('DOMContentLoaded', () => {
 		<div class="om-field">
 			<label>Description (optional)</label>
 			<input type="text" id="om-description" placeholder="Brief note" />
-		</div>
-
-		<div class="om-field" style="display:flex;align-items:center;gap:10px;padding:10px;background:rgba(255,160,0,0.08);border:1px solid rgba(255,160,0,0.3);border-radius:8px">
-			<input type="checkbox" id="om-protected" style="width:18px;height:18px;cursor:pointer" />
-			<label for="om-protected" style="cursor:pointer;margin:0">
-				&#128274; <strong>Protected output</strong> &mdash;
-				Keep this bit always ON in POWERCELL frames.
-				Use when this output powers the controller itself or
-				another device that must never be cut off by a scene.
-			</label>
 		</div>
 
 		<div class="btn-group" style="justify-content:flex-end;margin-top:4px">

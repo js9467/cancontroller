@@ -82,7 +82,15 @@ public:
         std::map<uint8_t, uint16_t> nextBitmaps;
         std::map<uint8_t, bool> cellHasActive;
         
-        // Build complete desired state per cell
+        // Seed next bitmaps from last-sent state so that POWERCELL outputs NOT managed
+        // by the behavioral engine are never inadvertently zeroed.  A CAN command for
+        // one output on a cell must never clobber unrelated outputs on the same cell.
+        for (const auto& [addr, state] : _cellStateCache) {
+            nextBitmaps[addr] = state.outputBitmap;
+        }
+        
+        // Apply each managed output: set or clear only its own bit.
+        // Bits for outputs outside the behavioral engine are preserved from the seed above.
         for (const auto& [id, output] : outputs) {
             // Skip non-POWERCELL devices — inMOTION & MASTERCELL have dedicated drivers
             if (output.deviceType != "POWERCELL") continue;
@@ -94,20 +102,16 @@ public:
             if (cellAddr < 1 || cellAddr > 16) continue;
             if (outNum < 1 || outNum > 10) continue;
             
-            // Ensure cell entry exists
-            uint16_t& bitmap = nextBitmaps[cellAddr];
             if (output.isActive) {
                 cellHasActive[cellAddr] = true;
             }
 
-            // Protected outputs are permanently kept ON in the CAN frame regardless of
-            // behavioral state — this prevents accidentally cutting power to the device
-            // itself if an aux output on the same POWERCELL is powering the controller.
-            if (output.protected_output) {
-                bitmap |= static_cast<uint16_t>(1u << (outNum - 1));
-                cellHasActive[cellAddr] = true;  // Always transmit cells with protected outputs
-            } else if (output.currentState) {
-                bitmap |= static_cast<uint16_t>(1u << (outNum - 1));
+            uint16_t& bitmap = nextBitmaps[cellAddr];
+            const uint16_t bit = static_cast<uint16_t>(1u << (outNum - 1));
+            if (output.currentState) {
+                bitmap |= bit;
+            } else {
+                bitmap &= ~bit;  // Only clear bits the engine explicitly manages
             }
         }
         

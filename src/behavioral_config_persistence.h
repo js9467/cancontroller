@@ -38,7 +38,6 @@ inline bool saveBehavioralConfig(BehaviorEngine& engine) {
         outObj["cell_address"] = output.cellAddress;
         outObj["output_number"] = output.outputNumber;
         outObj["device_type"] = output.deviceType;
-        outObj["protected_output"] = output.protected_output;
     }
     
     // Save scenes
@@ -170,7 +169,6 @@ inline bool loadBehavioralConfig(BehaviorEngine& engine) {
             const char* savedDevType = outObj["device_type"] | "";
             output.deviceType = (savedDevType[0] != '\0') ? String(savedDevType) : String("POWERCELL");
         }
-        output.protected_output = outObj["protected_output"] | false;
         
         engine.addOutput(output);
         outputCount++;
