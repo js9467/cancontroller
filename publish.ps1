@@ -94,5 +94,4 @@ try {
 }
 
 Info ""
-Info "NOTE: Do NOT push anything to master. master is frozen as a bridge for"
-Info "      devices running firmware older than 6.4.7. It contains only bronco_v6.4.7.bin."
+Info "NOTE: Do NOT push anything to master. master is a read-only bridge shim."
