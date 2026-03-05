@@ -200,6 +200,92 @@ private:
 };
 
 // =================================================================
+// MASTERCELL FRAME SYNTHESIZER
+// =================================================================
+
+class MastercellSynthesizer {
+public:
+    MastercellSynthesizer(BehaviorEngine* engine, std::function<void(uint32_t, uint8_t*)> sendFunc)
+        : _engine(engine), _sendFrame(sendFunc), _lastTransmit(0), _transmitInterval(50) {}
+    
+    void setTransmitInterval(uint16_t interval_ms) {
+        _transmitInterval = interval_ms;
+    }
+    
+    void update() {
+        if (!_engine) return;
+        
+        unsigned long now = millis();
+        if (now - _lastTransmit < _transmitInterval) {
+            return;
+        }
+        _lastTransmit = now;
+        
+        const auto& outputs = _engine->getOutputs();
+        
+        // MASTERCELL outputs have cellAddress==0 and use outputs 1-8
+        uint8_t bitmap = 0;
+        bool hasActive = false;
+        bool hasChange = false;
+        
+        for (const auto& [id, output] : outputs) {
+            if (output.deviceType != "MASTERCELL") continue;
+            if (output.cellAddress != 0) continue;
+            
+            if (output.isActive) {
+                hasActive = true;
+            }
+            
+            uint8_t outNum = output.outputNumber;
+            if (outNum < 1 || outNum > 8) continue;
+            
+            const uint8_t bit = static_cast<uint8_t>(1u << (outNum - 1));
+            if (output.currentState) {
+                bitmap |= bit;
+            } else {
+                bitmap &= ~bit;
+            }
+        }
+        
+        // Transmit only if state changed or there are active outputs
+        const bool hadActive = _lastHadActive;
+        const bool shouldTransmit = (bitmap != _lastBitmap) || hasActive || hadActive;
+        
+        if (shouldTransmit) {
+            _lastBitmap = bitmap;
+            _lastHadActive = hasActive;
+            _transmitFrame(bitmap);
+        }
+    }
+    
+private:
+    BehaviorEngine* _engine;
+    std::function<void(uint32_t, uint8_t*)> _sendFrame;
+    unsigned long _lastTransmit;
+    uint16_t _transmitInterval;
+    uint8_t _lastBitmap = 0;
+    bool _lastHadActive = false;
+    
+    void _transmitFrame(uint8_t bitmap) {
+        // MASTERCELL uses PGN 0xFF00 (same as POWERCELL cell 0)
+        const uint32_t pgn = 0xFF00;
+        uint8_t data[8] = {0};
+        
+        // Byte 0: outputs 1-8 in MSB-first mapping (like POWERCELL)
+        for (uint8_t out = 1; out <= 8; ++out) {
+            if (bitmap & (1u << (out - 1))) {
+                data[0] |= static_cast<uint8_t>(1u << (8 - out));
+            }
+        }
+        // Bytes 1-7 remain 0x00
+        
+        if (_sendFrame) {
+            _sendFrame(pgn, data);
+        }
+    }
+};
+
+// =================================================================
 // GENERIC CAN CONTROLLER
 // =================================================================
 

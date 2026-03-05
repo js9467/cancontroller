@@ -35,6 +35,7 @@ inline BehaviorEngine behaviorEngine;
 inline OutputRuleEngine outputRuleEngine;
 inline PowercellSynthesizer* powercellSynthesizer = nullptr;
 inline InMotionSynthesizer* inmotionSynthesizer = nullptr;
+inline MastercellSynthesizer* mastercellSynthesizer = nullptr;
 inline BehavioralOutputAPI* outputAPI = nullptr;
 
 // Forward declarations
@@ -69,6 +70,19 @@ inline void initBehavioralOutputSystem(AsyncWebServer* webServer) {
     Serial.println("[Behavioral] Creating InMotionSynthesizer...");
     inmotionSynthesizer = new InMotionSynthesizer(&behaviorEngine);
     Serial.println("[Behavioral] === InMotionSynthesizer created");
+    
+    // Create MASTERCELL synthesizer
+    Serial.println("[Behavioral] Creating MastercellSynthesizer...");
+    mastercellSynthesizer = new MastercellSynthesizer(
+        &behaviorEngine,
+        [](uint32_t pgn, uint8_t* data) {
+            // Send MASTERCELL CAN frame via existing CanManager
+            constexpr uint8_t priority = 6;
+            const uint8_t source_addr = Ipm1Can::kSourceAddress;
+            CanManager::instance().sendJ1939Pgn(priority, pgn, source_addr, data);
+        }
+    );
+    Serial.println("[Behavioral] === MastercellSynthesizer created");
     
     // Configure update rates
     Serial.println("[Behavioral] Configuring update rates...");
@@ -285,6 +299,7 @@ inline void loadInfinityBoxDefaults() {
     leftTurnIndicator.description = "Gauge cluster left turn indicator";
     leftTurnIndicator.cellAddress = 0;
     leftTurnIndicator.outputNumber = 1;
+    leftTurnIndicator.deviceType = "MASTERCELL";
     behaviorEngine.addOutput(leftTurnIndicator);
 
     OutputChannel rightTurnIndicator;
@@ -293,6 +308,7 @@ inline void loadInfinityBoxDefaults() {
     rightTurnIndicator.description = "Gauge cluster right turn indicator";
     rightTurnIndicator.cellAddress = 0;
     rightTurnIndicator.outputNumber = 2;
+    rightTurnIndicator.deviceType = "MASTERCELL";
     behaviorEngine.addOutput(rightTurnIndicator);
 
     OutputChannel highBeamIndicator;
@@ -301,6 +317,7 @@ inline void loadInfinityBoxDefaults() {
     highBeamIndicator.description = "Gauge cluster high beam indicator";
     highBeamIndicator.cellAddress = 0;
     highBeamIndicator.outputNumber = 3;
+    highBeamIndicator.deviceType = "MASTERCELL";
     behaviorEngine.addOutput(highBeamIndicator);
 
     OutputChannel gaugeIllumination;
@@ -309,6 +326,7 @@ inline void loadInfinityBoxDefaults() {
     gaugeIllumination.description = "Gauge cluster backlight";
     gaugeIllumination.cellAddress = 0;
     gaugeIllumination.outputNumber = 4;
+    gaugeIllumination.deviceType = "MASTERCELL";
     behaviorEngine.addOutput(gaugeIllumination);
 
     OutputChannel masterAux1;
@@ -317,6 +335,7 @@ inline void loadInfinityBoxDefaults() {
     masterAux1.description = "Mastercell open output 5";
     masterAux1.cellAddress = 0;
     masterAux1.outputNumber = 5;
+    masterAux1.deviceType = "MASTERCELL";
     behaviorEngine.addOutput(masterAux1);
 
     OutputChannel masterAux2;
@@ -325,6 +344,7 @@ inline void loadInfinityBoxDefaults() {
     masterAux2.description = "Mastercell open output 6";
     masterAux2.cellAddress = 0;
     masterAux2.outputNumber = 6;
+    masterAux2.deviceType = "MASTERCELL";
     behaviorEngine.addOutput(masterAux2);
 
     OutputChannel masterAux3;
@@ -333,6 +353,7 @@ inline void loadInfinityBoxDefaults() {
     masterAux3.description = "Mastercell open output 7";
     masterAux3.cellAddress = 0;
     masterAux3.outputNumber = 7;
+    masterAux3.deviceType = "MASTERCELL";
     behaviorEngine.addOutput(masterAux3);
 
     OutputChannel masterAux4;
@@ -341,6 +362,7 @@ inline void loadInfinityBoxDefaults() {
     masterAux4.description = "Mastercell open output 8";
     masterAux4.cellAddress = 0;
     masterAux4.outputNumber = 8;
+    masterAux4.deviceType = "MASTERCELL";
     behaviorEngine.addOutput(masterAux4);
     
     Serial.printf("[Behavioral Output] Loaded %d InfinityBox IPM1 standard outputs\n", 41);
@@ -559,6 +581,11 @@ inline void updateBehavioralOutputSystem() {
     // Synthesize and transmit inMOTION frames
     if (inmotionSynthesizer) {
         inmotionSynthesizer->update();
+    }
+    
+    // Synthesize and transmit MASTERCELL frames
+    if (mastercellSynthesizer) {
+        mastercellSynthesizer->update();
     }
 }
 
