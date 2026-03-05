@@ -225,10 +225,15 @@ private:
     int8_t suspension_pitch_active_ = 1;
 
     // CAN status feedback
-    std::map<std::string, lv_obj_t*> btn_lvgl_map_;
-    std::map<std::string, bool>      btn_status_pending_;
-    std::mutex                       btn_status_mutex_;
-    lv_timer_t*                      can_status_timer_ = nullptr;
+    std::map<std::string, lv_obj_t*>   btn_lvgl_map_;             // button id -> button widget
+    std::map<std::string, lv_obj_t*>   btn_label_map_;            // button id -> title label widget (for active_label swap)
+    std::map<std::string, std::string> output_to_btn_map_;        // output_id -> button.id (poll for output feedback)
+    std::map<std::string, std::string> btn_active_label_text_;    // button.id -> active label text
+    std::map<std::string, std::string> btn_normal_label_text_;    // button.id -> normal label text
+    std::map<std::string, bool>        btn_status_pending_;
+    std::mutex                         btn_status_mutex_;
+    lv_timer_t*                        can_status_timer_ = nullptr;
     static void canStatusTimerCb(lv_timer_t* t);
+    void        pollOutputFeedback();
     void        flushButtonStatus();
 };

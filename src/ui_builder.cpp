@@ -528,6 +528,10 @@ void UIBuilder::buildPage(std::size_t index) {
     lv_obj_set_grid_dsc_array(page_container_, grid_cols_.data(), grid_rows_.data());
 
     btn_lvgl_map_.clear();
+    btn_label_map_.clear();
+    output_to_btn_map_.clear();
+    btn_active_label_text_.clear();
+    btn_normal_label_text_.clear();
     for (const auto& button : page.buttons) {
         lv_obj_t* btn = lv_btn_create(page_container_);
         lv_obj_remove_style_all(btn);
@@ -557,8 +561,11 @@ void UIBuilder::buildPage(std::size_t index) {
         lv_obj_set_style_bg_color(btn, pressed_color, LV_STATE_PRESSED);
         lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, LV_STATE_PRESSED);
 
-        // CAN status feedback "active" appearance (green)
-        lv_obj_set_style_bg_color(btn, lv_color_hex(0x009944), LV_STATE_CHECKED);
+        // Active (checked) state — use per-button active_color or default green
+        const lv_color_t active_bg = !button.active_color.empty()
+            ? colorFromHex(button.active_color, lv_color_hex(0x009944))
+            : lv_color_hex(0x009944);
+        lv_obj_set_style_bg_color(btn, active_bg, LV_STATE_CHECKED);
         lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, LV_STATE_CHECKED);
         lv_obj_set_style_border_color(btn, lv_color_hex(0x00FF80), LV_STATE_CHECKED);
         lv_obj_set_style_border_width(btn, 3, LV_STATE_CHECKED);
@@ -591,6 +598,16 @@ void UIBuilder::buildPage(std::size_t index) {
 
         lv_obj_t* title = lv_label_create(btn);
         lv_label_set_text(title, button.label.c_str());
+        // Store label widget when active_label is configured (for live text swap)
+        if (!button.active_label.empty()) {
+            btn_label_map_[button.id] = title;
+            btn_active_label_text_[button.id] = button.active_label;
+            btn_normal_label_text_[button.id] = button.label;
+        }
+        // Register output -> button mapping so the timer can poll output state for visual feedback
+        if (!button.active_output_id.empty()) {
+            output_to_btn_map_[button.active_output_id] = button.id;
+        }
         // Button text color priority: per-button > page override > theme default
         const lv_color_t theme_text_fallback = config_
             ? colorFromHex(config_->theme.text_primary, UITheme::COLOR_TEXT_PRIMARY)
@@ -3361,10 +3378,71 @@ void UIBuilder::flushButtonStatus() {
         } else {
             lv_obj_clear_state(it->second, LV_STATE_CHECKED);
         }
+        // Swap label text if active_label is configured for this button
+        auto lbl_it = btn_label_map_.find(id);
+        auto act_it = btn_active_label_text_.find(id);
+        if (lbl_it != btn_label_map_.end() && lbl_it->second &&
+            act_it != btn_active_label_text_.end()) {
+            if (active) {
+                lv_label_set_text(lbl_it->second, act_it->second.c_str());
+            } else {
+                auto norm_it = btn_normal_label_text_.find(id);
+                lv_label_set_text(lbl_it->second,
+                    norm_it != btn_normal_label_text_.end() ? norm_it->second.c_str() : "");
+            }
+        }
+    }
+
+    // 2. Poll behavioral engine for output/scene-mode buttons
+    if (!config_) return;
+    for (const auto& page : config_->pages) {
+        for (const auto& button : page.buttons) {
+            if (button.mode != "output" && button.mode != "scene") continue;
+            auto widget_it = btn_lvgl_map_.find(button.id);
+            if (widget_it == btn_lvgl_map_.end() || !widget_it->second) continue;
+
+            bool active = false;
+            if (button.mode == "output" && !button.output_behavior.output_id.empty()) {
+                const auto* out = behaviorEngine.getOutput(
+                    String(button.output_behavior.output_id.c_str()));
+                if (out) active = out->currentState;
+            } else if (button.mode == "scene" && !button.scene_id.empty()) {
+                const auto* sc = behaviorEngine.getScene(
+                    String(button.scene_id.c_str()));
+                if (sc) active = sc->isActive;
+            }
+
+            lv_obj_t* btn_obj = widget_it->second;
+            if (active) {
+                lv_obj_add_state(btn_obj, LV_STATE_CHECKED);
+            } else {
+                lv_obj_clear_state(btn_obj, LV_STATE_CHECKED);
+            }
+
+            // Swap label text when active_label is configured
+            if (!button.active_label.empty()) {
+                auto label_it = btn_label_map_.find(button.id);
+                if (label_it != btn_label_map_.end() && label_it->second) {
+                    lv_label_set_text(label_it->second,
+                        active ? button.active_label.c_str() : button.label.c_str());
+                }
+            }
+        }
+    }
+}
+
+void UIBuilder::pollOutputFeedback() {
+    if (output_to_btn_map_.empty()) return;
+    const auto& outputs = behaviorEngine.getOutputs();
+    for (const auto& [output_id, btn_id] : output_to_btn_map_) {
+        auto it = outputs.find(String(output_id.c_str()));
+        bool active = (it != outputs.end()) && it->second.currentState;
+        notifyButtonActive(btn_id, active);
     }
 }
 
 void UIBuilder::canStatusTimerCb(lv_timer_t* /*t*/) {
+    UIBuilder::instance().pollOutputFeedback();
     UIBuilder::instance().flushButtonStatus();
 }
 

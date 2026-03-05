@@ -520,6 +520,8 @@ function switchTab(tabName){
 			<div><label>Border</label><input id="btn-border-color" type="color" /></div>
 			<div><label>Border Width</label><input id="btn-border-width" type="number" min="0" max="10" /></div>
 			<div><label>Corner Radius</label><input id="btn-corner-radius" type="number" min="0" max="50" /></div>
+			<div><label>Active Label</label><input id="btn-active-label" type="text" placeholder="Text when output is ON" /></div>
+			<div><label>Active Color</label><input id="btn-active-color" type="color" value="#009944" /></div>
 			<div class="row"><label><input id="btn-momentary" type="checkbox" /> Momentary</label></div>
 		</div>
 		<h4>Button Action Mode</h4>
@@ -622,7 +624,16 @@ function switchTab(tabName){
 			<div><label>Mask (hex)</label><input id="btn-status-mask" type="text" placeholder="01" /></div>
 		</div>
 		</div><!-- end can-config-section -->
-		
+
+		<h4>Output Feedback</h4>
+		<div class="muted" style="font-size:0.85rem;margin-bottom:8px;">Automatically reflect a behavioral output's live state on this button (works with any action mode).</div>
+		<div class="grid two-col">
+			<div style="grid-column:1/-1;"><label>Monitor Output</label>
+				<select id="btn-active-output-id"><option value="">None (no output feedback)</option></select></div>
+			<div><label>Active Fill Color</label><input id="btn-active-color" type="color" value="#009944" /></div>
+			<div><label>Active Label Text</label><input id="btn-active-label" type="text" placeholder="Same as normal label" /></div>
+		</div>
+
 		<div class="row" style="margin-top:12px; justify-content:flex-end; gap:8px;">
 			<button class="btn danger" onclick="deleteButtonFromModal()">Delete</button>
 			<button class="btn primary" onclick="saveButtonFromModal()">Save</button>
@@ -1179,6 +1190,8 @@ function openButtonModal(row,col){
 	document.getElementById('btn-border-color').value = firstDefined(data.border_color, defaults.border_color);
 	document.getElementById('btn-border-width').value = firstDefined(data.border_width, defaults.border_width);
 	document.getElementById('btn-corner-radius').value = firstDefined(data.corner_radius, defaults.corner_radius);
+	document.getElementById('btn-active-label').value = data.active_label || '';
+	document.getElementById('btn-active-color').value = data.active_color || '#009944';
 	document.getElementById('btn-font-size').value = data.font_size || 24;
 	document.getElementById('btn-font-family').value = data.font_family || 'montserrat';
 	document.getElementById('btn-text-align').value = data.text_align || 'center';
@@ -1197,15 +1210,19 @@ function openButtonModal(row,col){
 	document.getElementById('btn-auto-off').checked = ob.auto_off !== undefined ? ob.auto_off : true;
 	
 	// Load behavioral options from server, then set dropdown values
+	document.getElementById('btn-active-color').value = data.active_color || '#009944';
+	document.getElementById('btn-active-label').value = data.active_label || '';
 	loadBehavioralOptions().then(() => {
 		// Set dropdown values AFTER options are loaded
 		document.getElementById('btn-output-id').value = ob.output_id || '';
 		document.getElementById('btn-scene-id').value = data.scene_id || '';
+		document.getElementById('btn-active-output-id').value = data.active_output_id || '';
 	}).catch(err => {
 		console.error('Failed to load behavioral options:', err);
 		// Set values anyway even if loading failed
 		document.getElementById('btn-output-id').value = ob.output_id || '';
 		document.getElementById('btn-scene-id').value = data.scene_id || '';
+		document.getElementById('btn-active-output-id').value = data.active_output_id || '';
 	});
 	document.getElementById('btn-scene-action').value = data.scene_action || 'on';
 	document.getElementById('btn-scene-duration-ms').value = data.scene_duration_ms || 0;
@@ -1269,6 +1286,8 @@ function saveButtonFromModal(){
 		font_name: document.getElementById('btn-font-family').value+'_16',
 		text_align: document.getElementById('btn-text-align').value,
 		momentary: document.getElementById('btn-momentary').checked,
+		active_label: document.getElementById('btn-active-label').value || '',
+		active_color: document.getElementById('btn-active-color').value || '',
 		mode: document.getElementById('btn-mode').value,
 		output_behavior: {
 			output_id: document.getElementById('btn-output-id').value || '',
@@ -1309,7 +1328,10 @@ function saveButtonFromModal(){
 			source_address: parseInt(document.getElementById('btn-status-src').value,16)||0xFF,
 			byte_index: parseInt(document.getElementById('btn-status-byte').value)||0,
 			mask: parseInt(document.getElementById('btn-status-mask').value,16)||0
-		}
+		},
+		active_output_id: document.getElementById('btn-active-output-id').value || '',
+		active_color: document.getElementById('btn-active-color').value || '',
+		active_label: (document.getElementById('btn-active-label').value || '').trim()
 	};
 	if(idx>=0) page.buttons[idx] = button; else page.buttons.push(button);
 	closeModal();
@@ -1373,6 +1395,19 @@ function loadBehavioralOptions(){
 				opt.textContent = scene.name;
 				sceneSel.appendChild(opt);
 			});
+			// Also populate Output Feedback dropdown
+			const activeSel = document.getElementById('btn-active-output-id');
+			if (activeSel) {
+				const savedActive = activeSel.value;
+				activeSel.innerHTML = '<option value="">None (no output feedback)</option>';
+				(data.outputs || []).forEach(out => {
+					const opt = document.createElement('option');
+					opt.value = out.id;
+					opt.textContent = out.name;
+					activeSel.appendChild(opt);
+				});
+				activeSel.value = savedActive;
+			}
 		});
 }
 

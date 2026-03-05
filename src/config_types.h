@@ -48,6 +48,9 @@ struct ButtonConfig {
     std::uint8_t corner_radius = 12;  // Button corner radius in pixels
     std::uint8_t border_width = 0;  // Button border width in pixels
     std::string border_color = "#FFFFFF";  // Button border color
+    std::string active_label = "";   // Optional: text shown on button when output is active (empty = no change)
+    std::string active_color = "";   // Optional: button bg color when active, e.g. "#009944" (empty = default green)
+    std::string active_output_id = "";  // Output whose currentState drives this button's CHECKED appearance
     CanFrameConfig can;
     CanFrameConfig can_off;  // Optional OFF/release frame (used by some modules that require release frames)
     CanStatusConfig can_status;  // Optional CAN feedback for button active state
