@@ -15,6 +15,7 @@
 
 #include "output_behavior_engine.h"
 #include "output_frame_synthesizer.h"
+#include "inmotion_synthesizer.h"
 #include "behavioral_output_api.h"
 #include "behavioral_output_ui.h"
 #include "behavioral_config_persistence.h"
@@ -33,6 +34,7 @@ using namespace BehavioralOutput;
 inline BehaviorEngine behaviorEngine;
 inline OutputRuleEngine outputRuleEngine;
 inline PowercellSynthesizer* powercellSynthesizer = nullptr;
+inline InMotionSynthesizer* inmotionSynthesizer = nullptr;
 inline BehavioralOutputAPI* outputAPI = nullptr;
 
 // Forward declarations
@@ -63,11 +65,17 @@ inline void initBehavioralOutputSystem(AsyncWebServer* webServer) {
     );
     Serial.println("[Behavioral] === PowercellSynthesizer created");
     
+    // Create inMOTION synthesizer
+    Serial.println("[Behavioral] Creating InMotionSynthesizer...");
+    inmotionSynthesizer = new InMotionSynthesizer(&behaviorEngine);
+    Serial.println("[Behavioral] === InMotionSynthesizer created");
+    
     // Configure update rates
     Serial.println("[Behavioral] Configuring update rates...");
     behaviorEngine.setUpdateInterval(20);  // 50Hz behavior engine
     powercellSynthesizer->setTransmitInterval(50);  // 20Hz CAN transmission
-    Serial.println("[Behavioral] === Update rates: 50Hz engine, 20Hz transmission");
+    inmotionSynthesizer->setTransmitInterval(100);  // 10Hz for inMOTION (state changes only)
+    Serial.println("[Behavioral] === Update rates: 50Hz engine, 20Hz POWERCELL, 10Hz inMOTION");
     
     // Register REST API endpoints
     if (webServer) {
@@ -546,6 +554,11 @@ inline void updateBehavioralOutputSystem() {
     // Synthesize and transmit POWERCELL frames
     if (powercellSynthesizer) {
         powercellSynthesizer->update();
+    }
+    
+    // Synthesize and transmit inMOTION frames
+    if (inmotionSynthesizer) {
+        inmotionSynthesizer->update();
     }
 }
 
