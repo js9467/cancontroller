@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
     Publish a new firmware release. Bumps version, builds, commits source + binary
-    to main. Do NOT manually push anything to master — master is a read-only bridge
+    to main. Do NOT manually push anything to master â€” master is a read-only bridge
     shim for devices running firmware older than 6.4.7.
 
 .PARAMETER Message
@@ -28,15 +28,15 @@ $root = $PSScriptRoot
 function Fail($msg) { Write-Host "ERROR: $msg" -ForegroundColor Red; exit 1 }
 function Info($msg) { Write-Host $msg -ForegroundColor Cyan }
 
-# ── Guard: must be on main ───────────────────────────────────────────────────
+# â”€â”€ Guard: must be on main â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 $branch = git -C $root rev-parse --abbrev-ref HEAD
 if ($branch -ne 'main') { Fail "You are on '$branch'. Switch to main first: git checkout main" }
 
-# ── Guard: working tree must be clean (except versions/) ────────────────────
+# â”€â”€ Guard: working tree must be clean (except versions/) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 $dirty = git -C $root status --porcelain | Where-Object { $_ -notmatch '^\?\?' }
 if ($dirty) { Fail "Working tree has uncommitted changes. Commit or stash them first.`n$($dirty -join "`n")" }
 
-# ── 1. Bump version ──────────────────────────────────────────────────────────
+# â”€â”€ 1. Bump version â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 $statePath = Join-Path $root '.version_state.json'
 $state = Get-Content $statePath | ConvertFrom-Json
 
@@ -50,7 +50,7 @@ $version = "$($state.major).$($state.minor).$($state.build)"
 Info "Bumping version to $version..."
 $state | ConvertTo-Json | Set-Content $statePath -Encoding UTF8
 
-# ── 2. Build ─────────────────────────────────────────────────────────────────
+# â”€â”€ 2. Build â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 Info "Building firmware $version..."
 Push-Location $root
 $buildOut = pio run -e waveshare_7in 2>&1
@@ -61,7 +61,7 @@ if ($LASTEXITCODE -ne 0) {
 $buildOut | Where-Object { $_ -match 'error:|SUCCESS|FAILED|\[Versioning\]' } | Select-Object -Last 5
 Pop-Location
 
-# ── 3. Copy binary into versions/ (on main) ──────────────────────────────────
+# â”€â”€ 3. Copy binary into versions/ (on main) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 $binSrc  = Join-Path $root '.pio\build\waveshare_7in\firmware.bin'
 $binName = "bronco_v$version.bin"
 $binDst  = Join-Path $root "versions\$binName"
@@ -70,7 +70,7 @@ Info "Copying binary to versions\$binName..."
 New-Item -ItemType Directory -Force (Join-Path $root 'versions') | Out-Null
 Copy-Item $binSrc $binDst -Force
 
-# ── 4. Commit everything to main ─────────────────────────────────────────────
+# â”€â”€ 4. Commit everything to main â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 Info "Committing to main..."
 git -C $root add ".version_state.json" "src/version_auto.h" "versions/$binName"
 git -C $root commit -m "v${version}: $Message"
@@ -87,11 +87,8 @@ try {
     if ($found) {
         Info "Confirmed: $binName is live on GitHub."
     } else {
-        Write-Host "WARNING: $binName not yet visible via API — GitHub may need a few seconds." -ForegroundColor Yellow
+        Write-Host "WARNING: $binName not yet visible via API â€” GitHub may need a few seconds." -ForegroundColor Yellow
     }
 } catch {
     Write-Host "WARNING: Could not verify via GitHub API: $_" -ForegroundColor Yellow
 }
-
-Write-Host ""
-Write-Host "NOTE: Do NOT push anything to master." -ForegroundColor DarkGray
