@@ -662,6 +662,14 @@ input[type="range"]::-webkit-slider-thumb {
 				<span>Scenes</span>
 			</div>
 		</div>
+
+		<div class="nav-section">
+			<h3>Automation</h3>
+			<div class="nav-item" data-view="rules">
+				<span class="nav-icon">&#9889;</span>
+				<span>Output Logic</span>
+			</div>
+		</div>
 		
 		<div class="nav-section">
 			<h3>Testing</h3>
@@ -969,6 +977,32 @@ input[type="range"]::-webkit-slider-thumb {
 			</div>
 		</div>
 
+		<!--  -->
+		<!-- VIEW: OUTPUT RULES -->
+		<!--  -->
+		<div id="view-rules" class="view hidden">
+			<div class="card">
+				<h2>Output Logic</h2>
+				<p>IF/THEN rules that fire automatically based on output state changes &mdash; no button press required.</p>
+
+				<div class="alert alert-info">
+					&#9889; <strong>How it works:</strong> Watch any output. When it turns on or off, automatically control another output (or scene) and optionally hold that state until a release condition is met.<br>
+					<em>Example: door lock fires (pulse) &rarr; keep alarm LED on &rarr; door unlock fires &rarr; alarm LED off.</em>
+				</div>
+
+				<div class="btn-group">
+					<button class="btn btn-primary" onclick="openRuleModal()">+ Add Rule</button>
+					<button class="btn" onclick="loadRules()">&#128260; Refresh</button>
+				</div>
+
+				<div class="divider"></div>
+
+				<div id="rule-list">
+					<!-- Dynamically populated -->
+				</div>
+			</div>
+		</div>
+
 	</div>
 </div>
 
@@ -1021,6 +1055,7 @@ function switchView(viewName) {
 	// Load view-specific data
 	if (viewName === 'outputs') loadOutputs();
 	if (viewName === 'scenes') loadScenes();
+	if (viewName === 'rules') loadRules();
 	if (viewName === 'simulator') startSimulatorPolling();
 	if (viewName !== 'simulator') stopSimulatorPolling();
 	if (viewName === 'preview') {
@@ -2147,6 +2182,146 @@ function clearAllOutputs() {
 }
 
 // =================================================================
+// OUTPUT RULES
+// =================================================================
+
+async function loadRules() {
+	const container = document.getElementById('rule-list');
+	if (!container) return;
+	container.innerHTML = '<div class="muted" style="padding:12px">Loading...</div>';
+	try {
+		const resp = await fetchWithTimeout('/api/rules');
+		const rules = await resp.json();
+		appState.rules = rules || [];
+		renderRules(rules || []);
+	} catch(e) {
+		container.innerHTML = '<div class="alert alert-warning">Could not load rules.</div>';
+	}
+}
+
+function renderRules(rules) {
+	const container = document.getElementById('rule-list');
+	if (!container) return;
+	if (!rules.length) {
+		container.innerHTML = '<div class="muted" style="padding:12px">No rules yet. Click + Add Rule to get started.</div>';
+		return;
+	}
+	container.innerHTML = rules.map(r => {
+		const actionLabel = {on:'Turn ON',off:'Turn OFF',toggle:'Toggle',flash:'Flash',scene_activate:'Activate scene',scene_deactivate:'Deactivate scene'}[r.action] || r.action;
+		const edges = [r.trigger_on_rise && 'goes ON', r.trigger_on_fall && 'goes OFF'].filter(Boolean).join(' or ');
+		const target = r.action_output_id || r.action_scene_id || '?';
+		const relText = r.release_output_id
+			? `Release: when <em>${r.release_output_id}</em> ${r.release_on_rise ? 'goes ON' : 'goes OFF'}`
+			: (r.release_auto_ms > 0 ? `Auto-release after ${(r.release_auto_ms/1000).toFixed(1)}s` : 'No automatic release');
+		return `<div class="output-card" style="opacity:${r.enabled?1:0.5}">
+			<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+				<div>
+					<div style="font-weight:600">${r.name}</div>
+					<div style="font-size:0.82rem;color:var(--accent);margin-top:2px">IF <strong>${r.trigger_output_id||'?'}</strong> ${edges} &rarr; ${actionLabel} <strong>${target}</strong></div>
+					<div style="font-size:0.78rem;color:var(--muted);margin-top:2px">${relText}</div>
+				</div>
+				<div class="btn-group">
+					<button class="btn" onclick="openRuleModal('${r.id}')">&#9998; Edit</button>
+					<button class="btn btn-danger" onclick="deleteRule('${r.id}')">&#10006;</button>
+				</div>
+			</div>
+		</div>`;
+	}).join('');
+}
+
+function updateRuleActionFields() {
+	const isScene = ['scene_activate','scene_deactivate'].includes(document.getElementById('rule-action').value);
+	document.getElementById('rule-target-output-group').style.display = isScene ? 'none' : '';
+	document.getElementById('rule-target-scene-group').style.display = isScene ? '' : 'none';
+}
+
+async function populateRuleDropdowns() {
+	let outputs = appState.outputs || [];
+	if (!outputs.length) { try { outputs = await fetchWithTimeout('/api/outputs').then(r=>r.json()); } catch(e){} }
+	let scenes = []; try { scenes = await fetchWithTimeout('/api/scenes').then(r=>r.json()); } catch(e){}
+	const outOpts = outputs.map(o=>`<option value="${o.id}">${o.name||o.id}</option>`).join('');
+	const sceneOpts = (scenes||[]).map(s=>`<option value="${s.id}">${s.name||s.id}</option>`).join('');
+	['rule-trigger-output','rule-action-output'].forEach(id => { const el=document.getElementById(id); if(el) el.innerHTML=outOpts; });
+	const rel = document.getElementById('rule-release-output');
+	if (rel) rel.innerHTML = '<option value="">&#8212; None (no output-based release) &#8212;</option>' + outOpts;
+	const sc = document.getElementById('rule-action-scene');
+	if (sc) sc.innerHTML = sceneOpts || '<option value="">(no scenes defined)</option>';
+}
+
+async function openRuleModal(id = null) {
+	document.getElementById('rule-modal-title').textContent = id ? 'Edit Rule' : 'Add Rule';
+	document.getElementById('rule-id').value = id || '';
+	document.getElementById('rule-name').value = '';
+	document.getElementById('rule-enabled').checked = true;
+	document.getElementById('rule-trigger-rise').checked = true;
+	document.getElementById('rule-trigger-fall').checked = false;
+	document.getElementById('rule-action').value = 'on';
+	document.getElementById('rule-auto-release').value = 0;
+	document.getElementById('rule-release-rise').checked = true;
+	updateRuleActionFields();
+	await populateRuleDropdowns();
+	if (id) {
+		const rule = (appState.rules||[]).find(r=>r.id===id);
+		if (rule) {
+			document.getElementById('rule-name').value = rule.name||'';
+			document.getElementById('rule-enabled').checked = rule.enabled !== false;
+			document.getElementById('rule-trigger-output').value = rule.trigger_output_id||'';
+			document.getElementById('rule-trigger-rise').checked = rule.trigger_on_rise !== false;
+			document.getElementById('rule-trigger-fall').checked = !!rule.trigger_on_fall;
+			document.getElementById('rule-action').value = rule.action||'on';
+			updateRuleActionFields();
+			document.getElementById('rule-action-output').value = rule.action_output_id||'';
+			document.getElementById('rule-action-scene').value = rule.action_scene_id||'';
+			document.getElementById('rule-release-output').value = rule.release_output_id||'';
+			if (rule.release_on_rise === false) document.getElementById('rule-release-fall').checked = true;
+			else document.getElementById('rule-release-rise').checked = true;
+			document.getElementById('rule-auto-release').value = rule.release_auto_ms ? Math.round(rule.release_auto_ms/1000) : 0;
+		}
+	}
+	document.getElementById('rule-modal').style.display = 'flex';
+}
+
+function closeRuleModal() {
+	document.getElementById('rule-modal').style.display = 'none';
+}
+
+async function submitRuleModal() {
+	const id = document.getElementById('rule-id').value || ('rule_'+Date.now());
+	const releaseSec = parseFloat(document.getElementById('rule-auto-release').value)||0;
+	const releaseOnRise = document.querySelector('input[name="release-edge"]:checked')?.value !== 'fall';
+	const rule = {
+		id,
+		name: document.getElementById('rule-name').value || 'Unnamed Rule',
+		enabled: document.getElementById('rule-enabled').checked,
+		trigger_output_id: document.getElementById('rule-trigger-output').value,
+		trigger_on_rise: document.getElementById('rule-trigger-rise').checked,
+		trigger_on_fall: document.getElementById('rule-trigger-fall').checked,
+		action: document.getElementById('rule-action').value,
+		action_output_id: document.getElementById('rule-action-output').value,
+		action_scene_id: document.getElementById('rule-action-scene').value,
+		release_output_id: document.getElementById('rule-release-output').value,
+		release_on_rise: releaseOnRise,
+		release_auto_ms: Math.round(releaseSec*1000)
+	};
+	const isEdit = !!document.getElementById('rule-id').value;
+	const method = isEdit ? 'PUT' : 'POST';
+	const url = isEdit ? `/api/rules/${id}` : '/api/rules';
+	try {
+		await fetchWithTimeout(url, {method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(rule)});
+		closeRuleModal();
+		loadRules();
+	} catch(e) { alert('Save failed: '+e.message); }
+}
+
+async function deleteRule(id) {
+	if (!confirm('Delete this rule?')) return;
+	try {
+		await fetchWithTimeout(`/api/rules/${id}`, {method:'DELETE'});
+		loadRules();
+	} catch(e) { alert('Delete failed: '+e.message); }
+}
+
+// =================================================================
 // INITIALIZATION
 // =================================================================
 
@@ -2227,6 +2402,81 @@ document.addEventListener('DOMContentLoaded', () => {
 		<div class="btn-group" style="justify-content:flex-end;margin-top:4px">
 			<button class="btn" onclick="closeOutputModal()">Cancel</button>
 			<button class="btn btn-primary" onclick="submitOutputModal()">Save Output</button>
+		</div>
+	</div>
+</div>
+
+<!-- Rule Editor Modal -->
+<div id="rule-modal" class="output-modal-overlay" style="display:none" onclick="if(event.target===this)closeRuleModal()">
+	<div class="output-modal-box" style="max-width:540px">
+		<h3 id="rule-modal-title">Add Rule</h3>
+		<input type="hidden" id="rule-id" />
+
+		<div class="om-field">
+			<label>Rule Name</label>
+			<input type="text" id="rule-name" placeholder='e.g. "Lock &rarr; Alarm LED"' />
+		</div>
+		<div class="om-field">
+			<label><input type="checkbox" id="rule-enabled" checked> Enabled</label>
+		</div>
+
+		<hr style="border-color:var(--border);margin:10px 0">
+		<div style="font-weight:600;color:var(--accent);font-size:0.85rem;margin-bottom:8px">&#128260; TRIGGER &mdash; What to watch</div>
+
+		<div class="om-field">
+			<label>Watch Output</label>
+			<select id="rule-trigger-output"><option value="">(loading...)</option></select>
+		</div>
+		<div class="om-field">
+			<label>Fire when output&hellip;</label>
+			<label><input type="checkbox" id="rule-trigger-rise" checked> Goes <strong>ON</strong> (active/pulse)</label>
+			<label><input type="checkbox" id="rule-trigger-fall"> Goes <strong>OFF</strong></label>
+		</div>
+
+		<hr style="border-color:var(--border);margin:10px 0">
+		<div style="font-weight:600;color:var(--accent-2);font-size:0.85rem;margin-bottom:8px">&#9889; ACTION &mdash; What to do</div>
+
+		<div class="om-field">
+			<label>Action</label>
+			<select id="rule-action" onchange="updateRuleActionFields()">
+				<option value="on">Turn ON output</option>
+				<option value="off">Turn OFF output</option>
+				<option value="toggle">Toggle output</option>
+				<option value="flash">Flash output (500ms)</option>
+				<option value="scene_activate">Activate scene</option>
+				<option value="scene_deactivate">Deactivate scene</option>
+			</select>
+		</div>
+		<div id="rule-target-output-group" class="om-field">
+			<label>Target Output</label>
+			<select id="rule-action-output"><option value="">(loading...)</option></select>
+		</div>
+		<div id="rule-target-scene-group" class="om-field" style="display:none">
+			<label>Target Scene</label>
+			<select id="rule-action-scene"><option value="">(loading...)</option></select>
+		</div>
+
+		<hr style="border-color:var(--border);margin:10px 0">
+		<div style="font-weight:600;color:var(--success);font-size:0.85rem;margin-bottom:4px">&#128275; RELEASE &mdash; When to undo the action (optional)</div>
+		<div style="font-size:0.78rem;color:var(--muted);margin-bottom:8px">Leave blank for no automatic release. Great for latching behaviour like "stay on until unlock fires".</div>
+
+		<div class="om-field">
+			<label>Release when output:</label>
+			<select id="rule-release-output"><option value="">&#8212; None &#8212;</option></select>
+		</div>
+		<div class="om-field">
+			<label>Release edge</label>
+			<label><input type="radio" name="release-edge" id="rule-release-rise" value="rise" checked> Goes <strong>ON</strong></label>
+			<label><input type="radio" name="release-edge" id="rule-release-fall" value="fall"> Goes <strong>OFF</strong></label>
+		</div>
+		<div class="om-field">
+			<label>Auto-release after (seconds; 0&nbsp;=&nbsp;never)</label>
+			<input type="number" id="rule-auto-release" min="0" step="1" value="0" />
+		</div>
+
+		<div class="btn-group" style="justify-content:flex-end;margin-top:4px">
+			<button class="btn" onclick="closeRuleModal()">Cancel</button>
+			<button class="btn btn-primary" onclick="submitRuleModal()">Save Rule</button>
 		</div>
 	</div>
 </div>

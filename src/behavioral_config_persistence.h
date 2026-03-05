@@ -1,6 +1,7 @@
 #pragma once
 
 #include "output_behavior_engine.h"
+#include "output_rule_engine.h"
 #include <LittleFS.h>
 #include <ArduinoJson.h>
 
@@ -21,10 +22,10 @@ static const char* BEHAVIORAL_CONFIG_FILE = "/behavioral_config.json";
 // SAVE CONFIGURATION TO LITTLEFS
 // =================================================================
 
-inline bool saveBehavioralConfig(BehaviorEngine& engine) {
+inline bool saveBehavioralConfig(BehaviorEngine& engine, OutputRuleEngine& ruleEngine) {
     Serial.println("[Behavioral Persistence] Saving configuration to LittleFS...");
     
-    DynamicJsonDocument doc(32768); // 32KB buffer
+    DynamicJsonDocument doc(49152); // 48KB buffer
     
     // Save outputs
     JsonArray outputsArray = doc.createNestedArray("outputs");
@@ -107,6 +108,25 @@ inline bool saveBehavioralConfig(BehaviorEngine& engine) {
         suspObj["calibration_active"] = scene.suspension.calibration_active;
     }
     
+    // Save output rules
+    JsonArray rulesArray = doc.createNestedArray("rules");
+    const auto& rules = ruleEngine.getRules();
+    for (const auto& [id, rule] : rules) {
+        JsonObject rObj = rulesArray.createNestedObject();
+        rObj["id"]                 = rule.id;
+        rObj["name"]               = rule.name;
+        rObj["enabled"]            = rule.enabled;
+        rObj["trigger_output_id"]  = rule.trigger_output_id;
+        rObj["trigger_on_rise"]    = rule.trigger_on_rise;
+        rObj["trigger_on_fall"]    = rule.trigger_on_fall;
+        rObj["action"]             = rule.action;
+        rObj["action_output_id"]   = rule.action_output_id;
+        rObj["action_scene_id"]    = rule.action_scene_id;
+        rObj["release_output_id"]  = rule.release_output_id;
+        rObj["release_on_rise"]    = rule.release_on_rise;
+        rObj["release_auto_ms"]    = rule.release_auto_ms;
+    }
+
     // Write to file
     File file = LittleFS.open(BEHAVIORAL_CONFIG_FILE, "w");
     if (!file) {
@@ -117,8 +137,8 @@ inline bool saveBehavioralConfig(BehaviorEngine& engine) {
     size_t bytesWritten = serializeJson(doc, file);
     file.close();
     
-    Serial.printf("[Behavioral Persistence] Saved %d outputs and %d scenes (%d bytes)\n", 
-        outputs.size(), scenes.size(), bytesWritten);
+    Serial.printf("[Behavioral Persistence] Saved %d outputs, %d scenes, %d rules (%d bytes)\n", 
+        outputs.size(), scenes.size(), rules.size(), bytesWritten);
     
     return bytesWritten > 0;
 }
@@ -127,7 +147,7 @@ inline bool saveBehavioralConfig(BehaviorEngine& engine) {
 // LOAD CONFIGURATION FROM LITTLEFS
 // =================================================================
 
-inline bool loadBehavioralConfig(BehaviorEngine& engine) {
+inline bool loadBehavioralConfig(BehaviorEngine& engine, OutputRuleEngine& ruleEngine) {
     if (!LittleFS.exists(BEHAVIORAL_CONFIG_FILE)) {
         Serial.println("[Behavioral Persistence] No saved configuration found");
         return false;
@@ -252,8 +272,29 @@ inline bool loadBehavioralConfig(BehaviorEngine& engine) {
         sceneCount++;
     }
     
-    Serial.printf("[Behavioral Persistence] Loaded %d outputs and %d scenes from persistent storage\n", 
-        outputCount, sceneCount);
+    // Load output rules
+    JsonArray rulesArray = doc["rules"];
+    int ruleCount = 0;
+    for (JsonObject rObj : rulesArray) {
+        OutputRule rule;
+        rule.id                = rObj["id"].as<String>();
+        rule.name              = rObj["name"].as<String>();
+        rule.enabled           = rObj["enabled"] | true;
+        rule.trigger_output_id = rObj["trigger_output_id"].as<String>();
+        rule.trigger_on_rise   = rObj["trigger_on_rise"] | true;
+        rule.trigger_on_fall   = rObj["trigger_on_fall"] | false;
+        rule.action            = rObj["action"].as<String>();
+        rule.action_output_id  = rObj["action_output_id"].as<String>();
+        rule.action_scene_id   = rObj["action_scene_id"].as<String>();
+        rule.release_output_id = rObj["release_output_id"].as<String>();
+        rule.release_on_rise   = rObj["release_on_rise"] | true;
+        rule.release_auto_ms   = rObj["release_auto_ms"] | 0u;
+        ruleEngine.addRule(rule);
+        ruleCount++;
+    }
+
+    Serial.printf("[Behavioral Persistence] Loaded %d outputs, %d scenes, %d rules from persistent storage\n",
+        outputCount, sceneCount, ruleCount);
     
     return true;
 }

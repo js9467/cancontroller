@@ -18,6 +18,7 @@
 #include "behavioral_output_api.h"
 #include "behavioral_output_ui.h"
 #include "behavioral_config_persistence.h"
+#include "output_rule_engine.h"
 #include "can_manager.h"
 #include "infinitybox_control.h"
 #include "ipm1_can_library.h"
@@ -30,6 +31,7 @@ using namespace BehavioralOutput;
 // =================================================================
 
 inline BehaviorEngine behaviorEngine;
+inline OutputRuleEngine outputRuleEngine;
 inline PowercellSynthesizer* powercellSynthesizer = nullptr;
 inline BehavioralOutputAPI* outputAPI = nullptr;
 
@@ -69,7 +71,7 @@ inline void initBehavioralOutputSystem(AsyncWebServer* webServer) {
     
     // Register REST API endpoints
     if (webServer) {
-        outputAPI = new BehavioralOutputAPI(webServer, &behaviorEngine);
+        outputAPI = new BehavioralOutputAPI(webServer, &behaviorEngine, &outputRuleEngine);
         outputAPI->registerEndpoints();
         
         // Serve the main UI
@@ -86,7 +88,7 @@ inline void initBehavioralOutputSystem(AsyncWebServer* webServer) {
     });
     
     // Try to load from persistent storage first
-    bool loaded = loadBehavioralConfig(behaviorEngine);
+    bool loaded = loadBehavioralConfig(behaviorEngine, outputRuleEngine);
     size_t outputCount = behaviorEngine.getOutputs().size();
     size_t sceneCount = behaviorEngine.getScenes().size();
     
@@ -537,6 +539,9 @@ inline void updateBehavioralOutputSystem() {
     
     // Update behavior engine (evaluates all behaviors)
     behaviorEngine.update();
+
+    // Evaluate output rules (IF/THEN logic layer)
+    outputRuleEngine.update(behaviorEngine);
     
     // Synthesize and transmit POWERCELL frames
     if (powercellSynthesizer) {

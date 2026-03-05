@@ -6,6 +6,7 @@
 #include <ESPAsyncWebServer.h>
 #include "output_behavior_engine.h"
 #include "output_frame_synthesizer.h"
+#include "output_rule_engine.h"
 #include "can_manager.h"
 #include "behavioral_config_persistence.h"
 
@@ -21,8 +22,8 @@ namespace BehavioralOutput {
 
 class BehavioralOutputAPI {
 public:
-    BehavioralOutputAPI(AsyncWebServer* server, BehaviorEngine* engine)
-        : _server(server), _engine(engine) {}
+    BehavioralOutputAPI(AsyncWebServer* server, BehaviorEngine* engine, OutputRuleEngine* ruleEngine)
+        : _server(server), _engine(engine), _ruleEngine(ruleEngine) {}
     
     void registerEndpoints() {
         // =================================================================
@@ -160,7 +161,7 @@ public:
             String id = extractOutputId(path);
             
             _engine->removeOutput(id);
-            saveBehavioralConfig(*_engine); // Auto-save
+            saveBehavioralConfig(*_engine, *_ruleEngine); // Auto-save
             request->send(200, "application/json", "{\"success\":true}");
         });
         
@@ -380,7 +381,87 @@ public:
             String id = extractSceneId(path);
             
             _engine->removeScene(id);
-            saveBehavioralConfig(*_engine); // Auto-save
+            saveBehavioralConfig(*_engine, *_ruleEngine); // Auto-save
+            request->send(200, "application/json", "{\"success\":true}");
+        });
+
+        // =================================================================
+        // OUTPUT RULES  (IF/THEN logic layer)
+        // =================================================================
+
+        // GET /api/rules - list all rules
+        _server->on("/api/rules", HTTP_GET, [this](AsyncWebServerRequest* request) {
+            request->send(200, "application/json", serializeRules());
+        });
+
+        // POST /api/rules - create rule
+        _server->on("/api/rules", HTTP_POST, [](AsyncWebServerRequest* request){},
+            nullptr,
+            [this](AsyncWebServerRequest* request, uint8_t* data, size_t len, size_t index, size_t total) {
+                DynamicJsonDocument doc(2048);
+                DeserializationError err = deserializeJson(doc, (const char*)data, len);
+                if (err) {
+                    request->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
+                    return;
+                }
+                OutputRule rule;
+                rule.id               = doc["id"] | String(String("rule_") + String(millis()));
+                rule.name             = doc["name"] | String("Unnamed Rule");
+                rule.enabled          = doc["enabled"] | true;
+                rule.trigger_output_id = doc["trigger_output_id"] | String("");
+                rule.trigger_on_rise  = doc["trigger_on_rise"] | true;
+                rule.trigger_on_fall  = doc["trigger_on_fall"] | false;
+                rule.action           = doc["action"] | String("on");
+                rule.action_output_id = doc["action_output_id"] | String("");
+                rule.action_scene_id  = doc["action_scene_id"] | String("");
+                rule.release_output_id = doc["release_output_id"] | String("");
+                rule.release_on_rise  = doc["release_on_rise"] | true;
+                rule.release_auto_ms  = doc["release_auto_ms"] | 0u;
+                _ruleEngine->addRule(rule);
+                saveBehavioralConfig(*_engine, *_ruleEngine);
+                DynamicJsonDocument resp(256);
+                resp["success"] = true;
+                resp["id"] = rule.id;
+                String out; serializeJson(resp, out);
+                request->send(200, "application/json", out);
+            });
+
+        // PUT /api/rules/{id} - update rule
+        _server->on("/api/rules/*", HTTP_PUT, [](AsyncWebServerRequest* request){},
+            nullptr,
+            [this](AsyncWebServerRequest* request, uint8_t* data, size_t len, size_t index, size_t total) {
+                String path = request->url();
+                String id = path.substring(path.lastIndexOf('/') + 1);
+                DynamicJsonDocument doc(2048);
+                DeserializationError err = deserializeJson(doc, (const char*)data, len);
+                if (err) {
+                    request->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
+                    return;
+                }
+                OutputRule rule;
+                rule.id               = id;
+                rule.name             = doc["name"] | String("Unnamed Rule");
+                rule.enabled          = doc["enabled"] | true;
+                rule.trigger_output_id = doc["trigger_output_id"] | String("");
+                rule.trigger_on_rise  = doc["trigger_on_rise"] | true;
+                rule.trigger_on_fall  = doc["trigger_on_fall"] | false;
+                rule.action           = doc["action"] | String("on");
+                rule.action_output_id = doc["action_output_id"] | String("");
+                rule.action_scene_id  = doc["action_scene_id"] | String("");
+                rule.release_output_id = doc["release_output_id"] | String("");
+                rule.release_on_rise  = doc["release_on_rise"] | true;
+                rule.release_auto_ms  = doc["release_auto_ms"] | 0u;
+                _ruleEngine->addRule(rule); // addRule overwrites if id exists
+                saveBehavioralConfig(*_engine, *_ruleEngine);
+                request->send(200, "application/json", "{\"success\":true}");
+            });
+
+        // DELETE /api/rules/{id} - delete rule
+        _server->on("/api/rules/*", HTTP_DELETE, [this](AsyncWebServerRequest* request) {
+            String path = request->url();
+            String id = path.substring(path.lastIndexOf('/') + 1);
+            _ruleEngine->removeRule(id);
+            saveBehavioralConfig(*_engine, *_ruleEngine);
             request->send(200, "application/json", "{\"success\":true}");
         });
     }
@@ -388,7 +469,8 @@ public:
 private:
     AsyncWebServer* _server;
     BehaviorEngine* _engine;
-    
+    OutputRuleEngine* _ruleEngine;
+
     // =================================================================
     // SERIALIZATION
     // =================================================================
@@ -682,7 +764,7 @@ private:
         }
         
         _engine->addOutput(output);
-        saveBehavioralConfig(*_engine); // Auto-save
+        saveBehavioralConfig(*_engine, *_ruleEngine); // Auto-save
         
         request->send(200, "application/json", "{\"success\":true,\"id\":\"" + output.id + "\"}");
     }
@@ -809,11 +891,38 @@ private:
         }
         
         _engine->addScene(scene);
-        saveBehavioralConfig(*_engine); // Auto-save
+        saveBehavioralConfig(*_engine, *_ruleEngine); // Auto-save
         
         request->send(200, "application/json", "{\"success\":true,\"id\":\"" + scene.id + "\"}");
     }
-    
+
+    // =================================================================
+    // RULES SERIALIZATION
+    // =================================================================
+
+    String serializeRules() {
+        DynamicJsonDocument doc(8192);
+        JsonArray array = doc.to<JsonArray>();
+        for (const auto& [id, rule] : _ruleEngine->getRules()) {
+            JsonObject obj = array.createNestedObject();
+            obj["id"]                = rule.id;
+            obj["name"]              = rule.name;
+            obj["enabled"]           = rule.enabled;
+            obj["trigger_output_id"] = rule.trigger_output_id;
+            obj["trigger_on_rise"]   = rule.trigger_on_rise;
+            obj["trigger_on_fall"]   = rule.trigger_on_fall;
+            obj["action"]            = rule.action;
+            obj["action_output_id"]  = rule.action_output_id;
+            obj["action_scene_id"]   = rule.action_scene_id;
+            obj["release_output_id"] = rule.release_output_id;
+            obj["release_on_rise"]   = rule.release_on_rise;
+            obj["release_auto_ms"]   = rule.release_auto_ms;
+        }
+        String result;
+        serializeJson(doc, result);
+        return result;
+    }
+
     // =================================================================
     // UTILITIES
     // =================================================================
