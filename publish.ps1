@@ -93,5 +93,5 @@ try {
     Write-Host "WARNING: Could not verify via GitHub API: $_" -ForegroundColor Yellow
 }
 
-Info ""
-Info "NOTE: Do NOT push anything to master. master is a read-only bridge shim."
+Write-Host ""
+Write-Host "NOTE: Do NOT push anything to master." -ForegroundColor DarkGray
