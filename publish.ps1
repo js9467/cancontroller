@@ -53,12 +53,16 @@ $state | ConvertTo-Json | Set-Content $statePath -Encoding UTF8
 # â”€â”€ 2. Build â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 Info "Building firmware $version..."
 Push-Location $root
+$prevEAP = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
 $buildOut = pio run -e waveshare_7in 2>&1
-if ($LASTEXITCODE -ne 0) {
+$buildExitCode = $LASTEXITCODE
+$ErrorActionPreference = $prevEAP
+if ($buildExitCode -ne 0) {
     $buildOut | Select-Object -Last 30
     Fail "Build failed."
 }
-$buildOut | Where-Object { $_ -match 'error:|SUCCESS|FAILED|\[Versioning\]' } | Select-Object -Last 5
+$buildOut | Where-Object { $_ -match "error:|SUCCESS|FAILED" } | Select-Object -Last 5
 Pop-Location
 
 # â”€â”€ 3. Copy binary into versions/ (on main) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
