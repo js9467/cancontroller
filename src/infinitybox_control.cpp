@@ -84,21 +84,20 @@ bool InfinityboxController::begin(Ipm1CanSystem* can_system, BehavioralOutput::B
     }
     
     // Load default JSON schema
-    // Device definitions
-    Device pc_front = {"pc_front", DeviceType::POWERCELL, 1, "Front Powercell"};
-    Device pc_rear = {"pc_rear", DeviceType::POWERCELL, 2, "Rear Powercell"};
-    Device im_df = {"im_df", DeviceType::INMOTION, 3, "Driver Front inMotion"};
-    Device im_pf = {"im_pf", DeviceType::INMOTION, 4, "Passenger Front inMotion"};
-    Device im_dr = {"im_dr", DeviceType::INMOTION, 5, "Driver Rear inMotion"};
-    Device im_pr = {"im_pr", DeviceType::INMOTION, 6, "Passenger Rear inMotion"};
+    // Device definitions — matches user's physical setup:
+    //   1=Front Powercell, 2=Rear Powercell, 3=Driver inMOTION, 4=Passenger inMOTION, 5=Aux Powercell
+    Device pc_front   = {"pc_front",   DeviceType::POWERCELL,  1, "Front Powercell"};
+    Device pc_rear    = {"pc_rear",    DeviceType::POWERCELL,  2, "Rear Powercell"};
+    Device im_df      = {"im_df",      DeviceType::INMOTION,   3, "Driver inMotion"};
+    Device im_pf      = {"im_pf",      DeviceType::INMOTION,   4, "Passenger inMotion"};
+    Device pc_aux     = {"pc_aux",     DeviceType::POWERCELL,  5, "Aux Powercell"};
     Device mastercell = {"mastercell", DeviceType::MASTERCELL, 0, "Mastercell"};
     
     addDevice(pc_front);
     addDevice(pc_rear);
     addDevice(im_df);
     addDevice(im_pf);
-    addDevice(im_dr);
-    addDevice(im_pr);
+    addDevice(pc_aux);
     addDevice(mastercell);
 
     bool loaded_from_json = false;

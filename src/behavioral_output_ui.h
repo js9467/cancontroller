@@ -1057,10 +1057,11 @@ function openOutputModal(id = null) {
 		if (out) {
 			document.getElementById('om-name').value = out.name || '';
 			document.getElementById('om-description').value = out.description || '';
+			document.getElementById('om-protected').checked = !!out.protectedOutput;
 			const dt = out.deviceType || 'POWERCELL';
 			document.getElementById('om-device-type').value = dt;
 			if (dt === 'INMOTION') {
-				document.getElementById('om-inmotion-module').value = out.cellAddress || 3;
+				document.getElementById('om-inmotion-addr').value = out.cellAddress || 3;
 				document.getElementById('om-inmotion-output').value = out.outputNumber || 1;
 			} else if (dt === 'MASTERCELL') {
 				document.getElementById('om-mc-output-num').value = out.outputNumber || 1;
@@ -1072,6 +1073,7 @@ function openOutputModal(id = null) {
 	} else {
 		document.getElementById('om-name').value = '';
 		document.getElementById('om-description').value = '';
+		document.getElementById('om-protected').checked = false;
 		document.getElementById('om-device-type').value = 'POWERCELL';
 		document.getElementById('om-cell').value = '1';
 		document.getElementById('om-output-num').value = '1';
@@ -1095,9 +1097,10 @@ function submitOutputModal() {
 	const name = document.getElementById('om-name').value.trim();
 	if (!name) { alert('Name is required'); return; }
 	const dt = document.getElementById('om-device-type').value;
+	const protectedOutput = document.getElementById('om-protected').checked;
 	let cellAddress, outputNumber;
 	if (dt === 'INMOTION') {
-		cellAddress  = parseInt(document.getElementById('om-inmotion-module').value);
+		cellAddress  = parseInt(document.getElementById('om-inmotion-addr').value);
 		outputNumber = parseInt(document.getElementById('om-inmotion-output').value);
 	} else if (dt === 'MASTERCELL') {
 		cellAddress  = 0;
@@ -1109,6 +1112,7 @@ function submitOutputModal() {
 	const payload = {
 		id: _omEditId || `out_${Date.now()}`,
 		name, deviceType: dt, cellAddress, outputNumber,
+		protectedOutput,
 		description: document.getElementById('om-description').value.trim()
 	};
 	fetch('/api/outputs', {
@@ -1145,18 +1149,20 @@ function renderOutputList(outputs) {
 		const dt = out.deviceType || 'POWERCELL';
 		let metaLine;
 		if (dt === 'INMOTION') {
-			const mod = { 3:'Driver Front', 4:'Passenger Front', 5:'Driver Rear', 6:'Passenger Rear' }[out.cellAddress] || `Module ${out.cellAddress}`;
-			metaLine = `<span class="output-device-tag">inMOTION</span> ${mod} &bull; ${inmotionOutputLabel(out.outputNumber)}`;
+			metaLine = `<span class="output-device-tag">inMOTION</span> Addr ${out.cellAddress} &bull; ${inmotionOutputLabel(out.outputNumber)}`;
 		} else if (dt === 'MASTERCELL') {
 			metaLine = `<span class="output-device-tag">Mastercell</span> Output ${out.outputNumber}`;
 		} else {
 			metaLine = `<span class="output-device-tag">POWERCELL</span> Cell ${out.cellAddress} &bull; Output ${out.outputNumber}`;
 		}
+		const protectedBadge = out.protectedOutput
+			? '<span class="output-device-tag" style="background:rgba(255,160,0,0.2);color:#ffa000;border-color:#ffa000;margin-left:6px" title="Protected: this output bit is always kept ON in POWERCELL frames">&#128274; Protected</span>'
+			: '';
 		return `
 		<div class="output-item">
 			<div class="output-indicator ${out.isActive ? 'active' : ''}"></div>
 			<div class="output-info">
-				<div class="output-name">${out.name}</div>
+				<div class="output-name">${out.name}${protectedBadge}</div>
 				<div class="output-meta">${metaLine}</div>
 			</div>
 			<div class="output-badge">${out.behavior?.type || 'None'}</div>
@@ -2193,13 +2199,9 @@ document.addEventListener('DOMContentLoaded', () => {
 		<!-- inMOTION NGX -->
 		<div id="om-inmotion-fields" style="display:none">
 			<div class="om-field">
-				<label>Module (door location)</label>
-				<select id="om-inmotion-module">
-					<option value="3">Driver Front &mdash; FF031A / FF331B</option>
-					<option value="4">Passenger Front &mdash; FF041A / FF341B</option>
-					<option value="5">Driver Rear &mdash; FF051A / FF351B</option>
-					<option value="6">Passenger Rear &mdash; FF061A / FF361B</option>
-				</select>
+				<label>Module CAN Address (1&ndash;16)</label>
+				<input type="number" id="om-inmotion-addr" min="1" max="16" value="3" />
+				<div style="font-size:0.8rem;color:var(--muted);margin-top:4px">Default: 3=Driver&nbsp;Front, 4=Passenger&nbsp;Front; any address 1&ndash;16 supported</div>
 			</div>
 			<div class="om-field">
 				<label>Output / Relay</label>
@@ -2227,6 +2229,16 @@ document.addEventListener('DOMContentLoaded', () => {
 		<div class="om-field">
 			<label>Description (optional)</label>
 			<input type="text" id="om-description" placeholder="Brief note" />
+		</div>
+
+		<div class="om-field" style="display:flex;align-items:center;gap:10px;padding:10px;background:rgba(255,160,0,0.08);border:1px solid rgba(255,160,0,0.3);border-radius:8px">
+			<input type="checkbox" id="om-protected" style="width:18px;height:18px;cursor:pointer" />
+			<label for="om-protected" style="cursor:pointer;margin:0">
+				&#128274; <strong>Protected output</strong> &mdash;
+				Keep this bit always ON in POWERCELL frames.
+				Use when this output powers the controller itself or
+				another device that must never be cut off by a scene.
+			</label>
 		</div>
 
 		<div class="btn-group" style="justify-content:flex-end;margin-top:4px">

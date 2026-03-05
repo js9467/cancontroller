@@ -22,11 +22,10 @@ constexpr const char* kDefaultSystemJson = R"json(
 
   "devices": [
     { "id": "pc_front", "type": "powercell", "address": 1 },
-    { "id": "pc_rear", "type": "powercell", "address": 2 },
-    { "id": "im_df", "type": "inmotion", "address": 3 },
-    { "id": "im_pf", "type": "inmotion", "address": 4 },
-    { "id": "im_dr", "type": "inmotion", "address": 5 },
-    { "id": "im_pr", "type": "inmotion", "address": 6 },
+    { "id": "pc_rear",  "type": "powercell", "address": 2 },
+    { "id": "im_df",    "type": "inmotion",  "address": 3 },
+    { "id": "im_pf",    "type": "inmotion",  "address": 4 },
+    { "id": "pc_aux",   "type": "powercell", "address": 5 },
     { "id": "mastercell", "type": "mastercell" }
   ],
 

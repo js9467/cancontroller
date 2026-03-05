@@ -100,7 +100,13 @@ public:
                 cellHasActive[cellAddr] = true;
             }
 
-            if (output.currentState) {
+            // Protected outputs are permanently kept ON in the CAN frame regardless of
+            // behavioral state — this prevents accidentally cutting power to the device
+            // itself if an aux output on the same POWERCELL is powering the controller.
+            if (output.protected_output) {
+                bitmap |= static_cast<uint16_t>(1u << (outNum - 1));
+                cellHasActive[cellAddr] = true;  // Always transmit cells with protected outputs
+            } else if (output.currentState) {
                 bitmap |= static_cast<uint16_t>(1u << (outNum - 1));
             }
         }

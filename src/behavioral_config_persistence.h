@@ -38,6 +38,7 @@ inline bool saveBehavioralConfig(BehaviorEngine& engine) {
         outObj["cell_address"] = output.cellAddress;
         outObj["output_number"] = output.outputNumber;
         outObj["device_type"] = output.deviceType;
+        outObj["protected_output"] = output.protected_output;
     }
     
     // Save scenes
@@ -161,16 +162,15 @@ inline bool loadBehavioralConfig(BehaviorEngine& engine) {
         output.description = outObj["description"].as<String>();
         output.cellAddress = outObj["cell_address"];
         output.outputNumber = outObj["output_number"];
-        // Smart-default: configs saved before device_type existed have no field.
-        // If absent, infer from cellAddress: addresses 3-6 are inMOTION modules.
+        // Smart-default: configs saved before device_type field existed had no field.
+        // Default to POWERCELL — the user can always edit the output to INMOTION in the web UI.
+        // The old heuristic (address >= 3 → INMOTION) was wrong when powercells are at higher
+        // addresses (e.g. address 5 = powercell for aux functions).
         {
             const char* savedDevType = outObj["device_type"] | "";
-            if (savedDevType[0] != '\0') {
-                output.deviceType = savedDevType;
-            } else {
-                output.deviceType = (output.cellAddress >= 3) ? "INMOTION" : "POWERCELL";
-            }
+            output.deviceType = (savedDevType[0] != '\0') ? String(savedDevType) : String("POWERCELL");
         }
+        output.protected_output = outObj["protected_output"] | false;
         
         engine.addOutput(output);
         outputCount++;

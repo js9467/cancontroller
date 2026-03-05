@@ -828,15 +828,18 @@ void UIBuilder::actionButtonEvent(lv_event_t* e) {
                         Serial.printf("[UI] INMOTION dispatch SKIP: '%s' deviceType='%s' (expected INMOTION) cell=%d out=%d\n",
                                      output_id.c_str(), imOut->deviceType.c_str(), imOut->cellAddress, imOut->outputNumber);
                     } else {
-                        const uint8_t mod = (imOut->cellAddress >= 3 && imOut->cellAddress <= 6)
-                                          ? static_cast<uint8_t>(imOut->cellAddress - 3) : 0;
-                        Serial.printf("[UI] INMOTION dispatch: '%s' cell=%d mod=%d outNum=%d\n",
-                                     output_id.c_str(), imOut->cellAddress, mod, imOut->outputNumber);
+                        const uint8_t addr = imOut->cellAddress;
+                        Serial.printf("[UI] INMOTION dispatch: '%s' addr=%d outNum=%d\n",
+                                     output_id.c_str(), addr, imOut->outputNumber);
                         switch (imOut->outputNumber) {
-                            case 1: InMotionNGX::windowUp(mod);   break;  // Relay 1A → Window Up
-                            case 2: InMotionNGX::windowDown(mod); break;  // Relay 1B → Window Down
-                            case 3: InMotionNGX::lockDoor(mod);   break;  // Relay 2A → Lock
-                            case 4: InMotionNGX::unlockDoor(mod); break;  // Relay 2B → Unlock
+                            case 1: InMotionNGX::windowUpByAddress(addr);              break;  // Relay 1A → Window Up
+                            case 2: InMotionNGX::windowDownByAddress(addr);            break;  // Relay 1B → Window Down
+                            case 3: InMotionNGX::lockDoorByAddress(addr);              break;  // Relay 2A → Lock
+                            case 4: InMotionNGX::unlockDoorByAddress(addr);            break;  // Relay 2B → Unlock
+                            case 5: InMotionNGX::setOutputByAddress(addr, 1, true);    break;  // Output 1
+                            case 6: InMotionNGX::setOutputByAddress(addr, 2, true);    break;  // Output 2
+                            case 7: InMotionNGX::setOutputByAddress(addr, 3, true);    break;  // Output 3
+                            case 8: InMotionNGX::setOutputByAddress(addr, 4, true);    break;  // Output 4
                             default:
                                 Serial.printf("[UI] INMOTION dispatch SKIP: unknown outputNumber=%d\n", imOut->outputNumber);
                                 break;
@@ -854,10 +857,9 @@ void UIBuilder::actionButtonEvent(lv_event_t* e) {
                     {
                         auto* imOut = behaviorEngine.getOutput(config->output_behavior.output_id.c_str());
                         if (imOut && imOut->deviceType == "INMOTION") {
-                            const uint8_t mod = (imOut->cellAddress >= 3 && imOut->cellAddress <= 6)
-                                              ? static_cast<uint8_t>(imOut->cellAddress - 3) : 0;
+                            const uint8_t addr = imOut->cellAddress;
                             if (imOut->outputNumber == 1 || imOut->outputNumber == 2) {
-                                InMotionNGX::windowStop(mod);  // Cut H-bridge; lock pulses are self-timed
+                                InMotionNGX::windowStopByAddress(addr);  // Cut H-bridge; lock pulses are self-timed
                             }
                         }
                     }

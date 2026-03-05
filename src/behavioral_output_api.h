@@ -394,7 +394,9 @@ private:
     // =================================================================
     
     String serializeOutputs() {
-        DynamicJsonDocument doc(8192);
+        // 32 KB: 40+ default outputs × ~200 bytes each + overhead. The old 8 KB buffer
+        // overflowed silently, causing the output-config page to render nothing.
+        DynamicJsonDocument doc(32768);
         JsonArray array = doc.to<JsonArray>();
         
         const auto& outputs = _engine->getOutputs();
@@ -405,6 +407,7 @@ private:
             obj["cellAddress"] = output.cellAddress;
             obj["outputNumber"] = output.outputNumber;
             obj["deviceType"] = output.deviceType;
+            obj["protectedOutput"] = output.protected_output;
             obj["description"] = output.description;
             obj["isActive"] = output.isActive;
             obj["currentValue"] = output.currentState ? 255 : 0;
@@ -432,6 +435,7 @@ private:
         obj["cellAddress"] = output.cellAddress;
         obj["outputNumber"] = output.outputNumber;
         obj["deviceType"] = output.deviceType;
+        obj["protectedOutput"] = output.protected_output;
         obj["isActive"] = output.isActive;
         obj["currentValue"] = output.currentState ? 255 : 0;
         
@@ -449,7 +453,8 @@ private:
     }
     
     String serializeOutputStates() {
-        DynamicJsonDocument doc(4096);
+        // 16 KB: more room for 40+ outputs with telemetry data
+        DynamicJsonDocument doc(16384);
         JsonArray array = doc.to<JsonArray>();
 
         const uint32_t now = millis();
@@ -665,6 +670,7 @@ private:
         output.cellAddress = doc.containsKey("cellAddress") ? doc["cellAddress"].as<uint8_t>() : 1;
         output.outputNumber = doc.containsKey("outputNumber") ? doc["outputNumber"].as<uint8_t>() : 1;
         output.deviceType = doc.containsKey("deviceType") ? doc["deviceType"].as<String>() : String("POWERCELL");
+        output.protected_output = doc["protectedOutput"] | false;
 
         if (output.cellAddress > 254) output.cellAddress = 254;
         if (output.deviceType == "INMOTION") {

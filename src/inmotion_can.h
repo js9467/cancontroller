@@ -317,6 +317,74 @@ inline void unlockAll(uint16_t pulse_ms = 500) {
     for (uint8_t i = 0; i < 4; i++) unlockDoor(i, pulse_ms);
 }
 
+// ── ADDRESS-BASED DISPATCH HELPERS ───────────────────────────────────────
+// These functions take the raw CAN address (1-16) of the inMOTION module
+// rather than an index into kModules[].  This allows inMOTION modules at
+// any address (not just 3-6) to be controlled correctly.
+// The PGN PS byte equals the module address; SA is always 0x1A (command).
+
+/// @brief Build a transient Module descriptor for any CAN address.
+inline Module makeModuleByAddress(uint8_t addr) {
+    return Module{
+        "Dynamic",
+        addr,                                        // cmd_pgn_ps = address
+        0x1A,                                        // cmd_sa
+        static_cast<uint8_t>(0x30 | addr),           // resp_pgn_ps
+        0x1B                                         // resp_sa
+    };
+}
+
+/// Window UP (Track) for module at \p addr.
+inline void windowUpByAddress(uint8_t addr) {
+    const Module m = makeModuleByAddress(addr);
+    uint8_t d[8] = { 0x00, CMD_TRACK, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+    sendCommand(m, d);
+    Serial.printf("[inMOTION] Window addr=%d UP (Track)\n", addr);
+}
+
+/// Window DOWN (Track) for module at \p addr.
+inline void windowDownByAddress(uint8_t addr) {
+    const Module m = makeModuleByAddress(addr);
+    uint8_t d[8] = { CMD_TRACK, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+    sendCommand(m, d);
+    Serial.printf("[inMOTION] Window addr=%d DOWN (Track)\n", addr);
+}
+
+/// Window STOP (both relays off) for module at \p addr.
+inline void windowStopByAddress(uint8_t addr) {
+    const Module m = makeModuleByAddress(addr);
+    uint8_t d[8] = { CMD_OFF, CMD_OFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+    sendCommand(m, d);
+    Serial.printf("[inMOTION] Window addr=%d STOP\n", addr);
+}
+
+/// Lock door (Relay 2A timed pulse) for module at \p addr.
+inline void lockDoorByAddress(uint8_t addr, uint16_t pulse_ms = 500) {
+    const Module m = makeModuleByAddress(addr);
+    const uint8_t counts = static_cast<uint8_t>((pulse_ms + 124) / 250);
+    uint8_t d[8] = { 0x00, 0x00, cmdTimed(counts), 0x00, 0x00, 0x00, 0x00, 0x00 };
+    sendCommand(m, d);
+    Serial.printf("[inMOTION] Door addr=%d LOCK (%.2f s)\n", addr, counts * 0.25f);
+}
+
+/// Unlock door (Relay 2B timed pulse) for module at \p addr.
+inline void unlockDoorByAddress(uint8_t addr, uint16_t pulse_ms = 500) {
+    const Module m = makeModuleByAddress(addr);
+    const uint8_t counts = static_cast<uint8_t>((pulse_ms + 124) / 250);
+    uint8_t d[8] = { 0x00, 0x00, 0x00, cmdTimed(counts), 0x00, 0x00, 0x00, 0x00 };
+    sendCommand(m, d);
+    Serial.printf("[inMOTION] Door addr=%d UNLOCK (%.2f s)\n", addr, counts * 0.25f);
+}
+
+/// Set AUX output (1-4) on/off for module at \p addr.
+inline void setOutputByAddress(uint8_t addr, uint8_t output_num, bool on) {
+    if (output_num < 1 || output_num > 4) return;
+    const Module m = makeModuleByAddress(addr);
+    uint8_t d[8] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+    d[BYTE_OUTPUT_1 + (output_num - 1)] = on ? CMD_TRACK : CMD_OFF;
+    sendCommand(m, d);
+}
+
 // ── LIVE FEEDBACK CACHE ───────────────────────────────────────────────────
 
 struct ModuleStatus {

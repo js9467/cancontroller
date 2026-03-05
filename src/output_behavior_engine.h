@@ -109,9 +109,10 @@ struct OutputChannel {
     String description = "";
     
     // Physical mapping
-    uint8_t cellAddress = 1;        // POWERCELL cell address (3-6 = inMOTION module)
+    uint8_t cellAddress = 1;        // CAN address of the device (1-16 for POWERCELL, 1-16 for inMOTION)
     uint8_t outputNumber = 1;       // Output 1-10 on cell; for inMOTION: 1=R1A,2=R1B,3=R2A,4=R2B,5-8=Out1-4
     String deviceType = "POWERCELL"; // "POWERCELL" | "INMOTION" | "MASTERCELL"
+    bool protected_output = false;  // Always include this bit in POWERCELL frames (never send 0 for it)
     
     // Current behavior
     BehaviorConfig behavior;
