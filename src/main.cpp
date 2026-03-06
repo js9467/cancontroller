@@ -43,14 +43,11 @@
 #include <Preferences.h>
 
 // Increase the Arduino loop task stack from the default 8192 bytes.
-// The loopTask in the Arduino-ESP32 framework uses getArduinoLoopTaskStackSize()
-// (marked __attribute__((weak))) to determine the task stack.  By providing our
-// own non-weak definition we override it without touching the framework.
-// 20 KB gives plenty of headroom for deep call chains that include ArduinoJson
-// serialization, BehavioralOutput synthesizers, and ConfigManager::decodeConfig.
-size_t getArduinoLoopTaskStackSize(void) {
-    return 20480;  // 20 KB  (default is 8192)
-}
+// Arduino-ESP32 v3.x declares getArduinoLoopTaskStackSize() with C++ linkage
+// and marks it __attribute__((weak)).  Override without extern "C".
+// 24 KB gives plenty of headroom for ArduinoJson serialization,
+// BehavioralOutput synthesizers, and ConfigManager::decodeConfig.
+SET_LOOP_TASK_STACK_SIZE(24576);  // 24 KB  (default is 8192)
 
 // CAN message queue structure
 struct CanFrame {

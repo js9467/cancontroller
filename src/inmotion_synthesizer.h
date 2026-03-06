@@ -42,31 +42,33 @@ public:
         const auto& outputs = _engine->getOutputs();
         
         // Build desired command frames for every registered inMOTION output.
-        // IMPORTANT: ALL registered outputs are included, not just active ones.
         //   - Active output   → CMD_TRACK / CMD_EXPRESS / cmdTimed  (turn on)
-        //   - Inactive output → CMD_OFF (0x80)   (explicit OFF, not 0x00 don't-care)
+        //   - Inactive output → CMD_OFF (0x80)  (explicit OFF, not 0x00 don't-care)
         //
-        // Using 0x00 (don't-care) for inactive outputs would leave the inMOTION
-        // module in its last commanded state — meaning AUX MOSFETs could never be
-        // turned off once activated.  Explicit CMD_OFF fixes this.
+        // Using 0x00 (don't-care) for inactive outputs leaves the inMOTION module
+        // in its last commanded state — AUX MOSFETs would never turn off.
+        // Explicit CMD_OFF fixes this.
         std::map<uint8_t, std::array<uint8_t, 8>> frames;
+        std::map<uint8_t, bool> hasActiveOutput;  // addr -> any output currently on
 
-        // Initialise every registered output slot to CMD_OFF.
-        // Byte slots for outputs NOT registered in the engine stay 0x00 (don't-care).
+        // Step 1: Initialise every registered output slot to CMD_OFF.
         for (const auto& [id, output] : outputs) {
             if (output.deviceType != "INMOTION") continue;
             uint8_t addr = output.cellAddress;
             uint8_t outNum = output.outputNumber;
             if (addr < 1 || addr > 16) continue;
             if (outNum < 1 || outNum > 8) continue;
-            if (!frames.count(addr)) frames[addr].fill(0x00);
+            if (!frames.count(addr)) {
+                frames[addr].fill(0x00);
+                hasActiveOutput[addr] = false;
+            }
             frames[addr][outNum - 1] = InMotionNGX::CMD_OFF;
         }
 
-        // Apply the commanded state for every active output.
+        // Step 2: Apply the commanded state for every active output.
         for (const auto& [id, output] : outputs) {
             if (output.deviceType != "INMOTION") continue;
-            if (!output.isActive || !output.currentState) continue;  // CMD_OFF already set above
+            if (!output.isActive || !output.currentState) continue;
             uint8_t addr = output.cellAddress;
             uint8_t outNum = output.outputNumber;
             if (addr < 1 || addr > 16) continue;
@@ -83,18 +85,30 @@ public:
                 cmd = InMotionNGX::CMD_TRACK;  // 0x90
             }
             frames[addr][outNum - 1] = cmd;
+            hasActiveOutput[addr] = true;
         }
 
-        // Transmit only frames that differ from the last sent frame.
-        // This prevents flooding the bus while idle and ensures CMD_OFF is always
-        // sent when an output transitions from active → inactive.
+        // Step 3: Transmit.
+        // ACTIVE module  → always re-send every interval.  inMOTION NGX uses a
+        //   CAN watchdog: if the controller stops refreshing CMD_TRACK / CMD_EXPRESS
+        //   the module de-energises the relay/MOSFET for safety.  We must keep
+        //   sending the frame every _transmitInterval ms while any output is on.
+        // IDLE module    → send only when the frame changed vs the last transmission
+        //   (delivers CMD_OFF exactly once on the active→idle transition, then
+        //   stops to avoid unnecessary CAN traffic).
         for (auto& [addr, frame] : frames) {
-            auto prev_it = _prevFrames.find(addr);
-            bool changed = (prev_it == _prevFrames.end()) ||
-                           (prev_it->second != frame);
-            if (changed) {
+            bool active = hasActiveOutput.count(addr) && hasActiveOutput[addr];
+            if (active) {
                 _transmitFrame(addr, frame.data());
                 _prevFrames[addr] = frame;
+            } else {
+                auto prev_it = _prevFrames.find(addr);
+                bool changed = (prev_it == _prevFrames.end()) ||
+                               (prev_it->second != frame);
+                if (changed) {
+                    _transmitFrame(addr, frame.data());
+                    _prevFrames[addr] = frame;
+                }
             }
         }
     }

@@ -534,6 +534,7 @@ void UIBuilder::buildPage(std::size_t index) {
     btn_normal_label_text_.clear();
     btn_output_active_cache_.clear();
     output_feedback_cache_.clear();
+    can_status_cache_.clear();
     for (const auto& button : page.buttons) {
         lv_obj_t* btn = lv_btn_create(page_container_);
         lv_obj_remove_style_all(btn);
@@ -3375,14 +3376,20 @@ void UIBuilder::flushButtonStatus() {
     for (auto& [id, active] : pending) {
         auto it = btn_lvgl_map_.find(id);
         if (it == btn_lvgl_map_.end() || !it->second) continue;
+
+        // Cache check — skip all LVGL calls if CAN-reported state hasn't changed.
+        // lv_obj_add_state / lv_obj_clear_state can still trigger redraws in some
+        // LVGL versions even when the state bit is already correct.
+        auto cache_it = can_status_cache_.find(id);
+        if (cache_it != can_status_cache_.end() && cache_it->second == active) continue;
+        can_status_cache_[id] = active;
+
         if (active) {
             lv_obj_add_state(it->second, LV_STATE_CHECKED);
         } else {
             lv_obj_clear_state(it->second, LV_STATE_CHECKED);
         }
         // Swap label text if active_label is configured for this button
-        // Guard with strcmp: lv_label_set_text always calls lv_obj_invalidate, causing
-        // a full redraw every 150ms even when text hasn't changed (screen jitter).
         auto lbl_it = btn_label_map_.find(id);
         auto act_it = btn_active_label_text_.find(id);
         if (lbl_it != btn_label_map_.end() && lbl_it->second &&
