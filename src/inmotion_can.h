@@ -131,37 +131,35 @@ inline void sendCommand(const Module& m, const uint8_t data[8]) {
 
 // ── RELAY 1 (H-BRIDGE 1 — WINDOWS) ───────────────────────────────────────
 
-// ── H-BRIDGE 1 BYTE SWAP NOTE ───────────────────────────────────────────────
-// Per the spec, byte 0 = Relay 1A and byte 1 = Relay 1B.
-// In this physical installation the motor wires are reversed, so:
-//   byte 0 command → DOWN direction   (response: byte 0 bit[4] = 0x10)
-//   byte 1 command → UP direction     (response: byte 0 bit[0] = 0x01)
-// All functions below respect this swap via their byte ordering.
+// ── H-BRIDGE 1 WIRING (STANDARD — NO BYTE SWAP) ────────────────────────────
+// Per the spec and this physical installation:
+//   byte 0 = Relay 1A → UP direction   (response: byte 0 bit[4] = 0x10)
+//   byte 1 = Relay 1B → DOWN direction (response: byte 0 bit[0] = 0x01)
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Drive Relay 1A (byte 0 = DOWN in this hardware) in Track mode — stays on until stopped.
+/// Drive Relay 1A (byte 0 = UP in this hardware) in Track mode — stays on until stopped.
 inline void relay1A_Track(const Module& m) {
-    uint8_t d[8] = { CMD_TRACK, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };  // byte 0 ON, byte 1 don't-care
+    uint8_t d[8] = { CMD_TRACK, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };  // byte 0 ON (UP), byte 1 don't-care
     sendCommand(m, d);
 }
 
-/// Drive Relay 1B (byte 1 = UP in this hardware) in Track mode — stays on until stopped.
+/// Drive Relay 1B (byte 1 = DOWN in this hardware) in Track mode — stays on until stopped.
 inline void relay1B_Track(const Module& m) {
-    uint8_t d[8] = { 0x00, CMD_TRACK, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };  // byte 1 ON, byte 0 don't-care
+    uint8_t d[8] = { 0x00, CMD_TRACK, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };  // byte 1 ON (DOWN), byte 0 don't-care
     sendCommand(m, d);
 }
 
-/// Drive Relay 1A (DOWN) in Express mode — auto-stops at end of travel via current limit.
+/// Drive Relay 1A (UP) in Express mode — auto-stops at end of travel via current limit.
 /// Only use when H-bridge is known idle (no prior stalled Express outstanding).
 inline void relay1A_Express(const Module& m) {
-    uint8_t d[8] = { CMD_EXPRESS, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };  // byte 0 Express, byte 1 don't-care
+    uint8_t d[8] = { CMD_EXPRESS, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };  // byte 0 Express (UP), byte 1 don't-care
     sendCommand(m, d);
 }
 
-/// Drive Relay 1B (UP) in Express mode — auto-stops at end of travel via current limit.
+/// Drive Relay 1B (DOWN) in Express mode — auto-stops at end of travel via current limit.
 /// Only use when H-bridge is known idle (no prior stalled Express outstanding).
 inline void relay1B_Express(const Module& m) {
-    uint8_t d[8] = { 0x00, CMD_EXPRESS, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };  // byte 1 Express, byte 0 don't-care
+    uint8_t d[8] = { 0x00, CMD_EXPRESS, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };  // byte 1 Express (DOWN), byte 0 don't-care
     sendCommand(m, d);
 }
 
@@ -219,20 +217,20 @@ inline void setOutput(const Module& m, uint8_t output_num, bool on) {
  * @brief Raise window (window_id: 0=DriverFront, 1=PassFront, 2=DriverRear, 3=PassRear).
  *
  *  Uses Track personality (0x90) — motor runs while commanded, stops on windowStop().
- *  Byte layout with hardware swap: byte 1 = UP direction, byte 0 = 0x00 (don't-care).
+ *  Byte layout: byte 0 = Relay 1A = UP direction.
  *
- *  CRITICAL: byte 0 must be 0x00 (don't-care), NOT CMD_OFF (0x80).
- *  After an Express DOWN stall the H-bridge protection is active; sending CMD_OFF
- *  on byte 0 simultaneously with a new command on byte 1 blocks the new command.
- *  0x00 leaves byte 0 in its current (already-off) state and lets byte 1 fire cleanly.
+ *  CRITICAL: byte 1 must be 0x00 (don't-care), NOT CMD_OFF (0x80).
+ *  After an Express stall the H-bridge protection is active; sending CMD_OFF
+ *  on byte 1 simultaneously with a new command on byte 0 can block the new command.
+ *  0x00 leaves byte 1 in its current (already-off) state and lets byte 0 fire cleanly.
  *
  *  AppState: immediately transitions to OPENING.
  */
 inline void windowUp(uint8_t window_id) {
     if (window_id >= 4) return;
     AppState::getInstance().setWindowState(window_id, WindowState::OPENING);
-    // byte 1 = UP direction (Track ON); byte 0 = 0x00 don't-care (as per spec)
-    uint8_t d[8] = { 0x00, CMD_TRACK, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+    // byte 0 = Relay 1A = UP direction (Track ON); byte 1 = 0x00 don't-care
+    uint8_t d[8] = { CMD_TRACK, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
     sendCommand(*kModules[window_id], d);
     Serial.printf("[inMOTION] Window %d UP (Track)\n", window_id);
 }
@@ -241,15 +239,15 @@ inline void windowUp(uint8_t window_id) {
  * @brief Lower window.
  *
  *  Uses Track personality (0x90) — motor runs while commanded, stops on windowStop().
- *  Byte layout with hardware swap: byte 0 = DOWN direction, byte 1 = 0x00 (don't-care).
+ *  Byte layout: byte 1 = Relay 1B = DOWN direction.
  *
  *  AppState: immediately transitions to CLOSING.
  */
 inline void windowDown(uint8_t window_id) {
     if (window_id >= 4) return;
     AppState::getInstance().setWindowState(window_id, WindowState::CLOSING);
-    // byte 0 = DOWN direction (Track ON); byte 1 = 0x00 don't-care (as per spec)
-    uint8_t d[8] = { CMD_TRACK, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+    // byte 1 = Relay 1B = DOWN direction (Track ON); byte 0 = 0x00 don't-care
+    uint8_t d[8] = { 0x00, CMD_TRACK, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
     sendCommand(*kModules[window_id], d);
     Serial.printf("[inMOTION] Window %d DOWN (Track)\n", window_id);
 }
@@ -334,18 +332,18 @@ inline Module makeModuleByAddress(uint8_t addr) {
     };
 }
 
-/// Window UP (Track) for module at \p addr.
+/// Window UP (Track) for module at \p addr.  byte 0 = Relay 1A = UP direction.
 inline void windowUpByAddress(uint8_t addr) {
     const Module m = makeModuleByAddress(addr);
-    uint8_t d[8] = { 0x00, CMD_TRACK, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+    uint8_t d[8] = { CMD_TRACK, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };  // byte 0 = UP
     sendCommand(m, d);
     Serial.printf("[inMOTION] Window addr=%d UP (Track)\n", addr);
 }
 
-/// Window DOWN (Track) for module at \p addr.
+/// Window DOWN (Track) for module at \p addr.  byte 1 = Relay 1B = DOWN direction.
 inline void windowDownByAddress(uint8_t addr) {
     const Module m = makeModuleByAddress(addr);
-    uint8_t d[8] = { CMD_TRACK, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+    uint8_t d[8] = { 0x00, CMD_TRACK, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };  // byte 1 = DOWN
     sendCommand(m, d);
     Serial.printf("[inMOTION] Window addr=%d DOWN (Track)\n", addr);
 }
@@ -388,11 +386,11 @@ inline void setOutputByAddress(uint8_t addr, uint8_t output_num, bool on) {
 // ── LIVE FEEDBACK CACHE ───────────────────────────────────────────────────
 
 struct ModuleStatus {
-    // H-bridge 1 (windows).  With this hardware's byte swap:
-    //   relay1a_on = byte-0 relay = DOWN direction active  (response byte 0 bit[4] = 0x10)
-    //   relay1b_on = byte-1 relay = UP direction active    (response byte 0 bit[0] = 0x01)
-    bool     relay1a_on = false;  ///< Relay 1A energized — DOWN in this hardware
-    bool     relay1b_on = false;  ///< Relay 1B energized — UP in this hardware
+    // H-bridge 1 (windows).  Standard wiring:
+    //   relay1a_on = byte-0 relay = UP direction active    (response byte 0 bit[4] = 0x10)
+    //   relay1b_on = byte-1 relay = DOWN direction active  (response byte 0 bit[0] = 0x01)
+    bool     relay1a_on = false;  ///< Relay 1A energized — UP
+    bool     relay1b_on = false;  ///< Relay 1B energized — DOWN
     // H-bridge 2 (door locks)
     bool     relay2a_on = false;  ///< Relay 2A energized — LOCK
     bool     relay2b_on = false;  ///< Relay 2B energized — UNLOCK
@@ -445,14 +443,14 @@ inline bool parseRxFrame(uint32_t pgn, uint8_t sa, const uint8_t data[8]) {
 
     ModuleStatus& s = g_status[idx];
     // Decode relay status bits per spec:
-    //   byte 0 bit[4] (0x10) = Relay 1A active  → DOWN direction in this hardware
-    //   byte 0 bit[0] (0x01) = Relay 1B active  → UP direction in this hardware
+    //   byte 0 bit[4] (0x10) = Relay 1A active  → UP direction
+    //   byte 0 bit[0] (0x01) = Relay 1B active  → DOWN direction
     //   byte 1 bit[4] (0x10) = Relay 2A active  → LOCK
     //   byte 1 bit[0] (0x01) = Relay 2B active  → UNLOCK
     const bool prev_relay1a = s.relay1a_on;
     const bool prev_relay1b = s.relay1b_on;
-    s.relay1a_on  = (data[0] & RESP_REL_A_ON) != 0;  // DOWN motor
-    s.relay1b_on  = (data[0] & RESP_REL_B_ON) != 0;  // UP motor
+    s.relay1a_on  = (data[0] & RESP_REL_A_ON) != 0;  // UP motor (Relay 1A)
+    s.relay1b_on  = (data[0] & RESP_REL_B_ON) != 0;  // DOWN motor (Relay 1B)
     s.relay2a_on  = (data[1] & RESP_REL_A_ON) != 0;  // LOCK
     s.relay2b_on  = (data[1] & RESP_REL_B_ON) != 0;  // UNLOCK
     s.relay1_amps = data[4] * 0.196f;
@@ -468,14 +466,14 @@ inline bool parseRxFrame(uint32_t pgn, uint8_t sa, const uint8_t data[8]) {
     auto& app = AppState::getInstance();
     const WindowState ws = app.getWindowState(static_cast<uint8_t>(idx));
 
-    if (prev_relay1a && !s.relay1a_on && ws == WindowState::CLOSING) {
-        // DOWN motor just stopped while we were closing → assume reached bottom
-        app.setWindowState(static_cast<uint8_t>(idx), WindowState::CLOSED);
-        Serial.printf("[inMOTION] Window %d DOWN motor stopped (CLOSED)\n", idx);
-    } else if (prev_relay1b && !s.relay1b_on && ws == WindowState::OPENING) {
-        // UP motor just stopped while we were opening → assume reached top
+    if (prev_relay1a && !s.relay1a_on && ws == WindowState::OPENING) {
+        // UP motor (relay1a) just stopped while opening → assume reached top
         app.setWindowState(static_cast<uint8_t>(idx), WindowState::OPEN);
         Serial.printf("[inMOTION] Window %d UP motor stopped (OPEN)\n", idx);
+    } else if (prev_relay1b && !s.relay1b_on && ws == WindowState::CLOSING) {
+        // DOWN motor (relay1b) just stopped while closing → assume reached bottom
+        app.setWindowState(static_cast<uint8_t>(idx), WindowState::CLOSED);
+        Serial.printf("[inMOTION] Window %d DOWN motor stopped (CLOSED)\n", idx);
     }
 
     return true;
