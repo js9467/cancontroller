@@ -39,36 +39,52 @@ public:
         _lastTransmit = now;
         
         const auto& outputs = _engine->getOutputs();
-        
-        // Group outputs by module address and build command frames
+
+        // NOTE: INMOTION outputs are intentionally EXCLUDED from this synthesizer.
+        //
+        // The UI button handler (ui_builder.cpp) sends CAN frames directly via
+        // windowUpByAddress / windowDownByAddress / lockDoorByAddress etc.
+        // Those functions respect the H-bridge hardware byte-swap on this vehicle
+        // (byte 0 = DOWN, byte 1 = UP for Relay 1).  Running the synthesizer in
+        // parallel maps outNum=1 → byte 0 (DOWN) while the direct dispatch sends
+        // byte 1 (UP) — energising both directions simultaneously, triggering the
+        // H-bridge current-limit and cutting the relay immediately.
+        //
+        // inMOTION TRACK/EXPRESS/TIMED commands are self-sustaining: the module
+        // holds the relay ON until CMD_OFF is received.  No watchdog refresh is
+        // needed.  The release handler in ui_builder.cpp sends CMD_OFF.
+        //
+        // This synthesizer therefore handles only POWERCELL / MASTERCELL outputs.
+
+        // Group non-INMOTION outputs by module address and build command frames
         std::map<uint8_t, uint8_t[8]> frames;  // addr -> 8-byte command
         std::map<uint8_t, bool> hasChanges;
-        
+
         // Initialize all frames to "don't care" (0x00 = no modifier bit)
         for (const auto& [id, output] : outputs) {
-            if (output.deviceType != "INMOTION") continue;
+            if (output.deviceType == "INMOTION") continue;  // handled by direct dispatch
             if (!frames.count(output.cellAddress)) {
                 for (int i = 0; i < 8; i++) {
                     frames[output.cellAddress][i] = 0x00;
                 }
             }
         }
-        
+
         // Apply each managed output to its byte position
         for (const auto& [id, output] : outputs) {
-            if (output.deviceType != "INMOTION") continue;
+            if (output.deviceType == "INMOTION") continue;  // handled by direct dispatch
             if (!output.isActive && !output.currentState) continue;  // Skip inactive/off outputs
-            
+
             uint8_t addr = output.cellAddress;
             uint8_t outNum = output.outputNumber;
-            
+
             if (addr < 1 || addr > 16) continue;
             if (outNum < 1 || outNum > 8) continue;
-            
+
             uint8_t* frame = frames[addr];
             uint8_t byteIndex = 0;
             uint8_t cmd = 0x00;
-            
+
             // Map output number to byte index
             // 1=R1A(byte0), 2=R1B(byte1), 3=R2A(byte2), 4=R2B(byte3), 5-8=Out1-4(bytes4-7)
             if (outNum >= 1 && outNum <= 4) {
@@ -76,7 +92,7 @@ public:
             } else if (outNum >= 5 && outNum <= 8) {
                 byteIndex = outNum - 1;  // Outputs: bytes 4-7
             }
-            
+
             // Determine command byte based on behavior type and state
             if (!output.isActive || !output.currentState) {
                 cmd = InMotionNGX::CMD_OFF;  // 0x80
@@ -90,14 +106,14 @@ public:
                 // Default: TRACK mode (stays on until turned off)
                 cmd = InMotionNGX::CMD_TRACK;  // 0x90
             }
-            
+
             // Check if this byte changed
             if (frame[byteIndex] != cmd) {
                 frame[byteIndex] = cmd;
                 hasChanges[addr] = true;
             }
         }
-        
+
         // Transmit frames that have changes
         for (const auto& [addr, changed] : hasChanges) {
             if (changed) {

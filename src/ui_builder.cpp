@@ -3383,12 +3383,16 @@ void UIBuilder::flushButtonStatus() {
         auto act_it = btn_active_label_text_.find(id);
         if (lbl_it != btn_label_map_.end() && lbl_it->second &&
             act_it != btn_active_label_text_.end()) {
+            const char* newText;
             if (active) {
-                lv_label_set_text(lbl_it->second, act_it->second.c_str());
+                newText = act_it->second.c_str();
             } else {
                 auto norm_it = btn_normal_label_text_.find(id);
-                lv_label_set_text(lbl_it->second,
-                    norm_it != btn_normal_label_text_.end() ? norm_it->second.c_str() : "");
+                newText = (norm_it != btn_normal_label_text_.end()) ? norm_it->second.c_str() : "";
+            }
+            // Guard: lv_label_set_text always invalidates even when text unchanged
+            if (strcmp(lv_label_get_text(lbl_it->second), newText) != 0) {
+                lv_label_set_text(lbl_it->second, newText);
             }
         }
     }
@@ -3423,8 +3427,11 @@ void UIBuilder::flushButtonStatus() {
             if (!button.active_label.empty()) {
                 auto label_it = btn_label_map_.find(button.id);
                 if (label_it != btn_label_map_.end() && label_it->second) {
-                    lv_label_set_text(label_it->second,
-                        active ? button.active_label.c_str() : button.label.c_str());
+                    const char* newText = active ? button.active_label.c_str() : button.label.c_str();
+                    // Guard: lv_label_set_text always invalidates even when text unchanged
+                    if (strcmp(lv_label_get_text(label_it->second), newText) != 0) {
+                        lv_label_set_text(label_it->second, newText);
+                    }
                 }
             }
         }
