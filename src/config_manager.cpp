@@ -258,6 +258,61 @@ bool ConfigManager::writeToStorage(const std::string& json) const {
     return true;
 }
 
+// Out-of-line helpers keep their stack frames separate from buildDefaultConfig,
+// preventing the combined font + button locals from overflowing the 8 KB loopTask stack.
+static void __attribute__((noinline)) _addDefaultFonts(DeviceConfig& cfg) {
+    struct F { const char* name; const char* display; uint8_t size; };
+    static const F kFonts[] = {
+        {"montserrat_12","Montserrat 12",12},  {"montserrat_14","Montserrat 14",14},
+        {"montserrat_16","Montserrat 16",16},  {"montserrat_18","Montserrat 18",18},
+        {"montserrat_20","Montserrat 20",20},  {"montserrat_22","Montserrat 22",22},
+        {"montserrat_24","Montserrat 24",24},  {"montserrat_26","Montserrat 26",26},
+        {"montserrat_28","Montserrat 28",28},  {"montserrat_30","Montserrat 30",30},
+        {"montserrat_32","Montserrat 32",32},  {"montserrat_34","Montserrat 34",34},
+        {"montserrat_36","Montserrat 36",36},  {"montserrat_38","Montserrat 38",38},
+        {"montserrat_40","Montserrat 40",40},  {"montserrat_42","Montserrat 42",42},
+        {"montserrat_44","Montserrat 44",44},  {"montserrat_46","Montserrat 46",46},
+        {"montserrat_48","Montserrat 48",48},
+        {"dejavu_16","DejaVu 16 (Persian/Hebrew)",16},
+        {"simsun_16","SimSun 16 (CJK)",16},
+        {"unscii_8","UNSCII 8",8},
+        {"unscii_16","UNSCII 16",16},
+    };
+    cfg.available_fonts.clear();
+    cfg.available_fonts.reserve(sizeof(kFonts) / sizeof(kFonts[0]));
+    for (const auto& f : kFonts) {
+        FontConfig fc;
+        fc.name = f.name;
+        fc.display_name = f.display;
+        fc.size = f.size;
+        cfg.available_fonts.push_back(std::move(fc));
+    }
+}
+
+static void __attribute__((noinline)) _addDefaultPages(DeviceConfig& cfg) {
+    PageConfig home;
+    home.id = "home";
+    home.name = "Factory Home";
+    home.rows = 2;
+    home.cols = 2;
+
+    auto addButton = [&](const char* id, const char* label, const char* color, uint8_t row, uint8_t col) {
+        ButtonConfig b;
+        b.id = id;
+        b.label = label;
+        b.color = color;
+        b.row = row;
+        b.col = col;
+        home.buttons.push_back(std::move(b));
+    };
+    addButton("windows", "Windows",        "#FF8A00", 0, 0);
+    addButton("locks",   "Locks",           "#1ABC9C", 0, 1);
+    addButton("running", "Running Boards",  "#2980B9", 1, 0);
+    addButton("aux",     "Aux",             "#9B59B6", 1, 1);
+
+    cfg.pages = {std::move(home)};
+}
+
 DeviceConfig ConfigManager::buildDefaultConfig() const {
     DeviceConfig cfg;
     cfg.version = APP_VERSION;
@@ -284,91 +339,11 @@ DeviceConfig ConfigManager::buildDefaultConfig() const {
     cfg.ota.enabled = true;
     cfg.ota.channel = "stable";
 
-    // Initialize available fonts
-    cfg.available_fonts.clear();
-    FontConfig font_12; font_12.name = "montserrat_12"; font_12.display_name = "Montserrat 12"; font_12.size = 12;
-    cfg.available_fonts.push_back(font_12);
-    FontConfig font_14; font_14.name = "montserrat_14"; font_14.display_name = "Montserrat 14"; font_14.size = 14;
-    cfg.available_fonts.push_back(font_14);
-    FontConfig font_16; font_16.name = "montserrat_16"; font_16.display_name = "Montserrat 16"; font_16.size = 16;
-    cfg.available_fonts.push_back(font_16);
-    FontConfig font_18; font_18.name = "montserrat_18"; font_18.display_name = "Montserrat 18"; font_18.size = 18;
-    cfg.available_fonts.push_back(font_18);
-    FontConfig font_20; font_20.name = "montserrat_20"; font_20.display_name = "Montserrat 20"; font_20.size = 20;
-    cfg.available_fonts.push_back(font_20);
-    FontConfig font_22; font_22.name = "montserrat_22"; font_22.display_name = "Montserrat 22"; font_22.size = 22;
-    cfg.available_fonts.push_back(font_22);
-    FontConfig font_24; font_24.name = "montserrat_24"; font_24.display_name = "Montserrat 24"; font_24.size = 24;
-    cfg.available_fonts.push_back(font_24);
-    FontConfig font_26; font_26.name = "montserrat_26"; font_26.display_name = "Montserrat 26"; font_26.size = 26;
-    cfg.available_fonts.push_back(font_26);
-    FontConfig font_28; font_28.name = "montserrat_28"; font_28.display_name = "Montserrat 28"; font_28.size = 28;
-    cfg.available_fonts.push_back(font_28);
-    FontConfig font_30; font_30.name = "montserrat_30"; font_30.display_name = "Montserrat 30"; font_30.size = 30;
-    cfg.available_fonts.push_back(font_30);
-    FontConfig font_32; font_32.name = "montserrat_32"; font_32.display_name = "Montserrat 32"; font_32.size = 32;
-    cfg.available_fonts.push_back(font_32);
-    FontConfig font_34; font_34.name = "montserrat_34"; font_34.display_name = "Montserrat 34"; font_34.size = 34;
-    cfg.available_fonts.push_back(font_34);
-    FontConfig font_36; font_36.name = "montserrat_36"; font_36.display_name = "Montserrat 36"; font_36.size = 36;
-    cfg.available_fonts.push_back(font_36);
-    FontConfig font_38; font_38.name = "montserrat_38"; font_38.display_name = "Montserrat 38"; font_38.size = 38;
-    cfg.available_fonts.push_back(font_38);
-    FontConfig font_40; font_40.name = "montserrat_40"; font_40.display_name = "Montserrat 40"; font_40.size = 40;
-    cfg.available_fonts.push_back(font_40);
-    FontConfig font_42; font_42.name = "montserrat_42"; font_42.display_name = "Montserrat 42"; font_42.size = 42;
-    cfg.available_fonts.push_back(font_42);
-    FontConfig font_44; font_44.name = "montserrat_44"; font_44.display_name = "Montserrat 44"; font_44.size = 44;
-    cfg.available_fonts.push_back(font_44);
-    FontConfig font_46; font_46.name = "montserrat_46"; font_46.display_name = "Montserrat 46"; font_46.size = 46;
-    cfg.available_fonts.push_back(font_46);
-    FontConfig font_48; font_48.name = "montserrat_48"; font_48.display_name = "Montserrat 48"; font_48.size = 48;
-    cfg.available_fonts.push_back(font_48);
-    FontConfig font_dejavu16; font_dejavu16.name = "dejavu_16"; font_dejavu16.display_name = "DejaVu 16 (Persian/Hebrew)"; font_dejavu16.size = 16;
-    cfg.available_fonts.push_back(font_dejavu16);
-    FontConfig font_simsun16; font_simsun16.name = "simsun_16"; font_simsun16.display_name = "SimSun 16 (CJK)"; font_simsun16.size = 16;
-    cfg.available_fonts.push_back(font_simsun16);
-    FontConfig font_unscii8; font_unscii8.name = "unscii_8"; font_unscii8.display_name = "UNSCII 8"; font_unscii8.size = 8;
-    cfg.available_fonts.push_back(font_unscii8);
-    FontConfig font_unscii16; font_unscii16.name = "unscii_16"; font_unscii16.display_name = "UNSCII 16"; font_unscii16.size = 16;
-    cfg.available_fonts.push_back(font_unscii16);
+    // Initialize available fonts (out-of-line to reduce stack depth)
+    _addDefaultFonts(cfg);
 
-    PageConfig home;
-    home.id = "home";
-    home.name = "Factory Home";
-    home.rows = 2;
-    home.cols = 2;
-
-    ButtonConfig windows;
-    windows.id = "windows";
-    windows.label = "Windows";
-    windows.color = "#FF8A00";
-    windows.row = 0;
-    windows.col = 0;
-
-    ButtonConfig locks;
-    locks.id = "locks";
-    locks.label = "Locks";
-    locks.color = "#1ABC9C";
-    locks.row = 0;
-    locks.col = 1;
-
-    ButtonConfig running;
-    running.id = "running";
-    running.label = "Running Boards";
-    running.color = "#2980B9";
-    running.row = 1;
-    running.col = 0;
-
-    ButtonConfig aux;
-    aux.id = "aux";
-    aux.label = "Aux";
-    aux.color = "#9B59B6";
-    aux.row = 1;
-    aux.col = 1;
-
-    home.buttons = {windows, locks, running, aux};
-    cfg.pages = {home};
+    // Initialize default pages (out-of-line to reduce stack depth)
+    _addDefaultPages(cfg);
 
     return cfg;
 }
