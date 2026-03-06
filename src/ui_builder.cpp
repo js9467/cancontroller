@@ -532,6 +532,8 @@ void UIBuilder::buildPage(std::size_t index) {
     output_to_btn_map_.clear();
     btn_active_label_text_.clear();
     btn_normal_label_text_.clear();
+    btn_output_active_cache_.clear();
+    output_feedback_cache_.clear();
     for (const auto& button : page.buttons) {
         lv_obj_t* btn = lv_btn_create(page_container_);
         lv_obj_remove_style_all(btn);
@@ -3379,21 +3381,28 @@ void UIBuilder::flushButtonStatus() {
             lv_obj_clear_state(it->second, LV_STATE_CHECKED);
         }
         // Swap label text if active_label is configured for this button
+        // Guard with strcmp: lv_label_set_text always calls lv_obj_invalidate, causing
+        // a full redraw every 150ms even when text hasn't changed (screen jitter).
         auto lbl_it = btn_label_map_.find(id);
         auto act_it = btn_active_label_text_.find(id);
         if (lbl_it != btn_label_map_.end() && lbl_it->second &&
             act_it != btn_active_label_text_.end()) {
+            const char* newText;
             if (active) {
-                lv_label_set_text(lbl_it->second, act_it->second.c_str());
+                newText = act_it->second.c_str();
             } else {
                 auto norm_it = btn_normal_label_text_.find(id);
-                lv_label_set_text(lbl_it->second,
-                    norm_it != btn_normal_label_text_.end() ? norm_it->second.c_str() : "");
+                newText = (norm_it != btn_normal_label_text_.end()) ? norm_it->second.c_str() : "";
+            }
+            if (strcmp(lv_label_get_text(lbl_it->second), newText) != 0) {
+                lv_label_set_text(lbl_it->second, newText);
             }
         }
     }
 
     // 2. Poll behavioral engine for output/scene-mode buttons
+    // State cache (btn_output_active_cache_) prevents redundant LVGL invalidations:
+    // lv_label_set_text always marks objects dirty even when text is unchanged.
     if (!config_) return;
     for (const auto& page : config_->pages) {
         for (const auto& button : page.buttons) {
@@ -3412,6 +3421,13 @@ void UIBuilder::flushButtonStatus() {
                 if (sc) active = sc->isActive;
             }
 
+            // Check cache — skip LVGL updates if state hasn't changed
+            auto cache_it = btn_output_active_cache_.find(button.id);
+            bool state_changed = (cache_it == btn_output_active_cache_.end() ||
+                                  cache_it->second != active);
+            if (!state_changed) continue;
+            btn_output_active_cache_[button.id] = active;
+
             lv_obj_t* btn_obj = widget_it->second;
             if (active) {
                 lv_obj_add_state(btn_obj, LV_STATE_CHECKED);
@@ -3423,8 +3439,11 @@ void UIBuilder::flushButtonStatus() {
             if (!button.active_label.empty()) {
                 auto label_it = btn_label_map_.find(button.id);
                 if (label_it != btn_label_map_.end() && label_it->second) {
-                    lv_label_set_text(label_it->second,
-                        active ? button.active_label.c_str() : button.label.c_str());
+                    const char* newText = active ? button.active_label.c_str()
+                                                 : button.label.c_str();
+                    if (strcmp(lv_label_get_text(label_it->second), newText) != 0) {
+                        lv_label_set_text(label_it->second, newText);
+                    }
                 }
             }
         }
@@ -3437,7 +3456,13 @@ void UIBuilder::pollOutputFeedback() {
     for (const auto& [output_id, btn_id] : output_to_btn_map_) {
         auto it = outputs.find(String(output_id.c_str()));
         bool active = (it != outputs.end()) && it->second.currentState;
-        notifyButtonActive(btn_id, active);
+        // Only notify when state actually changed — avoids redundant lv_label_set_text
+        // invalidations (LVGL always marks the label dirty even when text is the same)
+        auto cache_it = output_feedback_cache_.find(output_id);
+        if (cache_it == output_feedback_cache_.end() || cache_it->second != active) {
+            output_feedback_cache_[output_id] = active;
+            notifyButtonActive(btn_id, active);
+        }
     }
 }
 

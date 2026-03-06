@@ -41,68 +41,60 @@ public:
         
         const auto& outputs = _engine->getOutputs();
         
-        // Group outputs by module address and build command frames
-        std::map<uint8_t, std::array<uint8_t, 8>> frames;  // addr -> 8-byte command
-        std::map<uint8_t, bool> hasChanges;
-        
-        // Initialize all frames to "don't care" (0x00 = no modifier bit)
+        // Build desired command frames for every registered inMOTION output.
+        // IMPORTANT: ALL registered outputs are included, not just active ones.
+        //   - Active output   → CMD_TRACK / CMD_EXPRESS / cmdTimed  (turn on)
+        //   - Inactive output → CMD_OFF (0x80)   (explicit OFF, not 0x00 don't-care)
+        //
+        // Using 0x00 (don't-care) for inactive outputs would leave the inMOTION
+        // module in its last commanded state — meaning AUX MOSFETs could never be
+        // turned off once activated.  Explicit CMD_OFF fixes this.
+        std::map<uint8_t, std::array<uint8_t, 8>> frames;
+
+        // Initialise every registered output slot to CMD_OFF.
+        // Byte slots for outputs NOT registered in the engine stay 0x00 (don't-care).
         for (const auto& [id, output] : outputs) {
             if (output.deviceType != "INMOTION") continue;
-            if (!frames.count(output.cellAddress)) {
-                for (int i = 0; i < 8; i++) {
-                    frames[output.cellAddress][i] = 0x00;
-                }
-            }
-        }
-        
-        // Apply each managed output to its byte position
-        for (const auto& [id, output] : outputs) {
-            if (output.deviceType != "INMOTION") continue;
-            if (!output.isActive && !output.currentState) continue;  // Skip inactive/off outputs
-            
             uint8_t addr = output.cellAddress;
             uint8_t outNum = output.outputNumber;
-            
             if (addr < 1 || addr > 16) continue;
             if (outNum < 1 || outNum > 8) continue;
-            
-            auto& frame = frames[addr];
-            uint8_t byteIndex = 0;
-            uint8_t cmd = 0x00;
-            
-            // Map output number to byte index
-            // 1=R1A(byte0), 2=R1B(byte1), 3=R2A(byte2), 4=R2B(byte3), 5-8=Out1-4(bytes4-7)
-            if (outNum >= 1 && outNum <= 4) {
-                byteIndex = outNum - 1;  // Relays: bytes 0-3
-            } else if (outNum >= 5 && outNum <= 8) {
-                byteIndex = outNum - 1;  // Outputs: bytes 4-7
-            }
-            
-            // Determine command byte based on behavior type and state
-            if (!output.isActive || !output.currentState) {
-                cmd = InMotionNGX::CMD_OFF;  // 0x80
-            } else if (output.behavior.type == BehaviorType::EXPRESS) {
+            if (!frames.count(addr)) frames[addr].fill(0x00);
+            frames[addr][outNum - 1] = InMotionNGX::CMD_OFF;
+        }
+
+        // Apply the commanded state for every active output.
+        for (const auto& [id, output] : outputs) {
+            if (output.deviceType != "INMOTION") continue;
+            if (!output.isActive || !output.currentState) continue;  // CMD_OFF already set above
+            uint8_t addr = output.cellAddress;
+            uint8_t outNum = output.outputNumber;
+            if (addr < 1 || addr > 16) continue;
+            if (outNum < 1 || outNum > 8) continue;
+
+            uint8_t cmd;
+            if (output.behavior.type == BehaviorType::EXPRESS) {
                 cmd = InMotionNGX::CMD_EXPRESS;  // 0xB0
-            } else if (output.behavior.type == BehaviorType::PULSE && output.behavior.duration_ms > 0) {
-                // Timed pulse: convert duration_ms to 0.25s steps
+            } else if (output.behavior.type == BehaviorType::PULSE &&
+                       output.behavior.duration_ms > 0) {
                 uint8_t quarter_secs = (output.behavior.duration_ms + 124) / 250;
                 cmd = InMotionNGX::cmdTimed(quarter_secs);
             } else {
-                // Default: TRACK mode (stays on until turned off)
                 cmd = InMotionNGX::CMD_TRACK;  // 0x90
             }
-            
-            // Check if this byte changed
-            if (frame[byteIndex] != cmd) {
-                frame[byteIndex] = cmd;
-                hasChanges[addr] = true;
-            }
+            frames[addr][outNum - 1] = cmd;
         }
-        
-        // Transmit frames that have changes
-        for (const auto& [addr, changed] : hasChanges) {
+
+        // Transmit only frames that differ from the last sent frame.
+        // This prevents flooding the bus while idle and ensures CMD_OFF is always
+        // sent when an output transitions from active → inactive.
+        for (auto& [addr, frame] : frames) {
+            auto prev_it = _prevFrames.find(addr);
+            bool changed = (prev_it == _prevFrames.end()) ||
+                           (prev_it->second != frame);
             if (changed) {
-                _transmitFrame(addr, frames[addr].data());
+                _transmitFrame(addr, frame.data());
+                _prevFrames[addr] = frame;
             }
         }
     }
@@ -111,6 +103,7 @@ private:
     BehaviorEngine* _engine;
     unsigned long _lastTransmit;
     uint16_t _transmitInterval;
+    std::map<uint8_t, std::array<uint8_t, 8>> _prevFrames;  // last transmitted frame per module address
     
     void _transmitFrame(uint8_t addr, const uint8_t data[8]) {
         // Use InMotionNGX::sendCommand via makeModuleByAddress
