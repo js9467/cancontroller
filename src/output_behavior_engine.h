@@ -479,18 +479,8 @@ private:
                 break;
 
             case BehaviorType::EXPRESS:
-                // inMOTION NGX Express: stay ON until the H-bridge detects stall
-                // (motor reaches end-of-travel and current spikes → module auto-stops).
-                // The CAN feedback parser does NOT currently call back into the engine,
-                // so we auto-expire after 15 s — well beyond any real window/lock travel
-                // time — to prevent the button from staying lit indefinitely.
-                // If a caller sets duration_ms > 0 explicitly, the standard duration-
-                // expiry check above handles it and we never reach here.
-                if (elapsed >= 15000UL) {
-                    output.isActive = false;
-                    output.currentState = false;
-                    return;
-                }
+                // inMOTION NGX Express: stay ON until current-limit feedback clears it
+                // The CAN feedback handler calls stopBehavior() when current spike detected
                 output.currentState = true;
                 break;
 

@@ -232,10 +232,6 @@ private:
     std::map<std::string, std::string> btn_normal_label_text_;    // button.id -> normal label text
     std::map<std::string, bool>        btn_status_pending_;
     std::mutex                         btn_status_mutex_;
-    // Caches to suppress redundant LVGL calls (lv_label_set_text / lv_obj_add_state always invalidate)
-    std::map<std::string, bool>        btn_output_active_cache_;  // last known active state per button (Section 2)
-    std::map<std::string, bool>        output_feedback_cache_;    // last known state per output_id (pollOutputFeedback)
-    std::map<std::string, bool>        can_status_cache_;         // last known state per CAN-status button (Section 1)
     lv_timer_t*                        can_status_timer_ = nullptr;
     static void canStatusTimerCb(lv_timer_t* t);
     void        pollOutputFeedback();

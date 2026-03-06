@@ -2378,10 +2378,10 @@ document.addEventListener('DOMContentLoaded', () => {
 					<option value="2">Relay 1B &mdash; H-Bridge 1, Direction B (Window Down / Unlock)</option>
 					<option value="3">Relay 2A &mdash; H-Bridge 2, Direction A</option>
 					<option value="4">Relay 2B &mdash; H-Bridge 2, Direction B</option>
-					<option value="5">Output 1 &mdash; MOSFET 1</option>
-					<option value="6">Output 2 &mdash; MOSFET 2</option>
-					<option value="7">Output 3 &mdash; MOSFET 3</option>
-					<option value="8">Output 4 &mdash; MOSFET 4</option>
+					<option value="5">Output 1 &mdash; 1A MOSFET</option>
+					<option value="6">Output 2 &mdash; 1A MOSFET</option>
+					<option value="7">Output 3 &mdash; 1A MOSFET</option>
+					<option value="8">Output 4 &mdash; 1A MOSFET</option>
 				</select>
 			</div>
 		</div>
