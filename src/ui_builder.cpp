@@ -853,9 +853,9 @@ void UIBuilder::actionButtonEvent(lv_event_t* e) {
                             case 2: InMotionNGX::windowDownByAddress(addr);            break;  // Relay 1B → Window Down
                             case 3: InMotionNGX::lockDoorByAddress(addr);              break;  // Relay 2A → Lock
                             case 4: InMotionNGX::unlockDoorByAddress(addr);            break;  // Relay 2B → Unlock
-                            case 5: InMotionNGX::setOutputByAddress(addr, 2, true);    break;  // MOSFET Output 2 (byte 5)
-                            case 6: InMotionNGX::setOutputByAddress(addr, 3, true);    break;  // MOSFET Output 3 (byte 6)
-                            case 7: InMotionNGX::setOutputByAddress(addr, 1, true);    break;  // MOSFET Output 1 (byte 4) — "Output 01" per spec
+                            case 5: InMotionNGX::setOutputByAddress(addr, 1, true);    break;  // MOSFET Output 1 (byte 4)
+                            case 6: InMotionNGX::setOutputByAddress(addr, 2, true);    break;  // MOSFET Output 2 (byte 5)
+                            case 7: InMotionNGX::setOutputByAddress(addr, 3, true);    break;  // MOSFET Output 3 (byte 6)
                             case 8: InMotionNGX::setOutputByAddress(addr, 4, true);    break;  // MOSFET Output 4 (byte 7)
                             default:
                                 Serial.printf("[UI] INMOTION dispatch SKIP: unknown outputNumber=%d\n", imOut->outputNumber);
@@ -879,11 +879,11 @@ void UIBuilder::actionButtonEvent(lv_event_t* e) {
                             if (outNum == 1 || outNum == 2) {
                                 InMotionNGX::windowStopByAddress(addr);  // Cut H-bridge; lock pulses are self-timed
                             } else if (outNum == 5) {
-                                InMotionNGX::setOutputByAddress(addr, 2, false);  // MOSFET Output 2 OFF
-                            } else if (outNum == 6) {
-                                InMotionNGX::setOutputByAddress(addr, 3, false);  // MOSFET Output 3 OFF
-                            } else if (outNum == 7) {
                                 InMotionNGX::setOutputByAddress(addr, 1, false);  // MOSFET Output 1 OFF
+                            } else if (outNum == 6) {
+                                InMotionNGX::setOutputByAddress(addr, 2, false);  // MOSFET Output 2 OFF
+                            } else if (outNum == 7) {
+                                InMotionNGX::setOutputByAddress(addr, 3, false);  // MOSFET Output 3 OFF
                             } else if (outNum == 8) {
                                 InMotionNGX::setOutputByAddress(addr, 4, false);  // MOSFET Output 4 OFF
                             }

@@ -40,29 +40,19 @@ public:
         
         const auto& outputs = _engine->getOutputs();
 
-        // NOTE: INMOTION outputs are intentionally EXCLUDED from this synthesizer.
-        //
-        // The UI button handler (ui_builder.cpp) sends CAN frames directly via
-        // windowUpByAddress / windowDownByAddress / lockDoorByAddress etc.
-        // Those functions respect the H-bridge hardware byte-swap on this vehicle
-        // (byte 0 = DOWN, byte 1 = UP for Relay 1).  Running the synthesizer in
-        // parallel maps outNum=1 → byte 0 (DOWN) while the direct dispatch sends
-        // byte 1 (UP) — energising both directions simultaneously, triggering the
-        // H-bridge current-limit and cutting the relay immediately.
-        //
-        // inMOTION TRACK/EXPRESS/TIMED commands are self-sustaining: the module
-        // holds the relay ON until CMD_OFF is received.  No watchdog refresh is
-        // needed.  The release handler in ui_builder.cpp sends CMD_OFF.
-        //
-        // This synthesizer therefore handles only POWERCELL / MASTERCELL outputs.
+        // This synthesizer handles INMOTION outputs ONLY.
+        // POWERCELL / MASTERCELL outputs are handled by their own synthesizers.
+        // Scenes and button presses both set output state in the behavioral engine;
+        // this synthesizer picks that up every 100 ms and sends CAN frames.
+        // Byte index = outNum - 1 (spec: 1=R1A/byte0, 2=R1B/byte1 ... 5-8=Out1-4/bytes4-7).
 
-        // Group non-INMOTION outputs by module address and build command frames
+        // Group INMOTION outputs by module address and build command frames
         std::map<uint8_t, uint8_t[8]> frames;  // addr -> 8-byte command
         std::map<uint8_t, bool> hasChanges;
 
         // Initialize all frames to "don't care" (0x00 = no modifier bit)
         for (const auto& [id, output] : outputs) {
-            if (output.deviceType == "INMOTION") continue;  // handled by direct dispatch
+            if (output.deviceType != "INMOTION") continue;
             if (!frames.count(output.cellAddress)) {
                 for (int i = 0; i < 8; i++) {
                     frames[output.cellAddress][i] = 0x00;
@@ -72,7 +62,7 @@ public:
 
         // Apply each managed output to its byte position
         for (const auto& [id, output] : outputs) {
-            if (output.deviceType == "INMOTION") continue;  // handled by direct dispatch
+            if (output.deviceType != "INMOTION") continue;
             if (!output.isActive && !output.currentState) continue;  // Skip inactive/off outputs
 
             uint8_t addr = output.cellAddress;
