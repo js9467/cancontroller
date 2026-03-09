@@ -56,7 +56,7 @@ void UIBuilder::begin() {
     createInfoModal();
 
     if (!can_status_timer_) {
-        can_status_timer_ = lv_timer_create(canStatusTimerCb, 150, nullptr);
+        can_status_timer_ = lv_timer_create(canStatusTimerCb, 300, nullptr);
     }
 
     if (config_ && !config_->pages.empty()) {
@@ -3426,20 +3426,29 @@ void UIBuilder::flushButtonStatus() {
             }
 
             lv_obj_t* btn_obj = widget_it->second;
-            if (active) {
-                lv_obj_add_state(btn_obj, LV_STATE_CHECKED);
-            } else {
-                lv_obj_clear_state(btn_obj, LV_STATE_CHECKED);
-            }
 
-            // Swap label text when active_label is configured
-            if (!button.active_label.empty()) {
-                auto label_it = btn_label_map_.find(button.id);
-                if (label_it != btn_label_map_.end() && label_it->second) {
-                    const char* newText = active ? button.active_label.c_str() : button.label.c_str();
-                    // Guard: lv_label_set_text always invalidates even when text unchanged
-                    if (strcmp(lv_label_get_text(label_it->second), newText) != 0) {
-                        lv_label_set_text(label_it->second, newText);
+            // Cache guard: only touch LVGL when the visual state actually changes.
+            // lv_obj_add_state / lv_obj_clear_state internally guard against same-state
+            // calls, but still re-evaluate styles and can mark regions dirty.
+            // Skipping the call entirely avoids that overhead on every 300ms tick.
+            auto cache_it = btn_visual_state_cache_.find(button.id);
+            const bool cached = (cache_it != btn_visual_state_cache_.end()) ? cache_it->second : !active; // force update on first run
+            if (active != cached) {
+                btn_visual_state_cache_[button.id] = active;
+                if (active) {
+                    lv_obj_add_state(btn_obj, LV_STATE_CHECKED);
+                } else {
+                    lv_obj_clear_state(btn_obj, LV_STATE_CHECKED);
+                }
+
+                // Swap label text when active_label is configured
+                if (!button.active_label.empty()) {
+                    auto label_it = btn_label_map_.find(button.id);
+                    if (label_it != btn_label_map_.end() && label_it->second) {
+                        const char* newText = active ? button.active_label.c_str() : button.label.c_str();
+                        if (strcmp(lv_label_get_text(label_it->second), newText) != 0) {
+                            lv_label_set_text(label_it->second, newText);
+                        }
                     }
                 }
             }

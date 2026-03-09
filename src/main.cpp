@@ -100,7 +100,7 @@ static volatile uint32_t g_can_frames_received = 0;
 Preferences g_prefs;
 
 // LVGL Task timing constants
-constexpr uint32_t LVGL_TASK_STACK_SIZE = 6 * 1024;
+constexpr uint32_t LVGL_TASK_STACK_SIZE = 10 * 1024;
 constexpr uint32_t LVGL_TASK_PRIORITY = 2;
 constexpr uint32_t LVGL_TASK_MAX_DELAY_MS = 500;
 constexpr uint32_t LVGL_TASK_MIN_DELAY_MS = 1;
@@ -400,7 +400,7 @@ void setup() {
     // LVGL draw buffers - DOUBLE BUFFER in PSRAM for safety
     Serial.println("[LVGL] Allocating double buffers in PSRAM...");
     static lv_disp_draw_buf_t draw_buf;
-    const uint32_t buf_sz = ESP_PANEL_LCD_H_RES * 40;
+    const uint32_t buf_sz = ESP_PANEL_LCD_H_RES * 80;  // 80 lines: halves flush-call count vs old 40-line buffer
     const uint32_t buf_bytes = buf_sz * sizeof(lv_color_t);
     
     uint8_t* buf1 = static_cast<uint8_t*>(heap_caps_calloc(1, buf_bytes, MALLOC_CAP_SPIRAM));
