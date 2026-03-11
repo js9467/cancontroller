@@ -634,6 +634,18 @@ function switchTab(tabName){
 			<div><label>Active Label Text</label><input id="btn-active-label" type="text" placeholder="Same as normal label" /></div>
 		</div>
 
+		<h4 style="margin-top:14px;">Last-Pressed Feedback</h4>
+		<div class="muted" style="font-size:0.85rem;margin-bottom:8px;">Radio-button style: the most recently pressed button in a group stays highlighted. Use for heated seats, transfer case, etc.</div>
+		<div class="grid two-col">
+			<div><label>Feedback Mode</label>
+				<select id="btn-feedback-mode">
+					<option value="">Off (use output monitor above)</option>
+					<option value="last_pressed">Last Pressed (radio group)</option>
+				</select>
+			</div>
+			<div><label>Group Name</label><input id="btn-feedback-group" type="text" placeholder="e.g. heated_seats" /></div>
+		</div>
+
 		<div class="row" style="margin-top:12px; justify-content:flex-end; gap:8px;">
 			<button class="btn danger" onclick="deleteButtonFromModal()">Delete</button>
 			<button class="btn primary" onclick="saveButtonFromModal()">Save</button>
@@ -1196,6 +1208,8 @@ function openButtonModal(row,col){
 	document.getElementById('btn-font-family').value = data.font_family || 'montserrat';
 	document.getElementById('btn-text-align').value = data.text_align || 'center';
 	document.getElementById('btn-momentary').checked = data.momentary || false;
+	document.getElementById('btn-feedback-mode').value = data.feedback_mode || '';
+	document.getElementById('btn-feedback-group').value = data.feedback_group || '';
 	
 	// Mode and behavioral fields (set non-dropdown fields first)
 	document.getElementById('btn-mode').value = data.mode || 'can';
@@ -1330,6 +1344,8 @@ function saveButtonFromModal(){
 			mask: parseInt(document.getElementById('btn-status-mask').value,16)||0
 		},
 		active_output_id: document.getElementById('btn-active-output-id').value || '',
+		feedback_mode: document.getElementById('btn-feedback-mode').value || '',
+		feedback_group: document.getElementById('btn-feedback-group').value || '',
 		active_color: document.getElementById('btn-active-color').value || '',
 		active_label: (document.getElementById('btn-active-label').value || '').trim()
 	};
