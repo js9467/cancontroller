@@ -51,6 +51,8 @@ struct ButtonConfig {
     std::string active_label = "";   // Optional: text shown on button when output is active (empty = no change)
     std::string active_color = "";   // Optional: button bg color when active, e.g. "#009944" (empty = default green)
     std::string active_output_id = "";  // Output whose currentState drives this button's CHECKED appearance
+    std::string feedback_mode = "";     // "last_pressed": radio-button group (stays lit until another in group pressed); empty/"output": mirror output/scene state
+    std::string feedback_group = "";    // Group name for last_pressed mutual-exclusion (e.g. "heated_seats", "transfer_case")
     CanFrameConfig can;
     CanFrameConfig can_off;  // Optional OFF/release frame (used by some modules that require release frames)
     CanStatusConfig can_status;  // Optional CAN feedback for button active state

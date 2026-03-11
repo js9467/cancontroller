@@ -235,7 +235,8 @@ private:
     // Visual state cache: tracks last state pushed to LVGL so we only call
     // lv_obj_add_state / lv_obj_clear_state when the value actually changes.
     // This is the primary guard against unnecessary LVGL invalidations and redraws.
-    std::map<std::string, bool>        btn_visual_state_cache_;  // button id -> last rendered active state
+    std::map<std::string, bool>        btn_visual_state_cache_;   // button id -> last rendered active state
+    std::map<std::string, std::string> btn_last_pressed_group_;   // feedback_group name -> last-pressed button id
     lv_timer_t*                        can_status_timer_ = nullptr;
     static void canStatusTimerCb(lv_timer_t* t);
     void        pollOutputFeedback();

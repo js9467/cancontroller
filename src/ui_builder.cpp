@@ -707,6 +707,17 @@ void UIBuilder::actionButtonEvent(lv_event_t* e) {
         config->mode.c_str(), code, config->label.c_str());
 
     // =================================================================
+    // LAST-PRESSED FEEDBACK: record which button was most recently pressed
+    // within its feedback_group so flushButtonStatus() can highlight it.
+    // Fires on LV_EVENT_PRESSED for instant visual response.
+    // =================================================================
+    if (code == LV_EVENT_PRESSED &&
+        config->feedback_mode == "last_pressed" &&
+        !config->feedback_group.empty()) {
+        instance().btn_last_pressed_group_[config->feedback_group] = config->id;
+    }
+
+    // =================================================================
     // NEW MODE-BASED BUTTON HANDLING
     // =================================================================
     
@@ -3442,6 +3453,42 @@ void UIBuilder::flushButtonStatus() {
                 }
 
                 // Swap label text when active_label is configured
+                if (!button.active_label.empty()) {
+                    auto label_it = btn_label_map_.find(button.id);
+                    if (label_it != btn_label_map_.end() && label_it->second) {
+                        const char* newText = active ? button.active_label.c_str() : button.label.c_str();
+                        if (strcmp(lv_label_get_text(label_it->second), newText) != 0) {
+                            lv_label_set_text(label_it->second, newText);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 3. "last_pressed" feedback mode: radio-button / exclusive group selection.
+    // Highlights the most-recently-pressed button within a group, and clears
+    // all others. Works for any button mode (can, output, scene, etc.).
+    for (const auto& page : config_->pages) {
+        for (const auto& button : page.buttons) {
+            if (button.feedback_mode != "last_pressed" || button.feedback_group.empty()) continue;
+            auto widget_it = btn_lvgl_map_.find(button.id);
+            if (widget_it == btn_lvgl_map_.end() || !widget_it->second) continue;
+
+            auto group_it = btn_last_pressed_group_.find(button.feedback_group);
+            const bool active = (group_it != btn_last_pressed_group_.end()) &&
+                                (group_it->second == button.id);
+
+            lv_obj_t* btn_obj = widget_it->second;
+            auto cache_it = btn_visual_state_cache_.find(button.id);
+            const bool cached = (cache_it != btn_visual_state_cache_.end()) ? cache_it->second : !active;
+            if (active != cached) {
+                btn_visual_state_cache_[button.id] = active;
+                if (active) {
+                    lv_obj_add_state(btn_obj, LV_STATE_CHECKED);
+                } else {
+                    lv_obj_clear_state(btn_obj, LV_STATE_CHECKED);
+                }
                 if (!button.active_label.empty()) {
                     auto label_it = btn_label_map_.find(button.id);
                     if (label_it != btn_label_map_.end() && label_it->second) {

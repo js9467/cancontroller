@@ -458,6 +458,9 @@ void ConfigManager::encodeConfig(const DeviceConfig& source, DynamicJsonDocument
             btn_obj["border_color"] = button.border_color.c_str();
             btn_obj["active_label"] = button.active_label.c_str();
             btn_obj["active_color"] = button.active_color.c_str();
+            btn_obj["active_output_id"] = button.active_output_id.c_str();
+            btn_obj["feedback_mode"] = button.feedback_mode.c_str();
+            btn_obj["feedback_group"] = button.feedback_group.c_str();
 
             JsonObject can_obj = btn_obj["can"].to<JsonObject>();
             can_obj["enabled"] = button.can.enabled;
@@ -701,6 +704,8 @@ bool ConfigManager::decodeConfig(JsonVariantConst json, DeviceConfig& target, st
                     button.active_label = safeString(btn_obj["active_label"], "");
                     button.active_color = sanitizeColorOptional(safeString(btn_obj["active_color"], ""));
                     button.active_output_id = safeString(btn_obj["active_output_id"], "");
+                    button.feedback_mode = safeString(btn_obj["feedback_mode"], "");
+                    button.feedback_group = safeString(btn_obj["feedback_group"], "");
 
                     JsonObjectConst can_obj = btn_obj["can"];
                     if (!can_obj.isNull()) {
