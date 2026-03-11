@@ -47,16 +47,15 @@ public:
         // Byte index = outNum - 1 (spec: 1=R1A/byte0, 2=R1B/byte1 ... 5-8=Out1-4/bytes4-7).
 
         // Group INMOTION outputs by module address and build command frames
-        std::map<uint8_t, uint8_t[8]> frames;  // addr -> 8-byte command
+        // NOTE: must use std::array<uint8_t,8> — raw uint8_t[8] is not a valid map value type
+        std::map<uint8_t, std::array<uint8_t, 8>> frames;  // addr -> 8-byte command
         std::map<uint8_t, bool> hasChanges;
 
         // Initialize all frames to "don't care" (0x00 = no modifier bit)
         for (const auto& [id, output] : outputs) {
             if (output.deviceType != "INMOTION") continue;
             if (!frames.count(output.cellAddress)) {
-                for (int i = 0; i < 8; i++) {
-                    frames[output.cellAddress][i] = 0x00;
-                }
+                frames[output.cellAddress].fill(0x00);
             }
         }
 
@@ -71,7 +70,7 @@ public:
             if (addr < 1 || addr > 16) continue;
             if (outNum < 1 || outNum > 8) continue;
 
-            uint8_t* frame = frames[addr];
+            auto& frame = frames[addr];
             uint8_t byteIndex = 0;
             uint8_t cmd = 0x00;
 
@@ -107,7 +106,7 @@ public:
         // Transmit frames that have changes
         for (const auto& [addr, changed] : hasChanges) {
             if (changed) {
-                _transmitFrame(addr, frames[addr]);
+                _transmitFrame(addr, frames[addr].data());
             }
         }
     }
