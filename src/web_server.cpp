@@ -918,6 +918,12 @@ void WebServerManager::setupRoutes() {
                 payload_data[idx++] = v.as<uint8_t>();
             }
 
+            // Guard suspension-related standard IDs when user disabled suspension CAN messaging.
+            if (!CanManager::instance().isSuspensionMessagingEnabled() && (id == 0x737 || id == 0x738)) {
+                request->send(423, "application/json", "{\"error\":\"Suspension CAN messaging disabled\"}");
+                return;
+            }
+
             bool success = CanManager::instance().sendStandardFrame(id, payload_data, static_cast<uint8_t>(idx));
 
             DynamicJsonDocument response(128);
@@ -937,6 +943,7 @@ void WebServerManager::setupRoutes() {
 
         DynamicJsonDocument response(512);
         response["power_on"] = state.power_on;
+        response["messaging_enabled"] = CanManager::instance().isSuspensionMessagingEnabled();
         response["front_left"] = state.front_left_percent;
         response["front_right"] = state.front_right_percent;
         response["rear_left"] = state.rear_left_percent;

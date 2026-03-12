@@ -329,6 +329,7 @@ DeviceConfig ConfigManager::buildDefaultConfig() const {
     cfg.display.brightness = 100;
     cfg.display.sleep_enabled = false;
     cfg.display.sleep_timeout_seconds = 60;
+    cfg.display.suspension_can_enabled = true;
 
     // Ensure WiFi AP is always enabled by default
     cfg.wifi.ap.enabled = true;
@@ -370,6 +371,7 @@ void ConfigManager::encodeConfig(const DeviceConfig& source, DynamicJsonDocument
     display["brightness"] = source.display.brightness;
     display["sleep_enabled"] = source.display.sleep_enabled;
     display["sleep_timeout_seconds"] = source.display.sleep_timeout_seconds;
+    display["suspension_can_enabled"] = source.display.suspension_can_enabled;
     display["sleep_icon_base64"] = source.display.sleep_icon_base64.c_str();
 
     JsonObject images = doc["images"].to<JsonObject>();
@@ -577,6 +579,7 @@ bool ConfigManager::decodeConfig(JsonVariantConst json, DeviceConfig& target, st
         target.display.brightness = clampValue<std::uint8_t>(display["brightness"] | target.display.brightness, 0u, 100u);
         target.display.sleep_enabled = display["sleep_enabled"] | target.display.sleep_enabled;
         target.display.sleep_timeout_seconds = clampValue<std::uint16_t>(display["sleep_timeout_seconds"] | target.display.sleep_timeout_seconds, 5u, 3600u);
+        target.display.suspension_can_enabled = display["suspension_can_enabled"] | target.display.suspension_can_enabled;
         target.display.sleep_icon_base64 = safeString(display["sleep_icon_base64"], target.display.sleep_icon_base64);
     }
 

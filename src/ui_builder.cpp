@@ -37,6 +37,7 @@ void UIBuilder::begin() {
     // Apply display settings before constructing UI
     loadSleepIcon();
     setBrightness(config_->display.brightness);
+    CanManager::instance().setSuspensionMessagingEnabled(config_->display.suspension_can_enabled);
     createBaseScreen();
     if (!dim_overlay_) {
         lv_disp_t* disp = lv_disp_get_default();
@@ -75,6 +76,19 @@ void UIBuilder::applyConfig(const DeviceConfig& config) {
 
     loadSleepIcon();
     setBrightness(config.display.brightness);
+    CanManager::instance().setSuspensionMessagingEnabled(config.display.suspension_can_enabled);
+
+    if (settings_suspension_can_switch_) {
+        if (config.display.suspension_can_enabled) {
+            lv_obj_add_state(settings_suspension_can_switch_, LV_STATE_CHECKED);
+        } else {
+            lv_obj_clear_state(settings_suspension_can_switch_, LV_STATE_CHECKED);
+        }
+    }
+    if (settings_suspension_can_label_) {
+        lv_label_set_text(settings_suspension_can_label_,
+                          config.display.suspension_can_enabled ? "Enabled" : "Disabled");
+    }
 
     buildNavigation();
     if (config_->pages.empty()) {
@@ -878,8 +892,10 @@ void UIBuilder::actionButtonEvent(lv_event_t* e) {
             
             // Handle release - check auto_off regardless of momentary mode
             if (code == LV_EVENT_RELEASED || code == LV_EVENT_PRESS_LOST || code == LV_EVENT_CANCEL) {
+                // Only release-to-off for press-driven interactions.
+                // Click/toggle actions should remain active until explicitly turned off.
                 const bool release_to_off = config->momentary ||
-                    config->output_behavior.auto_off;
+                    (trigger_on_press && config->output_behavior.auto_off);
                 if (action == "on" && release_to_off) {
                     // inMOTION window outputs: stop motor on release
                     {
@@ -1502,6 +1518,40 @@ void UIBuilder::createInfoModal() {
     createKeyValue(system_card, "Wi-Fi SSID", "Not connected", &settings_wifi_label_);
     const char* version_default = (APP_VERSION && APP_VERSION[0]) ? APP_VERSION : "--";
     createKeyValue(system_card, "Firmware Version", version_default, &settings_version_label_);
+
+    lv_obj_t* suspension_row = lv_obj_create(system_card);
+    lv_obj_remove_style_all(suspension_row);
+    lv_obj_set_width(suspension_row, lv_pct(100));
+    lv_obj_set_flex_flow(suspension_row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(suspension_row, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_all(suspension_row, 0, 0);
+    lv_obj_set_style_pad_gap(suspension_row, 8, 0);
+
+    lv_obj_t* suspension_text_col = lv_obj_create(suspension_row);
+    lv_obj_remove_style_all(suspension_text_col);
+    lv_obj_set_flex_flow(suspension_text_col, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(suspension_text_col, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_flex_grow(suspension_text_col, 1);
+    lv_obj_set_style_pad_all(suspension_text_col, 0, 0);
+    lv_obj_set_style_pad_gap(suspension_text_col, 2, 0);
+
+    lv_obj_t* suspension_key = lv_label_create(suspension_text_col);
+    lv_label_set_text(suspension_key, "Suspension CAN TX");
+    lv_obj_set_style_text_font(suspension_key, &lv_font_montserrat_12, 0);
+    lv_obj_set_style_text_color(suspension_key, UITheme::COLOR_TEXT_SECONDARY, 0);
+
+    settings_suspension_can_label_ = lv_label_create(suspension_text_col);
+    lv_label_set_text(settings_suspension_can_label_,
+                      (config_ && config_->display.suspension_can_enabled) ? "Enabled" : "Disabled");
+    lv_obj_set_style_text_font(settings_suspension_can_label_, &lv_font_montserrat_16, 0);
+    lv_obj_set_style_text_color(settings_suspension_can_label_, UITheme::COLOR_TEXT_PRIMARY, 0);
+
+    settings_suspension_can_switch_ = lv_switch_create(suspension_row);
+    lv_obj_clear_flag(settings_suspension_can_switch_, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_event_cb(settings_suspension_can_switch_, suspensionCanSwitchEvent, LV_EVENT_VALUE_CHANGED, nullptr);
+    if (config_ && config_->display.suspension_can_enabled) {
+        lv_obj_add_state(settings_suspension_can_switch_, LV_STATE_CHECKED);
+    }
 
     // Network health bar + diagnostics
     lv_obj_t* bar_row = lv_obj_create(system_card);
@@ -2225,6 +2275,31 @@ void UIBuilder::brightnessSliderEvent(lv_event_t* e) {
         ui.setBrightnessInternal(value, true);
     }
     UIBuilder::instance().resetSleepTimer();
+}
+
+void UIBuilder::suspensionCanSwitchEvent(lv_event_t* e) {
+    if (lv_event_get_code(e) != LV_EVENT_VALUE_CHANGED) {
+        return;
+    }
+
+    lv_obj_t* sw = lv_event_get_target(e);
+    const bool enabled = lv_obj_has_state(sw, LV_STATE_CHECKED);
+
+    DeviceConfig& cfg = ConfigManager::instance().getConfig();
+    const bool changed = cfg.display.suspension_can_enabled != enabled;
+    cfg.display.suspension_can_enabled = enabled;
+    CanManager::instance().setSuspensionMessagingEnabled(enabled);
+
+    UIBuilder& ui = UIBuilder::instance();
+    if (ui.settings_suspension_can_label_) {
+        lv_label_set_text(ui.settings_suspension_can_label_, enabled ? "Enabled" : "Disabled");
+    }
+
+    if (changed) {
+        ConfigManager::instance().save();
+    }
+
+    ui.resetSleepTimer();
 }
 
 uint8_t UIBuilder::clampBrightness(uint8_t percent) const {

@@ -109,6 +109,7 @@ private:
     static void infoModalCloseEvent(lv_event_t* e);
     static void infoModalBackdropEvent(lv_event_t* e);
     static void brightnessSliderEvent(lv_event_t* e);
+    static void suspensionCanSwitchEvent(lv_event_t* e);
     static void modalActivityEvent(lv_event_t* e);
     static lv_color_t colorFromHex(const std::string& hex, lv_color_t fallback);
 
@@ -136,6 +137,8 @@ private:
     lv_obj_t* settings_wifi_label_ = nullptr;
     lv_obj_t* settings_brightness_slider_ = nullptr;
     lv_obj_t* settings_brightness_label_ = nullptr;
+    lv_obj_t* settings_suspension_can_switch_ = nullptr;
+    lv_obj_t* settings_suspension_can_label_ = nullptr;
     lv_obj_t* settings_version_label_ = nullptr;
     lv_obj_t* ota_version_label_ = nullptr;
     lv_obj_t* ota_available_version_label_ = nullptr;

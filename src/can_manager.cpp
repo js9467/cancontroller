@@ -484,10 +484,36 @@ SuspensionCANStats CanManager::getSuspensionStats() const {
     return stats;
 }
 
+void CanManager::setSuspensionMessagingEnabled(bool enabled) {
+    if (suspension_mutex_) {
+        xSemaphoreTake(suspension_mutex_, portMAX_DELAY);
+        suspension_messaging_enabled_ = enabled;
+        xSemaphoreGive(suspension_mutex_);
+    } else {
+        suspension_messaging_enabled_ = enabled;
+    }
+}
+
+bool CanManager::isSuspensionMessagingEnabled() const {
+    bool enabled = true;
+    if (suspension_mutex_) {
+        xSemaphoreTake(suspension_mutex_, portMAX_DELAY);
+        enabled = suspension_messaging_enabled_;
+        xSemaphoreGive(suspension_mutex_);
+    } else {
+        enabled = suspension_messaging_enabled_;
+    }
+    return enabled;
+}
+
 bool CanManager::sendSuspensionCommand() {
     if (!ready_) {
         Serial.println("[Suspension] CAN not ready");
         return false;
+    }
+
+    if (!isSuspensionMessagingEnabled()) {
+        return true;
     }
 
     // Get current state

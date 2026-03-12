@@ -559,6 +559,9 @@ void setup() {
         Serial.println("[Config] Failed to mount LittleFS; factory defaults applied.");
     }
 
+    CanManager::instance().setSuspensionMessagingEnabled(
+        ConfigManager::instance().getConfig().display.suspension_can_enabled);
+
     if (!Ipm1CanSystem::instance().begin()) {
         Serial.println("[IPM1] Failed to load system JSON; default system retained");
     }

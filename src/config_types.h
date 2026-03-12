@@ -169,6 +169,7 @@ struct DisplayConfig {
     std::uint8_t brightness = 100;  // 0-100 percent
     bool sleep_enabled = false;
     std::uint16_t sleep_timeout_seconds = 60;  // idle timeout before sleep overlay
+    bool suspension_can_enabled = true;  // Master switch for suspension-related CAN TX
     std::string sleep_icon_base64 = "";  // Custom sleep image (PNG/JPG base64) - DEPRECATED, use ImageAssets
 };
 

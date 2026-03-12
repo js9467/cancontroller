@@ -89,6 +89,8 @@ public:
     void updateSuspensionState(const SuspensionState& state);
     SuspensionState getSuspensionState() const;
     SuspensionCANStats getSuspensionStats() const;
+    void setSuspensionMessagingEnabled(bool enabled);
+    bool isSuspensionMessagingEnabled() const;
     bool sendSuspensionCommand();  // Sends current state to 0x737
     void parseSuspensionStatus(const uint8_t data[8]);  // Parse 0x738 response
 
@@ -117,6 +119,7 @@ private:
     // Suspension state (separate from Infinitybox)
     SuspensionState suspension_state_;
     SuspensionCANStats suspension_stats_;
+    bool suspension_messaging_enabled_ = true;
     mutable SemaphoreHandle_t suspension_mutex_ = nullptr;
 
     static constexpr uint8_t kPowercellMaxAddress = 16;
