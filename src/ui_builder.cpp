@@ -2690,28 +2690,32 @@ void UIBuilder::buildSuspensionInterfacePage(const PageConfig& page) {
     // Front (top-left), Rear (top-right), Roll (bottom-left), Pitch (bottom-right)
     lv_obj_t* front_panel = createArcGaugePanel(grid_cont, "FRONT", "front",
                                                  &suspension_ui_.front_arc,
-                                                 &suspension_ui_.front_val_label);
+                                                 &suspension_ui_.front_val_label,
+                                                 suspension_ui_.front_preset_btns);
     lv_obj_set_grid_cell(front_panel,
         LV_GRID_ALIGN_STRETCH, 0, 1,
         LV_GRID_ALIGN_STRETCH, 0, 1);
 
     lv_obj_t* rear_panel = createArcGaugePanel(grid_cont, "REAR", "rear",
                                                 &suspension_ui_.rear_arc,
-                                                &suspension_ui_.rear_val_label);
+                                                &suspension_ui_.rear_val_label,
+                                                suspension_ui_.rear_preset_btns);
     lv_obj_set_grid_cell(rear_panel,
         LV_GRID_ALIGN_STRETCH, 1, 1,
         LV_GRID_ALIGN_STRETCH, 0, 1);
 
     lv_obj_t* roll_panel = createArcGaugePanel(grid_cont, "ROLL", "roll",
                                                 &suspension_ui_.roll_arc,
-                                                &suspension_ui_.roll_val_label);
+                                                &suspension_ui_.roll_val_label,
+                                                suspension_ui_.roll_preset_btns);
     lv_obj_set_grid_cell(roll_panel,
         LV_GRID_ALIGN_STRETCH, 0, 1,
         LV_GRID_ALIGN_STRETCH, 1, 1);
 
     lv_obj_t* pitch_panel = createArcGaugePanel(grid_cont, "PITCH", "pitch",
                                                   &suspension_ui_.pitch_arc,
-                                                  &suspension_ui_.pitch_val_label);
+                                                  &suspension_ui_.pitch_val_label,
+                                                  suspension_ui_.pitch_preset_btns);
     lv_obj_set_grid_cell(pitch_panel,
         LV_GRID_ALIGN_STRETCH, 1, 1,
         LV_GRID_ALIGN_STRETCH, 1, 1);
@@ -2722,7 +2726,8 @@ void UIBuilder::buildSuspensionInterfacePage(const PageConfig& page) {
 
 lv_obj_t* UIBuilder::createArcGaugePanel(lv_obj_t* parent, const char* title,
                                           const char* axis_id,
-                                          lv_obj_t** arc_out, lv_obj_t** val_out) {
+                                          lv_obj_t** arc_out, lv_obj_t** val_out,
+                                          lv_obj_t** preset_btns) {
     // ── Card ─────────────────────────────────────────────────────────────────
     lv_obj_t* card = lv_obj_create(parent);
     lv_obj_set_style_bg_color(card, lv_color_hex(0x10131b), 0);
@@ -2833,6 +2838,41 @@ lv_obj_t* UIBuilder::createArcGaugePanel(lv_obj_t* parent, const char* title,
     lv_obj_set_user_data(btn_inc, (void*)axis_id);
     lv_obj_add_event_cb(btn_inc, suspensionDamperEvent, LV_EVENT_CLICKED,
                         (void*)(intptr_t)1);
+
+    // ── Preset quick-select row (1 … 5) ──────────────────────────────────
+    lv_obj_t* preset_row = lv_obj_create(card);
+    lv_obj_remove_style_all(preset_row);
+    lv_obj_set_size(preset_row, lv_pct(100), 24);
+    lv_obj_set_layout(preset_row, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(preset_row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(preset_row, LV_FLEX_ALIGN_SPACE_EVENLY,
+                                      LV_FLEX_ALIGN_CENTER,
+                                      LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_bottom(preset_row, 4, 0);
+
+    for (int i = 1; i <= 5; i++) {
+        lv_obj_t* pb = lv_btn_create(preset_row);
+        lv_obj_set_size(pb, 42, 20);
+        lv_obj_set_style_bg_color(pb, lv_color_hex(0x1a1d28), 0);
+        lv_obj_set_style_bg_color(pb, lv_color_hex(0xD4A017), LV_STATE_CHECKED);
+        lv_obj_set_style_bg_color(pb, lv_color_hex(0xb08010), LV_STATE_PRESSED);
+        lv_obj_set_style_border_color(pb, lv_color_hex(0x3a3a4a), 0);
+        lv_obj_set_style_border_color(pb, lv_color_hex(0xD4A017), LV_STATE_CHECKED);
+        lv_obj_set_style_border_width(pb, 1, 0);
+        lv_obj_set_style_radius(pb, 6, 0);
+        lv_obj_add_flag(pb, LV_OBJ_FLAG_CHECKABLE);
+        lv_obj_t* pl = lv_label_create(pb);
+        char num[4];
+        snprintf(num, sizeof(num), "%d", i);
+        lv_label_set_text(pl, num);
+        lv_obj_set_style_text_font(pl, &lv_font_montserrat_12, 0);
+        lv_obj_set_style_text_color(pl, lv_color_hex(0xffffff), 0);
+        lv_obj_center(pl);
+        lv_obj_set_user_data(pb, (void*)axis_id);
+        lv_obj_add_event_cb(pb, suspensionPresetEvent, LV_EVENT_CLICKED,
+                            (void*)(intptr_t)i);
+        if (preset_btns) preset_btns[i - 1] = pb;
+    }
 
     return card;
 }
@@ -3148,30 +3188,22 @@ void UIBuilder::suspensionDamperEvent(lv_event_t* e) {
 void UIBuilder::suspensionPresetEvent(lv_event_t* e) {
     lv_obj_t* btn = lv_event_get_target(e);
     int preset_number = (int)(intptr_t)lv_event_get_user_data(e);  // 1-5
-    const char* axle = (const char*)lv_obj_get_user_data(btn);  // "front" or "rear"
-    
-    if (!axle) return;
-    
-// Preset maps 1-5 directly to TCU damper settings 1-5
-    if (preset_number < 1 || preset_number > 5) return;
+    const char* axle = (const char*)lv_obj_get_user_data(btn);
 
-    // Get current state
+    if (!axle || preset_number < 1 || preset_number > 5) return;
+
     SuspensionState state = CanManager::instance().getSuspensionState();
 
-    // Apply preset to front or rear
-    if (strcmp(axle, "front") == 0) {
-        state.front_setting = (uint8_t)preset_number;
-        UIBuilder::instance().suspension_front_preset_active_ = preset_number - 1;
-        Serial.printf("[Suspension] Front preset -> S%d\n", preset_number);
-    } else if (strcmp(axle, "rear") == 0) {
-        state.rear_setting = (uint8_t)preset_number;
-        UIBuilder::instance().suspension_rear_preset_active_ = preset_number - 1;
-        Serial.printf("[Suspension] Rear preset -> S%d\n", preset_number);
-    }
-    
+    if      (strcmp(axle, "front") == 0) state.front_setting = (uint8_t)preset_number;
+    else if (strcmp(axle, "rear")  == 0) state.rear_setting  = (uint8_t)preset_number;
+    else if (strcmp(axle, "roll")  == 0) state.roll_setting  = (uint8_t)preset_number;
+    else if (strcmp(axle, "pitch") == 0) state.pitch_setting = (uint8_t)preset_number;
+
     state.power_on = true;
     CanManager::instance().updateSuspensionState(state);
     CanManager::instance().sendSuspensionCommand();
+
+    Serial.printf("[Suspension] Preset %s -> S%d\n", axle, preset_number);
     UIBuilder::instance().updateSuspensionUI();
 }
 
@@ -3257,6 +3289,19 @@ void UIBuilder::updateSuspensionUI() {
     updateArc(suspension_ui_.rear_arc,   suspension_ui_.rear_val_label,   state.rear_setting);
     updateArc(suspension_ui_.roll_arc,   suspension_ui_.roll_val_label,   state.roll_setting);
     updateArc(suspension_ui_.pitch_arc,  suspension_ui_.pitch_val_label,  state.pitch_setting);
+
+    // Update preset button checked states
+    auto updatePresets = [](lv_obj_t** btns, uint8_t setting) {
+        for (int i = 0; i < 5; i++) {
+            if (!btns[i]) continue;
+            if (i + 1 == (int)setting) lv_obj_add_state(btns[i], LV_STATE_CHECKED);
+            else lv_obj_clear_state(btns[i], LV_STATE_CHECKED);
+        }
+    };
+    updatePresets(suspension_ui_.front_preset_btns, state.front_setting);
+    updatePresets(suspension_ui_.rear_preset_btns,  state.rear_setting);
+    updatePresets(suspension_ui_.roll_preset_btns,  state.roll_setting);
+    updatePresets(suspension_ui_.pitch_preset_btns, state.pitch_setting);
 
     // Calibrate button highlight when active
     if (suspension_ui_.calibrate_btn && suspension_ui_.calibrate_label) {

@@ -605,6 +605,17 @@ void CanManager::parseSuspensionStatus(const uint8_t data[8]) {
         suspension_state_.error_rl = data[7];
         suspension_state_.last_feedback_ms = millis();
 
+        // If we are not actively commanding the suspension, sync our settings
+        // to match what the TCU is actually doing (bidirectional awareness).
+        // actual_* is 0-indexed (0=S1 .. 4=S5); settings are 1-indexed.
+        if (!suspension_state_.power_on) {
+            auto toSetting = [](uint8_t v) -> uint8_t { return (v <= 4) ? (v + 1) : 1; };
+            suspension_state_.front_setting = toSetting(data[0]);
+            suspension_state_.rear_setting  = toSetting(data[1]);
+            suspension_state_.roll_setting  = toSetting(data[2]);
+            suspension_state_.pitch_setting = toSetting(data[3]);
+        }
+
         suspension_stats_.rx_count++;
         suspension_stats_.last_rx_ms = millis();
         memcpy(suspension_stats_.last_rx_data, data, 8);
@@ -612,10 +623,38 @@ void CanManager::parseSuspensionStatus(const uint8_t data[8]) {
         xSemaphoreGive(suspension_mutex_);
     }
 
+    suspension_ui_dirty_.store(true);
+
     Serial.printf("[Suspension] RX 0x738: %02X %02X %02X %02X %02X %02X %02X %02X "
                   "(Front=S%d Rear=S%d Roll=S%d Pitch=S%d ErrFR=%02X ErrFL=%02X ErrRR=%02X ErrRL=%02X)\n",
                   data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7],
                   data[0]+1, data[1]+1, data[2]+1, data[3]+1,
                   data[4], data[5], data[6], data[7]);
+}
+
+void CanManager::parseSuspensionCommand(const uint8_t data[8]) {
+    // Sniff 0x737 commands from other controllers (e.g. stock TCU head unit).
+    // TX byte layout: D3=pitch(1-5), D4=roll(1-5), D5=rear(1-5), D6=front(1-5), D7=0x30(ON)/0x00(OFF)
+    // Only update our state when we are not actively commanding (avoids conflict).
+    if (!isSuspensionMessagingEnabled()) return;
+
+    if (suspension_mutex_) {
+        xSemaphoreTake(suspension_mutex_, portMAX_DELAY);
+        if (!suspension_state_.power_on) {
+            uint8_t f  = data[6];  // front (1-5)
+            uint8_t r  = data[5];  // rear  (1-5)
+            uint8_t ro = data[4];  // roll  (1-5)
+            uint8_t p  = data[3];  // pitch (1-5)
+            if (f  >= 1 && f  <= 5) suspension_state_.front_setting = f;
+            if (r  >= 1 && r  <= 5) suspension_state_.rear_setting  = r;
+            if (ro >= 1 && ro <= 5) suspension_state_.roll_setting  = ro;
+            if (p  >= 1 && p  <= 5) suspension_state_.pitch_setting = p;
+        }
+        xSemaphoreGive(suspension_mutex_);
+    }
+
+    suspension_ui_dirty_.store(true);
+    Serial.printf("[Suspension] Sniffed 0x737: Front=S%d Rear=S%d Roll=S%d Pitch=S%d Power=%s\n",
+                  data[6], data[5], data[4], data[3], data[7] == 0x30 ? "ON" : "OFF");
 }
 

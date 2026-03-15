@@ -28,6 +28,7 @@ public:
                              const std::string& sta_ssid);
     void setBrightness(uint8_t percent);
     void notifyButtonActive(const std::string& id, bool active);
+    void updateSuspensionUI();  // Refresh UI from CAN feedback (also called from main.cpp)
 
 private:
     UIBuilder() = default;
@@ -45,8 +46,7 @@ private:
     // Suspension interface UI
     void buildSuspensionInterfacePage(const PageConfig& page);
     lv_obj_t* createArcGaugePanel(lv_obj_t* parent, const char* title, const char* axis_id,
-                                   lv_obj_t** arc_out, lv_obj_t** val_out);
-    void updateSuspensionUI();  // Refresh UI from CAN feedback
+                                   lv_obj_t** arc_out, lv_obj_t** val_out, lv_obj_t** preset_btns);
     static void suspensionDamperEvent(lv_event_t* e);  // +/- button handler
     static void suspensionPresetEvent(lv_event_t* e);  // Preset 1-5 handler
     static void suspensionCalibrateEvent(lv_event_t* e);  // Calibrate handler
@@ -214,6 +214,10 @@ private:
         lv_obj_t* rear_val_label = nullptr;
         lv_obj_t* roll_val_label = nullptr;
         lv_obj_t* pitch_val_label = nullptr;
+        lv_obj_t* front_preset_btns[5] = {};
+        lv_obj_t* rear_preset_btns[5] = {};
+        lv_obj_t* roll_preset_btns[5] = {};
+        lv_obj_t* pitch_preset_btns[5] = {};
         lv_obj_t* calibrate_btn = nullptr;
         lv_obj_t* calibrate_label = nullptr;
     } suspension_ui_;

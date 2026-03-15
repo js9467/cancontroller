@@ -4,6 +4,7 @@
 #include <hal/gpio_types.h>
 #include <array>
 #include <vector>
+#include <atomic>
 
 #include "config_types.h"
 
@@ -99,7 +100,10 @@ public:
     void setSuspensionMessagingEnabled(bool enabled);
     bool isSuspensionMessagingEnabled() const;
     bool sendSuspensionCommand();  // Sends current state to 0x737
-    void parseSuspensionStatus(const uint8_t data[8]);  // Parse 0x738 response
+    void parseSuspensionStatus(const uint8_t data[8]);  // Parse 0x738 feedback
+    void parseSuspensionCommand(const uint8_t data[8]); // Sniff 0x737 from other controller
+    bool isSuspensionUIDirty() const { return suspension_ui_dirty_.load(); }
+    void clearSuspensionUIDirty() { suspension_ui_dirty_.store(false); }
 
     bool updatePowercellStatusFromPgn(uint32_t pgn, const uint8_t data[8]);
     PowercellOutputState getPowercellOutputState(uint8_t cell_address, uint8_t output_number) const;
@@ -128,6 +132,7 @@ private:
     SuspensionCANStats suspension_stats_;
     bool suspension_messaging_enabled_ = true;
     mutable SemaphoreHandle_t suspension_mutex_ = nullptr;
+    mutable std::atomic<bool> suspension_ui_dirty_{false};
 
     static constexpr uint8_t kPowercellMaxAddress = 16;
     static constexpr uint8_t kPowercellOutputsPerCell = 10;

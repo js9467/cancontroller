@@ -197,6 +197,10 @@ void can_rx_task(void* param) {
             if (is_standard && msg.identifier == 0x738 && msg.length == 8) {
                 CanManager::instance().parseSuspensionStatus(msg.data);
             }
+            // Sniff 0x737 commands from any other controller on bus (e.g. stock TCU head unit)
+            if (is_standard && msg.identifier == 0x737 && msg.length == 8) {
+                CanManager::instance().parseSuspensionCommand(msg.data);
+            }
             if (!is_standard && msg.length == 8) {
                 const uint32_t pgn = (msg.identifier >> 8) & 0x3FFFF;
                 const uint8_t  sa  = static_cast<uint8_t>(msg.identifier & 0xFF);
@@ -1000,6 +1004,14 @@ void loop() {
     if (UIBuilder::instance().consumeDirtyFlag()) {
         lvgl_port_lock(-1);
         UIBuilder::instance().applyConfig(ConfigManager::instance().getConfig());
+        lvgl_port_unlock();
+    }
+
+    // Refresh suspension UI when CAN feedback or snooped commands arrive
+    if (CanManager::instance().isSuspensionUIDirty()) {
+        CanManager::instance().clearSuspensionUIDirty();
+        lvgl_port_lock(-1);
+        UIBuilder::instance().updateSuspensionUI();
         lvgl_port_unlock();
     }
 
