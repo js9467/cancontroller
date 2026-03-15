@@ -42,6 +42,14 @@ struct SuspensionState {
     uint8_t error_rr = 0;
     uint8_t error_rl = 0;
     uint32_t last_feedback_ms = 0;
+
+    // Last values we (or the stock unit) explicitly sent on 0x737.
+    // 0 = never commanded. Used to avoid 0x738 feedback overwriting
+    // a freshly-commanded setting while the damper is still moving.
+    uint8_t last_commanded_front = 0;
+    uint8_t last_commanded_rear  = 0;
+    uint8_t last_commanded_roll  = 0;
+    uint8_t last_commanded_pitch = 0;
 };
 
 // Suspension CAN diagnostics

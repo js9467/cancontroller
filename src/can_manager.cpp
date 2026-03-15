@@ -557,6 +557,12 @@ bool CanManager::sendSuspensionCommand() {
             suspension_stats_.tx_count++;
             suspension_stats_.last_tx_ms = millis();
             memcpy(suspension_stats_.last_tx_data, data, 8);
+            // Record what we just commanded so parseSuspensionStatus can avoid
+            // overwriting settings while the damper is still moving.
+            suspension_state_.last_commanded_front = data[6];
+            suspension_state_.last_commanded_rear  = data[5];
+            suspension_state_.last_commanded_roll  = data[4];
+            suspension_state_.last_commanded_pitch = data[3];
         } else {
             suspension_stats_.tx_fail_count++;
         }
@@ -605,17 +611,21 @@ void CanManager::parseSuspensionStatus(const uint8_t data[8]) {
         suspension_state_.error_rl = data[7];
         suspension_state_.last_feedback_ms = millis();
 
-        // Sync settings from 0x738 only when we haven't sent our own command recently.
-        // The TCU's 0x738 still reports the OLD position for ~1-2s while the damper
-        // responds — syncing during that window would immediately revert our change.
-        const uint32_t COMMAND_COOLDOWN_MS = 2000;
-        if (millis() - suspension_stats_.last_tx_ms >= COMMAND_COOLDOWN_MS) {
-            auto toSetting = [](uint8_t v) -> uint8_t { return (v <= 4) ? (v + 1) : 1; };
+        // Only sync *_setting from 0x738 feedback if we have never sent a command.
+        // Once last_commanded_* is set (non-zero), settings are driven exclusively
+        // by user actions and snooped 0x737 frames — not by 0x738 feedback — so
+        // that commands aren't reverted while the damper is still physically moving.
+        // On first boot (last_commanded==0) this allows the display to initialise
+        // from the TCU's confirmed position before anything is commanded.
+        auto toSetting = [](uint8_t v) -> uint8_t { return (v <= 4) ? (v + 1) : 1; };
+        if (suspension_state_.last_commanded_front == 0)
             suspension_state_.front_setting = toSetting(data[0]);
+        if (suspension_state_.last_commanded_rear == 0)
             suspension_state_.rear_setting  = toSetting(data[1]);
+        if (suspension_state_.last_commanded_roll == 0)
             suspension_state_.roll_setting  = toSetting(data[2]);
+        if (suspension_state_.last_commanded_pitch == 0)
             suspension_state_.pitch_setting = toSetting(data[3]);
-        }
 
         suspension_stats_.rx_count++;
         suspension_stats_.last_rx_ms = millis();
@@ -641,22 +651,20 @@ void CanManager::parseSuspensionCommand(const uint8_t data[8]) {
 
     if (suspension_mutex_) {
         xSemaphoreTake(suspension_mutex_, portMAX_DELAY);
-        // Mirror the stock TCU's snooped 0x737 only when we haven't sent our own
-        // command recently — otherwise our change gets overwritten by the stock
-        // head unit re-broadcasting its previous (pre-change) commanded state.
-        const uint32_t COMMAND_COOLDOWN_MS = 2000;
+        // Always mirror snooped 0x737 — TWAI never loopbacks our own TX,
+        // so any 0x737 received here came from another device (stock head unit).
+        // Also update last_commanded_* so subsequent 0x738 feedback (which will
+        // still report the old position while the damper moves) does not override.
+        uint8_t f   = data[6];  // front (1-5)
+        uint8_t r   = data[5];  // rear  (1-5)
+        uint8_t ro  = data[4];  // roll  (1-5)
+        uint8_t p   = data[3];  // pitch (1-5)
         uint8_t pwr = data[7];
         suspension_state_.power_on = (pwr == 0x30);
-        if (millis() - suspension_stats_.last_tx_ms >= COMMAND_COOLDOWN_MS) {
-            uint8_t f  = data[6];  // front (1-5)
-            uint8_t r  = data[5];  // rear  (1-5)
-            uint8_t ro = data[4];  // roll  (1-5)
-            uint8_t p  = data[3];  // pitch (1-5)
-            if (f  >= 1 && f  <= 5) suspension_state_.front_setting = f;
-            if (r  >= 1 && r  <= 5) suspension_state_.rear_setting  = r;
-            if (ro >= 1 && ro <= 5) suspension_state_.roll_setting  = ro;
-            if (p  >= 1 && p  <= 5) suspension_state_.pitch_setting = p;
-        }
+        if (f  >= 1 && f  <= 5) { suspension_state_.front_setting = f;  suspension_state_.last_commanded_front = f;  }
+        if (r  >= 1 && r  <= 5) { suspension_state_.rear_setting  = r;  suspension_state_.last_commanded_rear  = r;  }
+        if (ro >= 1 && ro <= 5) { suspension_state_.roll_setting  = ro; suspension_state_.last_commanded_roll  = ro; }
+        if (p  >= 1 && p  <= 5) { suspension_state_.pitch_setting = p;  suspension_state_.last_commanded_pitch = p;  }
         xSemaphoreGive(suspension_mutex_);
     }
 
