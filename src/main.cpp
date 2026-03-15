@@ -163,15 +163,21 @@ void mux_watchdog_task(void*) {
 }
 
 // Suspension TX task - sends 0x737 command every 300ms (separate from Infinitybox)
+// Only transmits when the user has actively engaged suspension control (power_on=true).
+// Sending 0x737 with byte7=0x00 (OFF) unconditionally fights other devices on the bus
+// that may have the TCU enabled, causing repeated ON/OFF relay transitions (clicking).
 void suspension_tx_task(void*) {
     Serial.println("[Suspension] TX task started - 300ms cadence");
     
     for (;;) {
         vTaskDelay(pdMS_TO_TICKS(300));  // 300ms interval per spec
         
-        // Only send if CAN is ready
+        // Only send if CAN is ready AND suspension control is actively ON
         if (CanManager::instance().isReady()) {
-            CanManager::instance().sendSuspensionCommand();
+            SuspensionState s = CanManager::instance().getSuspensionState();
+            if (s.power_on) {
+                CanManager::instance().sendSuspensionCommand();
+            }
         }
     }
 }
