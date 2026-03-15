@@ -645,10 +645,10 @@ private:
 
             JsonObject susp = obj.createNestedObject("suspension");
             susp["enabled"] = scene.suspension.enabled;
-            susp["front_left"] = scene.suspension.front_left;
-            susp["front_right"] = scene.suspension.front_right;
-            susp["rear_left"] = scene.suspension.rear_left;
-            susp["rear_right"] = scene.suspension.rear_right;
+            susp["front"] = scene.suspension.front_setting;
+            susp["rear"] = scene.suspension.rear_setting;
+            susp["roll"] = scene.suspension.roll_setting;
+            susp["pitch"] = scene.suspension.pitch_setting;
             susp["calibration_active"] = scene.suspension.calibration_active;
         }
         
@@ -715,10 +715,10 @@ private:
 
         JsonObject susp = obj.createNestedObject("suspension");
         susp["enabled"] = scene.suspension.enabled;
-        susp["front_left"] = scene.suspension.front_left;
-        susp["front_right"] = scene.suspension.front_right;
-        susp["rear_left"] = scene.suspension.rear_left;
-        susp["rear_right"] = scene.suspension.rear_right;
+        susp["front"] = scene.suspension.front_setting;
+        susp["rear"] = scene.suspension.rear_setting;
+        susp["roll"] = scene.suspension.roll_setting;
+        susp["pitch"] = scene.suspension.pitch_setting;
         susp["calibration_active"] = scene.suspension.calibration_active;
 
         String result;
@@ -883,10 +883,10 @@ private:
         if (doc.containsKey("suspension")) {
             JsonObject susp = doc["suspension"];
             scene.suspension.enabled = susp["enabled"] | false;
-            scene.suspension.front_left = susp["front_left"] | 0;
-            scene.suspension.front_right = susp["front_right"] | 0;
-            scene.suspension.rear_left = susp["rear_left"] | 0;
-            scene.suspension.rear_right = susp["rear_right"] | 0;
+            scene.suspension.front_setting = susp["front"] | 0;
+            scene.suspension.rear_setting = susp["rear"] | 0;
+            scene.suspension.roll_setting = susp["roll"] | 0;
+            scene.suspension.pitch_setting = susp["pitch"] | 0;
             scene.suspension.calibration_active = susp["calibration_active"] | false;
         }
         

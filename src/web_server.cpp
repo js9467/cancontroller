@@ -944,17 +944,20 @@ void WebServerManager::setupRoutes() {
         DynamicJsonDocument response(512);
         response["power_on"] = state.power_on;
         response["messaging_enabled"] = CanManager::instance().isSuspensionMessagingEnabled();
-        response["front_left"] = state.front_left_percent;
-        response["front_right"] = state.front_right_percent;
-        response["rear_left"] = state.rear_left_percent;
-        response["rear_right"] = state.rear_right_percent;
+        response["front"] = state.front_setting;
+        response["rear"] = state.rear_setting;
+        response["roll"] = state.roll_setting;
+        response["pitch"] = state.pitch_setting;
         response["calibration_active"] = state.calibration_active;
 
-        response["actual_fl"] = state.actual_fl_percent;
-        response["actual_fr"] = state.actual_fr_percent;
-        response["actual_rl"] = state.actual_rl_percent;
-        response["actual_rr"] = state.actual_rr_percent;
-        response["fault_flags"] = state.fault_flags;
+        response["actual_front"] = state.actual_front;
+        response["actual_rear"] = state.actual_rear;
+        response["actual_roll"] = state.actual_roll;
+        response["actual_pitch"] = state.actual_pitch;
+        response["error_fr"] = state.error_fr;
+        response["error_fl"] = state.error_fl;
+        response["error_rr"] = state.error_rr;
+        response["error_rl"] = state.error_rl;
         response["last_feedback_ms"] = state.last_feedback_ms;
 
         response["tx_count"] = stats.tx_count;
@@ -981,10 +984,10 @@ void WebServerManager::setupRoutes() {
 
             SuspensionState state = CanManager::instance().getSuspensionState();
 
-            if (doc.containsKey("front_left")) state.front_left_percent = doc["front_left"];
-            if (doc.containsKey("front_right")) state.front_right_percent = doc["front_right"];
-            if (doc.containsKey("rear_left")) state.rear_left_percent = doc["rear_left"];
-            if (doc.containsKey("rear_right")) state.rear_right_percent = doc["rear_right"];
+            if (doc.containsKey("front")) state.front_setting = doc["front"];
+            if (doc.containsKey("rear")) state.rear_setting = doc["rear"];
+            if (doc.containsKey("roll")) state.roll_setting = doc["roll"];
+            if (doc.containsKey("pitch")) state.pitch_setting = doc["pitch"];
             if (doc.containsKey("calibration_active")) state.calibration_active = doc["calibration_active"];
 
             state.power_on = true;
@@ -993,10 +996,10 @@ void WebServerManager::setupRoutes() {
 
             DynamicJsonDocument response(256);
             response["success"] = success;
-            response["front_left"] = state.front_left_percent;
-            response["front_right"] = state.front_right_percent;
-            response["rear_left"] = state.rear_left_percent;
-            response["rear_right"] = state.rear_right_percent;
+            response["front"] = state.front_setting;
+            response["rear"] = state.rear_setting;
+            response["roll"] = state.roll_setting;
+            response["pitch"] = state.pitch_setting;
             response["calibration_active"] = state.calibration_active;
 
             String payload;

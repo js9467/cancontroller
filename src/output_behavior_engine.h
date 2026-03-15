@@ -158,10 +158,10 @@ struct SceneInfinityboxAction {
 
 struct SceneSuspensionSettings {
     bool enabled = false;
-    uint8_t front_left = 0;
-    uint8_t front_right = 0;
-    uint8_t rear_left = 0;
-    uint8_t rear_right = 0;
+    uint8_t front_setting = 0;   // 1-5 (TCU setting, 0 = no change)
+    uint8_t rear_setting = 0;    // 1-5
+    uint8_t roll_setting = 0;    // 1-5
+    uint8_t pitch_setting = 0;   // 1-5
     bool calibration_active = false;
 };
 

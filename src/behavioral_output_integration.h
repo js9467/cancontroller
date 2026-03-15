@@ -418,10 +418,10 @@ inline void applySceneActivationActions(const Scene& scene) {
 
     if (scene.suspension.enabled) {
         SuspensionState state = CanManager::instance().getSuspensionState();
-        state.front_left_percent = scene.suspension.front_left;
-        state.front_right_percent = scene.suspension.front_right;
-        state.rear_left_percent = scene.suspension.rear_left;
-        state.rear_right_percent = scene.suspension.rear_right;
+        state.front_setting = scene.suspension.front_setting;
+        state.rear_setting = scene.suspension.rear_setting;
+        state.roll_setting = scene.suspension.roll_setting;
+        state.pitch_setting = scene.suspension.pitch_setting;
         state.calibration_active = scene.suspension.calibration_active;
         state.power_on = true;
         CanManager::instance().updateSuspensionState(state);

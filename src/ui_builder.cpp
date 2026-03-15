@@ -3235,17 +3235,16 @@ void UIBuilder::suspensionDamperEvent(lv_event_t* e) {
     // Get current suspension state
     SuspensionState state = CanManager::instance().getSuspensionState();
     
-    // Update the appropriate damper
+// Update the appropriate damper (TCU uses Front/Rear/Roll/Pitch axes, not per-corner)
     uint8_t* target = nullptr;
-    if (strcmp(damper_id, "FL") == 0) target = &state.front_left_percent;
-    else if (strcmp(damper_id, "FR") == 0) target = &state.front_right_percent;
-    else if (strcmp(damper_id, "RL") == 0) target = &state.rear_left_percent;
-    else if (strcmp(damper_id, "RR") == 0) target = &state.rear_right_percent;
-    
+    if (strcmp(damper_id, "FL") == 0 || strcmp(damper_id, "FR") == 0) target = &state.front_setting;
+    else if (strcmp(damper_id, "RL") == 0 || strcmp(damper_id, "RR") == 0) target = &state.rear_setting;
+
     if (target) {
-        int new_val = (int)*target + delta;
-        if (new_val < 0) new_val = 0;
-        if (new_val > 100) new_val = 100;
+        int step = (delta > 0) ? 1 : -1;
+        int new_val = (int)*target + step;
+        if (new_val < 1) new_val = 1;
+        if (new_val > 5) new_val = 5;
         *target = (uint8_t)new_val;
         state.power_on = true;  // Enable power when adjusting
         
@@ -3253,7 +3252,7 @@ void UIBuilder::suspensionDamperEvent(lv_event_t* e) {
         CanManager::instance().updateSuspensionState(state);
         CanManager::instance().sendSuspensionCommand();
         
-        Serial.printf("[Suspension] %s %s -> %d%%\n", damper_id, 
+Serial.printf("[Suspension] %s %s -> S%d\n", damper_id,
                       delta > 0 ? "INC" : "DEC", new_val);
         
         // Update UI immediately for responsiveness
@@ -3268,24 +3267,21 @@ void UIBuilder::suspensionPresetEvent(lv_event_t* e) {
     
     if (!axle) return;
     
-    // Preset damping percentages (adjust based on your spec)
-    const uint8_t preset_values[] = {0, 25, 50, 75, 100};  // Presets 1-5
-    uint8_t value = preset_values[preset_number - 1];
-    
+// Preset maps 1-5 directly to TCU damper settings 1-5
+    if (preset_number < 1 || preset_number > 5) return;
+
     // Get current state
     SuspensionState state = CanManager::instance().getSuspensionState();
-    
+
     // Apply preset to front or rear
     if (strcmp(axle, "front") == 0) {
-        state.front_left_percent = value;
-        state.front_right_percent = value;
+        state.front_setting = (uint8_t)preset_number;
         UIBuilder::instance().suspension_front_preset_active_ = preset_number - 1;
-        Serial.printf("[Suspension] Front preset %d -> %d%%\n", preset_number, value);
+        Serial.printf("[Suspension] Front preset -> S%d\n", preset_number);
     } else if (strcmp(axle, "rear") == 0) {
-        state.rear_left_percent = value;
-        state.rear_right_percent = value;
+        state.rear_setting = (uint8_t)preset_number;
         UIBuilder::instance().suspension_rear_preset_active_ = preset_number - 1;
-        Serial.printf("[Suspension] Rear preset %d -> %d%%\n", preset_number, value);
+        Serial.printf("[Suspension] Rear preset -> S%d\n", preset_number);
     }
     
     state.power_on = true;
@@ -3319,6 +3315,22 @@ void UIBuilder::suspensionControlEvent(lv_event_t* e) {
         UIBuilder::instance().suspension_pitch_active_ = index;
     }
 
+    // Map button index (0-2) to TCU setting (1=soft, 3=mid, 5=firm)
+    static const uint8_t kIndexToSetting[3] = {1, 3, 5};
+    uint8_t setting = kIndexToSetting[index < 3 ? index : 2];
+
+    SuspensionState state = CanManager::instance().getSuspensionState();
+    if (strcmp(group, "roll") == 0) {
+        state.roll_setting = setting;
+        Serial.printf("[Suspension] Roll -> S%d\n", setting);
+    } else if (strcmp(group, "pitch") == 0) {
+        state.pitch_setting = setting;
+        Serial.printf("[Suspension] Pitch -> S%d\n", setting);
+    }
+    state.power_on = true;
+    CanManager::instance().updateSuspensionState(state);
+    CanManager::instance().sendSuspensionCommand();
+
     UIBuilder::instance().updateSuspensionUI();
 }
 
@@ -3339,39 +3351,45 @@ void UIBuilder::suspensionBackEvent(lv_event_t* e) {
 void UIBuilder::updateSuspensionUI() {
     SuspensionState state = CanManager::instance().getSuspensionState();
     
-    // Update value labels
+    // Update value labels (settings 1-5 for Front/Rear; Roll/Pitch shown on their buttons)
     char buf[8];
     if (suspension_ui_.fl_value_label) {
-        snprintf(buf, sizeof(buf), "%d%%", state.front_left_percent);
+        if (state.front_setting) snprintf(buf, sizeof(buf), "S%d", state.front_setting);
+        else snprintf(buf, sizeof(buf), "--");
         lv_label_set_text(suspension_ui_.fl_value_label, buf);
     }
     if (suspension_ui_.fr_value_label) {
-        snprintf(buf, sizeof(buf), "%d%%", state.front_right_percent);
+        if (state.front_setting) snprintf(buf, sizeof(buf), "S%d", state.front_setting);
+        else snprintf(buf, sizeof(buf), "--");
         lv_label_set_text(suspension_ui_.fr_value_label, buf);
     }
     if (suspension_ui_.rl_value_label) {
-        snprintf(buf, sizeof(buf), "%d%%", state.rear_left_percent);
+        if (state.rear_setting) snprintf(buf, sizeof(buf), "S%d", state.rear_setting);
+        else snprintf(buf, sizeof(buf), "--");
         lv_label_set_text(suspension_ui_.rl_value_label, buf);
     }
     if (suspension_ui_.rr_value_label) {
-        snprintf(buf, sizeof(buf), "%d%%", state.rear_right_percent);
+        if (state.rear_setting) snprintf(buf, sizeof(buf), "S%d", state.rear_setting);
+        else snprintf(buf, sizeof(buf), "--");
         lv_label_set_text(suspension_ui_.rr_value_label, buf);
     }
-    
+
     // Update status indicators based on feedback
     uint32_t now = millis();
     bool feedback_fresh = (now - state.last_feedback_ms) < 1000;  // < 1s old
-    
-    auto updateStatus = [&](lv_obj_t* label, uint8_t desired, uint8_t actual) {
+    bool any_error = (state.error_fr | state.error_fl | state.error_rr | state.error_rl) != 0;
+
+    // desired = setting 1-5; actual = TCU 0-indexed (0=S1..4=S5), convert to 1-indexed for comparison
+    auto updateStatus = [&](lv_obj_t* label, uint8_t desired, uint8_t actual_0idx) {
         if (!label) return;
-        
+        uint8_t actual = actual_0idx + 1;
         if (!feedback_fresh) {
             lv_label_set_text(label, "\u25cf Waiting");
             lv_obj_set_style_text_color(label, lv_color_hex(0x8d92a3), 0);
-        } else if (state.fault_flags != 0) {
+        } else if (any_error) {
             lv_label_set_text(label, "\u2716 Error");
             lv_obj_set_style_text_color(label, lv_color_hex(0xff6b6b), 0);
-        } else if (abs((int)desired - (int)actual) <= 2) {
+        } else if (desired == 0 || desired == actual) {
             lv_label_set_text(label, "\u2713 OK");
             lv_obj_set_style_text_color(label, lv_color_hex(0x3dd598), 0);
         } else {
@@ -3380,30 +3398,11 @@ void UIBuilder::updateSuspensionUI() {
         }
     };
 
-    const uint8_t preset_values[] = {0, 25, 50, 75, 100};
-    if (state.front_left_percent == state.front_right_percent) {
-        suspension_front_preset_active_ = -1;
-        for (int i = 0; i < 5; i++) {
-            if (state.front_left_percent == preset_values[i]) {
-                suspension_front_preset_active_ = i;
-                break;
-            }
-        }
-    } else {
-        suspension_front_preset_active_ = -1;
-    }
-
-    if (state.rear_left_percent == state.rear_right_percent) {
-        suspension_rear_preset_active_ = -1;
-        for (int i = 0; i < 5; i++) {
-            if (state.rear_left_percent == preset_values[i]) {
-                suspension_rear_preset_active_ = i;
-                break;
-            }
-        }
-    } else {
-        suspension_rear_preset_active_ = -1;
-    }
+    // Front preset active = front_setting - 1 (convert 1-5 to 0-4 index)
+    suspension_front_preset_active_ = (state.front_setting >= 1 && state.front_setting <= 5)
+                                       ? (state.front_setting - 1) : -1;
+    suspension_rear_preset_active_  = (state.rear_setting >= 1 && state.rear_setting <= 5)
+                                       ? (state.rear_setting - 1) : -1;
 
     auto applyCheckedState = [](lv_obj_t** btns, int count, int active_index) {
         for (int i = 0; i < count; i++) {
@@ -3427,11 +3426,12 @@ void UIBuilder::updateSuspensionUI() {
             lv_obj_set_style_text_color(suspension_ui_.calibrate_label, lv_color_hex(0x0a0f0a), 0);
         }
     }
-    
-    updateStatus(suspension_ui_.fl_status_label, state.front_left_percent, state.actual_fl_percent);
-    updateStatus(suspension_ui_.fr_status_label, state.front_right_percent, state.actual_fr_percent);
-    updateStatus(suspension_ui_.rl_status_label, state.rear_left_percent, state.actual_rl_percent);
-    updateStatus(suspension_ui_.rr_status_label, state.rear_right_percent, state.actual_rr_percent);
+
+    // fl/fr share front status; rl/rr share rear status; roll/pitch via their own buttons
+    updateStatus(suspension_ui_.fl_status_label, state.front_setting, state.actual_front);
+    updateStatus(suspension_ui_.fr_status_label, state.front_setting, state.actual_front);
+    updateStatus(suspension_ui_.rl_status_label, state.rear_setting, state.actual_rear);
+    updateStatus(suspension_ui_.rr_status_label, state.rear_setting, state.actual_rear);
 }
 
 void UIBuilder::infinityboxFlashEvent(lv_event_t* e) {

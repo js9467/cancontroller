@@ -19,20 +19,27 @@ struct CanRxMessage {
 };
 
 // Suspension state management (single source of truth)
+// TCU S15 protocol (CAN 250 kbit/s):
+//   TX 0x737: B3=pitch(1-5), B4=roll(1-5), B5=rear(1-5), B6=front(1-5), B7=0x30(ON)/0x00(OFF)
+//   RX 0x738: B0=front(0-4), B1=rear(0-4), B2=roll(0-4), B3=pitch(0-4), B4-7=error flags
 struct SuspensionState {
     bool power_on = false;
-    uint8_t front_left_percent = 0;    // 0-100%
-    uint8_t front_right_percent = 0;   // 0-100%
-    uint8_t rear_left_percent = 0;     // 0-100%
-    uint8_t rear_right_percent = 0;    // 0-100%
+    uint8_t front_setting = 0;   // 1-5 (0 = not set), maps to TX byte 6
+    uint8_t rear_setting = 0;    // 1-5 (0 = not set), maps to TX byte 5
+    uint8_t roll_setting = 0;    // 1-5 (0 = not set), maps to TX byte 4
+    uint8_t pitch_setting = 0;   // 1-5 (0 = not set), maps to TX byte 3
     bool calibration_active = false;
-    
-    // Actual state from 0x738 feedback
-    uint8_t actual_fl_percent = 0;
-    uint8_t actual_fr_percent = 0;
-    uint8_t actual_rl_percent = 0;
-    uint8_t actual_rr_percent = 0;
-    uint8_t fault_flags = 0;
+
+    // Confirmed state from 0x738 feedback (0-indexed: 0=setting1 .. 4=setting5)
+    uint8_t actual_front = 0;
+    uint8_t actual_rear = 0;
+    uint8_t actual_roll = 0;
+    uint8_t actual_pitch = 0;
+    // Error flags per damper (0x02=short circuit, 0x08=open lead)
+    uint8_t error_fr = 0;
+    uint8_t error_fl = 0;
+    uint8_t error_rr = 0;
+    uint8_t error_rl = 0;
     uint32_t last_feedback_ms = 0;
 };
 

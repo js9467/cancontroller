@@ -519,25 +519,19 @@ bool CanManager::sendSuspensionCommand() {
     // Get current state
     SuspensionState state = getSuspensionState();
 
-    // Build 8-byte payload for 0x737
-    // Byte layout based on spec (adjust as needed):
-    // Byte 0: Power/Mode flags
-    // Byte 1: Front Left damping %
-    // Byte 2: Front Right damping %
-    // Byte 3: Rear Left damping %
-    // Byte 4: Rear Right damping %
-    // Byte 5: Calibration flags
-    // Byte 6-7: Reserved
+    // Build 8-byte payload for 0x737 (TCU S15 protocol):
+    // Byte 0-2: Reserved (must be 0x00)
+    // Byte 3: Pitch damper setting (0x01-0x05), 0x00 = no change
+    // Byte 4: Roll  damper setting (0x01-0x05), 0x00 = no change
+    // Byte 5: Rear  damper setting (0x01-0x05), 0x00 = no change
+    // Byte 6: Front damper setting (0x01-0x05), 0x00 = no change
+    // Byte 7: Power ON=0x30, OFF=0x00
     uint8_t data[8] = {0};
-    data[0] = state.power_on ? 0x01 : 0x00;
-    if (state.calibration_active) data[0] |= 0x80;  // Calibration bit
-    data[1] = state.front_left_percent;
-    data[2] = state.front_right_percent;
-    data[3] = state.rear_left_percent;
-    data[4] = state.rear_right_percent;
-    data[5] = 0x00;  // Reserved for calibration status
-    data[6] = 0x00;
-    data[7] = 0x00;
+    data[3] = state.pitch_setting;
+    data[4] = state.roll_setting;
+    data[5] = state.rear_setting;
+    data[6] = state.front_setting;
+    data[7] = state.power_on ? 0x30 : 0x00;
 
     // Build standard 11-bit CAN frame (0x737)
     twai_message_t msg = {};
@@ -581,35 +575,40 @@ bool CanManager::sendSuspensionCommand() {
 }
 
 void CanManager::parseSuspensionStatus(const uint8_t data[8]) {
-    // Parse 0x738 status frame
-    // Byte layout based on spec (adjust as needed):
-    // Byte 0: Status flags
-    // Byte 1: Actual Front Left %
-    // Byte 2: Actual Front Right %
-    // Byte 3: Actual Rear Left %
-    // Byte 4: Actual Rear Right %
-    // Byte 5: Fault flags
-    // Byte 6-7: Reserved
-    
+    // Parse 0x738 status frame (TCU S15 protocol):
+    // Byte 0: Front confirmed setting (0=S1, 1=S2, 2=S3, 3=S4, 4=S5)
+    // Byte 1: Rear confirmed setting
+    // Byte 2: Roll confirmed setting
+    // Byte 3: Pitch confirmed setting
+    // Byte 4: Error FR (0x02=short circuit, 0x08=open lead)
+    // Byte 5: Error FL
+    // Byte 6: Error RR
+    // Byte 7: Error RL
+
     if (suspension_mutex_) {
         xSemaphoreTake(suspension_mutex_, portMAX_DELAY);
-        
-        suspension_state_.actual_fl_percent = data[1];
-        suspension_state_.actual_fr_percent = data[2];
-        suspension_state_.actual_rl_percent = data[3];
-        suspension_state_.actual_rr_percent = data[4];
-        suspension_state_.fault_flags = data[5];
+
+        suspension_state_.actual_front = data[0];
+        suspension_state_.actual_rear  = data[1];
+        suspension_state_.actual_roll  = data[2];
+        suspension_state_.actual_pitch = data[3];
+        suspension_state_.error_fr = data[4];
+        suspension_state_.error_fl = data[5];
+        suspension_state_.error_rr = data[6];
+        suspension_state_.error_rl = data[7];
         suspension_state_.last_feedback_ms = millis();
-        
+
         suspension_stats_.rx_count++;
         suspension_stats_.last_rx_ms = millis();
         memcpy(suspension_stats_.last_rx_data, data, 8);
-        
+
         xSemaphoreGive(suspension_mutex_);
     }
 
-    Serial.printf("[Suspension] RX 0x738: %02X %02X %02X %02X %02X %02X %02X %02X (FL=%d%%, FR=%d%%, RL=%d%%, RR=%d%%)\n",
+    Serial.printf("[Suspension] RX 0x738: %02X %02X %02X %02X %02X %02X %02X %02X "
+                  "(Front=S%d Rear=S%d Roll=S%d Pitch=S%d ErrFR=%02X ErrFL=%02X ErrRR=%02X ErrRL=%02X)\n",
                   data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7],
-                  data[1], data[2], data[3], data[4]);
+                  data[0]+1, data[1]+1, data[2]+1, data[3]+1,
+                  data[4], data[5], data[6], data[7]);
 }
 

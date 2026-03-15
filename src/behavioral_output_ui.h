@@ -1270,10 +1270,10 @@ function normalizeSceneDraft(scene) {
 
 	normalized.suspension = {
 		enabled: normalized.suspension.enabled || false,
-		front_left: firstDefined(normalized.suspension.front_left, 0),
-		front_right: firstDefined(normalized.suspension.front_right, 0),
-		rear_left: firstDefined(normalized.suspension.rear_left, 0),
-		rear_right: firstDefined(normalized.suspension.rear_right, 0),
+		front: firstDefined(normalized.suspension.front, 0),
+		rear: firstDefined(normalized.suspension.rear, 0),
+		roll: firstDefined(normalized.suspension.roll, 0),
+		pitch: firstDefined(normalized.suspension.pitch, 0),
 		calibration_active: normalized.suspension.calibration_active || false
 	};
 
@@ -1292,10 +1292,10 @@ function openSceneEditor(scene) {
 	document.getElementById('scene-exclusive').checked = sceneDraft.exclusive;
 
 	document.getElementById('scene-suspension-enabled').checked = sceneDraft.suspension.enabled;
-	document.getElementById('scene-suspension-front-left').value = sceneDraft.suspension.front_left;
-	document.getElementById('scene-suspension-front-right').value = sceneDraft.suspension.front_right;
-	document.getElementById('scene-suspension-rear-left').value = sceneDraft.suspension.rear_left;
-	document.getElementById('scene-suspension-rear-right').value = sceneDraft.suspension.rear_right;
+	document.getElementById('scene-suspension-front').value = sceneDraft.suspension.front;
+	document.getElementById('scene-suspension-rear').value = sceneDraft.suspension.rear;
+	document.getElementById('scene-suspension-roll').value = sceneDraft.suspension.roll;
+	document.getElementById('scene-suspension-pitch').value = sceneDraft.suspension.pitch;
 	document.getElementById('scene-suspension-calibrate').checked = sceneDraft.suspension.calibration_active;
 
 	renderSceneOutputs();
@@ -1408,10 +1408,10 @@ function saveSceneEditor() {
 
 	sceneDraft.suspension = {
 		enabled: document.getElementById('scene-suspension-enabled').checked,
-		front_left: parseInt(document.getElementById('scene-suspension-front-left').value || 0),
-		front_right: parseInt(document.getElementById('scene-suspension-front-right').value || 0),
-		rear_left: parseInt(document.getElementById('scene-suspension-rear-left').value || 0),
-		rear_right: parseInt(document.getElementById('scene-suspension-rear-right').value || 0),
+		front: parseInt(document.getElementById('scene-suspension-front').value || 0),
+		rear: parseInt(document.getElementById('scene-suspension-rear').value || 0),
+		roll: parseInt(document.getElementById('scene-suspension-roll').value || 0),
+		pitch: parseInt(document.getElementById('scene-suspension-pitch').value || 0),
 		calibration_active: document.getElementById('scene-suspension-calibrate').checked
 	};
 

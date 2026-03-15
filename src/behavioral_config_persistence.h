@@ -101,10 +101,10 @@ inline bool saveBehavioralConfig(BehaviorEngine& engine, OutputRuleEngine& ruleE
 
         JsonObject suspObj = sceneObj.createNestedObject("suspension");
         suspObj["enabled"] = scene.suspension.enabled;
-        suspObj["front_left"] = scene.suspension.front_left;
-        suspObj["front_right"] = scene.suspension.front_right;
-        suspObj["rear_left"] = scene.suspension.rear_left;
-        suspObj["rear_right"] = scene.suspension.rear_right;
+        suspObj["front"] = scene.suspension.front_setting;
+        suspObj["rear"] = scene.suspension.rear_setting;
+        suspObj["roll"] = scene.suspension.roll_setting;
+        suspObj["pitch"] = scene.suspension.pitch_setting;
         suspObj["calibration_active"] = scene.suspension.calibration_active;
     }
     
@@ -261,10 +261,10 @@ inline bool loadBehavioralConfig(BehaviorEngine& engine, OutputRuleEngine& ruleE
         JsonObject suspObj = sceneObj["suspension"];
         if (!suspObj.isNull()) {
             scene.suspension.enabled = suspObj["enabled"] | false;
-            scene.suspension.front_left = suspObj["front_left"] | 0;
-            scene.suspension.front_right = suspObj["front_right"] | 0;
-            scene.suspension.rear_left = suspObj["rear_left"] | 0;
-            scene.suspension.rear_right = suspObj["rear_right"] | 0;
+            scene.suspension.front_setting = suspObj["front"] | 0;
+            scene.suspension.rear_setting = suspObj["rear"] | 0;
+            scene.suspension.roll_setting = suspObj["roll"] | 0;
+            scene.suspension.pitch_setting = suspObj["pitch"] | 0;
             scene.suspension.calibration_active = suspObj["calibration_active"] | false;
         }
         
