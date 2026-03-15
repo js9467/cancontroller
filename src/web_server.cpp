@@ -992,6 +992,7 @@ void WebServerManager::setupRoutes() {
 
             state.power_on = true;
             CanManager::instance().updateSuspensionState(state);
+            CanManager::instance().notifySuspensionUserCommand();
             bool success = CanManager::instance().sendSuspensionCommand();
 
             DynamicJsonDocument response(256);

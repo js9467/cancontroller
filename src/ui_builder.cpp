@@ -3170,6 +3170,7 @@ void UIBuilder::suspensionDamperEvent(lv_event_t* e) {
         state.power_on = true;
 
         CanManager::instance().updateSuspensionState(state);
+        CanManager::instance().notifySuspensionUserCommand();
         CanManager::instance().sendSuspensionCommand();
 
         Serial.printf("[Suspension] %s %s -> S%d\n",
@@ -3192,6 +3193,7 @@ void UIBuilder::suspensionPresetEvent(lv_event_t* e) {
     state.pitch_setting = (uint8_t)preset_number;
     state.power_on = true;
     CanManager::instance().updateSuspensionState(state);
+    CanManager::instance().notifySuspensionUserCommand();
     CanManager::instance().sendSuspensionCommand();
 
     Serial.printf("[Suspension] Universal Preset S%d (all axes)\n", preset_number);
@@ -3203,6 +3205,7 @@ void UIBuilder::suspensionCalibrateEvent(lv_event_t* e) {
     state.calibration_active = !state.calibration_active;
     
     CanManager::instance().updateSuspensionState(state);
+    CanManager::instance().notifySuspensionUserCommand();
     CanManager::instance().sendSuspensionCommand();
     UIBuilder::instance().updateSuspensionUI();
     
@@ -3237,6 +3240,7 @@ void UIBuilder::suspensionControlEvent(lv_event_t* e) {
     }
     state.power_on = true;
     CanManager::instance().updateSuspensionState(state);
+    CanManager::instance().notifySuspensionUserCommand();
     CanManager::instance().sendSuspensionCommand();
 
     UIBuilder::instance().updateSuspensionUI();

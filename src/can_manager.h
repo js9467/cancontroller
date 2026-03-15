@@ -43,13 +43,11 @@ struct SuspensionState {
     uint8_t error_rl = 0;
     uint32_t last_feedback_ms = 0;
 
-    // Last values we (or the stock unit) explicitly sent on 0x737.
-    // 0 = never commanded. Used to avoid 0x738 feedback overwriting
-    // a freshly-commanded setting while the damper is still moving.
-    uint8_t last_commanded_front = 0;
-    uint8_t last_commanded_rear  = 0;
-    uint8_t last_commanded_roll  = 0;
-    uint8_t last_commanded_pitch = 0;
+    // Timestamp of the last EXPLICIT user command (button press / web API).
+    // The 300ms periodic TX task does NOT update this.
+    // Used by parseSuspensionStatus to block 0x738 from overwriting a freshly-
+    // commanded setting for 2 s while the damper is still physically moving.
+    uint32_t last_user_command_ms = 0;
 };
 
 // Suspension CAN diagnostics
@@ -108,6 +106,7 @@ public:
     void setSuspensionMessagingEnabled(bool enabled);
     bool isSuspensionMessagingEnabled() const;
     bool sendSuspensionCommand();  // Sends current state to 0x737
+    void notifySuspensionUserCommand();  // Call after explicit user action
     void parseSuspensionStatus(const uint8_t data[8]);  // Parse 0x738 feedback
     void parseSuspensionCommand(const uint8_t data[8]); // Sniff 0x737 from other controller
     bool isSuspensionUIDirty() const { return suspension_ui_dirty_.load(); }
