@@ -44,8 +44,8 @@ private:
     
     // Suspension interface UI
     void buildSuspensionInterfacePage(const PageConfig& page);
-    lv_obj_t* createDamperCard(lv_obj_t* parent, const char* label, const char* id);
-    lv_obj_t* createControlCard(lv_obj_t* parent, const char* label);
+    lv_obj_t* createArcGaugePanel(lv_obj_t* parent, const char* title, const char* axis_id,
+                                   lv_obj_t** arc_out, lv_obj_t** val_out);
     void updateSuspensionUI();  // Refresh UI from CAN feedback
     static void suspensionDamperEvent(lv_event_t* e);  // +/- button handler
     static void suspensionPresetEvent(lv_event_t* e);  // Preset 1-5 handler
@@ -206,20 +206,16 @@ private:
     
     // Suspension UI element tracking
     struct {
-        lv_obj_t* fl_value_label = nullptr;
-        lv_obj_t* fr_value_label = nullptr;
-        lv_obj_t* rl_value_label = nullptr;
-        lv_obj_t* rr_value_label = nullptr;
-        lv_obj_t* fl_status_label = nullptr;
-        lv_obj_t* fr_status_label = nullptr;
-        lv_obj_t* rl_status_label = nullptr;
-        lv_obj_t* rr_status_label = nullptr;
+        lv_obj_t* front_arc = nullptr;
+        lv_obj_t* rear_arc = nullptr;
+        lv_obj_t* roll_arc = nullptr;
+        lv_obj_t* pitch_arc = nullptr;
+        lv_obj_t* front_val_label = nullptr;
+        lv_obj_t* rear_val_label = nullptr;
+        lv_obj_t* roll_val_label = nullptr;
+        lv_obj_t* pitch_val_label = nullptr;
         lv_obj_t* calibrate_btn = nullptr;
         lv_obj_t* calibrate_label = nullptr;
-        lv_obj_t* front_preset_btns[5] = {nullptr, nullptr, nullptr, nullptr, nullptr};
-        lv_obj_t* rear_preset_btns[5] = {nullptr, nullptr, nullptr, nullptr, nullptr};
-        lv_obj_t* roll_btns[3] = {nullptr, nullptr, nullptr};
-        lv_obj_t* pitch_btns[3] = {nullptr, nullptr, nullptr};
     } suspension_ui_;
 
     int8_t suspension_front_preset_active_ = -1;
