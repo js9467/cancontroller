@@ -519,6 +519,13 @@ bool CanManager::sendSuspensionCommand() {
     // Get current state
     SuspensionState state = getSuspensionState();
 
+    // Hard guard: never transmit if power_on is false.
+    // Sending byte7=0x00 (OFF) fights any other device on the bus that has the TCU enabled,
+    // causing the TCU relay to toggle repeatedly (audible clicking).
+    if (!state.power_on) {
+        return true;
+    }
+
     // Build 8-byte payload for 0x737 (TCU S15 protocol):
     // Byte 0-2: Reserved (must be 0x00)
     // Byte 3: Pitch damper setting (0x01-0x05), 0x00 = no change
