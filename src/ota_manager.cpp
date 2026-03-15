@@ -616,9 +616,12 @@ bool OTAUpdateManager::checkGitHubVersions(std::vector<std::string>& versions) {
     
     Serial.printf("[OTA] Response: %d bytes\n", payload.length());
     
-    // Parse JSON array
-    DynamicJsonDocument doc(16384);  // Large enough for file list
-    auto err = deserializeJson(doc, payload);
+    // Only keep "name" from each array entry — GitHub returns ~850 bytes/file,
+    // so without a filter the doc overflows once there are ~20+ versions.
+    StaticJsonDocument<128> filter;
+    filter[0]["name"] = true;
+    DynamicJsonDocument doc(4096);  // Sufficient: 26 names × ~25 bytes each
+    auto err = deserializeJson(doc, payload, DeserializationOption::Filter(filter));
     if (err) {
         Serial.printf("[OTA] JSON parse failed: %s\n", err.c_str());
         return false;
